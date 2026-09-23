@@ -1,0 +1,20 @@
+# A VM per test, and a build boots one too: a dozen at once leaves the host
+# swapping, and a starved guest looks like a hang.
+[test-groups]
+containers = { max-threads = 4 }
+
+[[profile.default.overrides]]
+filter = 'binary(session)'
+test-group = 'containers'
+# Stuck, not slow: a container starts in about a second once unpacked.
+slow-timeout = { period = "120s", terminate-after = 3 }
+
+# A cold store downloads a kernel, pulls a base and boots a builder.
+[[profile.default.overrides]]
+filter = 'binary(build)'
+test-group = 'containers'
+slow-timeout = { period = "300s", terminate-after = 4 }
+
+[[profile.default.overrides]]
+filter = 'binary(store)'
+slow-timeout = { period = "300s", terminate-after = 4 }

@@ -41,4 +41,5 @@ swift-bridge-build = "0.1.59"
 tempfile = "3"
 
 [features]
+integration = []
 strict = []

@@ -36,6 +36,7 @@ steps = [
   {audit = {}},
   {update = {}},
   {test = {}},
+  {name = "rust: integration!", shell = "bin/dev/test-integration", verbose = true},
   {step = "git", command = "push"},
 ]
 

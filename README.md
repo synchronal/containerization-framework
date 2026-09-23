@@ -108,6 +108,20 @@ The Containerization release and the kernel are pinned separately, and a
 mismatch fails at runtime rather than at build time. `Session::version()` names
 both.
 
+## Testing
+
+`cargo nextest run` runs the unit tests.
+
+The suite in `tests/` boots real containers, so it sits behind the `integration`
+feature and runs through `bin/dev/test-integration`, which signs each test binary
+with `containerization.entitlements` first — the entitlement is checked against the
+calling process.
+
+Those tests share an image store at `~/.cache/containerization-framework-tests`,
+kept between runs. The first run fills it — a kernel download, the init image, and
+a small image built from `alpine:3` — so it needs the network; later runs reuse it.
+This directory can be deleted.
+
 ## License
 
 MIT. Containerization itself is Apache-2.0 and is fetched at build time, not

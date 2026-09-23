@@ -26,6 +26,10 @@ argv = ["cargo", "fmt", "--all"]
 argv = ["cargo", "nextest", "run"]
 tty = true
 
+[host.commands.test-integration]
+argv = ["bin/dev/test-integration"]
+tty = true
+
 # Widened deliberately, for the iterate-on-one-failing-test loop.
 [host.commands.test-one]
 arguments = true
