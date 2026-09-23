@@ -1,0 +1,44 @@
+[claude]
+seed_from_keychain = true
+
+[container]
+cpus = 4
+env = []
+memory = "8G"
+
+[host]
+clipboard = true
+
+[host.commands.audit]
+argv = ["cargo", "audit"]
+
+[host.commands.check]
+argv = ["cargo", "check", "--all-targets"]
+
+[host.commands.clippy]
+argv = ["cargo", "clippy", "--", "-D", "warnings"]
+
+[host.commands.fmt]
+argv = ["cargo", "fmt", "--all"]
+
+# Exact: no arguments, the whole suite.
+[host.commands.test]
+argv = ["cargo", "nextest", "run"]
+tty = true
+
+# Widened deliberately, for the iterate-on-one-failing-test loop.
+[host.commands.test-one]
+arguments = true
+argv = ["cargo", "nextest", "run"]
+deny = ["--config", "--manifest-path", "-Z", "-p"]
+tty = true
+
+[[paths]]
+source = ".claude/plans"
+
+[project]
+image = "compostbin/base:latest"
+name = "containerization"
+
+[workspace]
+roots = []

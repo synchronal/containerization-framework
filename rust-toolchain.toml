@@ -1,0 +1,6 @@
+# The rustup-side twin of `.tool-versions`, for anyone building this crate
+# without asdf. `rust-version` in Cargo.toml is a floor (1.98); this is the
+# toolchain the crate is developed and tested against. A `RUSTUP_TOOLCHAIN` in
+# the environment overrides it.
+[toolchain]
+channel = "1.98.1"

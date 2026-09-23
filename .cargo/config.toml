@@ -1,0 +1,12 @@
+# The Swift runtime this crate links against is dynamic and referenced as
+# `@rpath/libswift_Concurrency.dylib`, so every binary that links it —
+# including this crate's own test binaries — needs this rpath or dies in dyld
+# at launch. A rustflag is the one mechanism that reaches every kind of target,
+# so it is the only place the rpath is set; a build script emitting it as well
+# would draw `ld: duplicate -rpath ignored`.
+#
+# This file covers builds of this repository only. A crate depending on
+# `containerization-framework` needs the same rustflag in its own
+# `.cargo/config.toml`.
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
