@@ -47,4 +47,30 @@ fn boots_and_runs_processes() {
     support::MARKER,
     "the step the image was built with should be in a container booted from it"
   );
+
+  assert_eq!(
+    container.sh("hostname", "hostname").trim(),
+    container.name(),
+    "an unnamed host should take the container's name"
+  );
+  assert_eq!(
+    container.sh("resolv", "cat /etc/resolv.conf").trim(),
+    format!("nameserver {}", support::GATEWAY),
+    "a container given no DNS should resolve through its gateway"
+  );
+  assert!(
+    container
+      .sh("pid-one", "tr '\\0' ' ' < /proc/1/cmdline")
+      .starts_with("/bin/sh "),
+    "a container not asked for an init should run its first process as PID 1"
+  );
+  assert!(
+    container
+      .session()
+      .store()
+      .container_dir(container.name())
+      .join("bootlog.log")
+      .is_file(),
+    "a container given no boot log should write one in its directory"
+  );
 }

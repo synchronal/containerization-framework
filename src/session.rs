@@ -35,6 +35,9 @@ impl Session {
   pub fn boot(&self, spec: &BootSpec) -> Result<(), Error> {
     let _ = std::fs::remove_dir_all(self.store.container_dir(&spec.name));
 
+    let configuration = serde_json::to_string(&wire::Configuration::from(spec))
+      .map_err(|error| Error::failed(format!("boot {}", spec.name), error))?;
+
     let code = ffi::czbridge_boot(
       &spec.name,
       &self.store.root().display().to_string(),
@@ -51,6 +54,7 @@ impl Session {
       &wire::working_directory(spec.workdir.as_deref()),
       &spec.network.ipv4_address,
       &spec.network.ipv4_gateway,
+      &configuration,
     );
 
     checked(code)

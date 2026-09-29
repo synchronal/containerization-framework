@@ -72,6 +72,65 @@ pub struct Network {
   pub ipv4_gateway: String,
 }
 
+/// The guest's `/etc/resolv.conf`.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Dns {
+  /// IPv4 or IPv6 addresses. A hostname is refused at boot.
+  pub nameservers: Vec<String>,
+  pub domain: Option<String>,
+  pub search_domains: Vec<String>,
+  /// Written as they are, e.g. `ndots:2`.
+  pub options: Vec<String>,
+}
+
+/// One line of the guest's `/etc/hosts`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HostsEntry {
+  pub ip_address: String,
+  pub hostnames: Vec<String>,
+  pub comment: Option<String>,
+}
+
+impl HostsEntry {
+  pub fn new(ip_address: impl Into<String>, hostnames: &[&str]) -> Self {
+    Self {
+      ip_address: ip_address.into(),
+      hostnames: hostnames.iter().map(|name| name.to_string()).collect(),
+      comment: None,
+    }
+  }
+}
+
+/// Guest paths Containerization guards by default — masking some, making
+/// others read-only — and what a container does with that set.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum GuardedPaths {
+  /// The OCI standard set, as Containerization defines it: `/proc/kcore`,
+  /// `/sys/firmware` and the like.
+  #[default]
+  Default,
+  /// The standard set, and these too.
+  DefaultAnd(Vec<String>),
+  /// These alone. Empty guards nothing.
+  Only(Vec<String>),
+}
+
+/// The seccomp filter on a container's processes.
+///
+/// Only an OCI runtime installs one, so anything but `Unconfined` needs
+/// [`BootSpec::oci_runtime`], and a boot without one fails rather than run
+/// unfiltered.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum Seccomp {
+  #[default]
+  Unconfined,
+  /// containerd's allowlist, resolved against the process's capabilities.
+  Default,
+  /// The JSON of an OCI runtime spec's `linux.seccomp`, applied unvalidated. A
+  /// Docker-format profile is refused.
+  Profile(String),
+}
+
 /// A container to create and start.
 ///
 /// Mounts keep their declared order, which matters for nested paths. Sockets
@@ -96,6 +155,35 @@ pub struct BootSpec {
   /// Ceiling for an image's unpacked rootfs. Sparse, so a ceiling rather than
   /// an allocation, but no container may outgrow it.
   pub rootfs_capacity_in_bytes: u64,
+  /// `None` is the container's name.
+  pub hostname: Option<String>,
+  /// Kernel parameters set in the container, by dotted name
+  /// (`net.core.somaxconn`).
+  pub sysctl: BTreeMap<String, String>,
+  /// `None` resolves through the network's gateway.
+  pub dns: Option<Dns>,
+  /// Replaces the image's `/etc/hosts` whole, so include `localhost` when that
+  /// should still resolve. `None` keeps the image's.
+  pub hosts: Option<Vec<HostsEntry>>,
+  /// Paths hidden from the container's processes.
+  pub masked_paths: GuardedPaths,
+  /// Paths the container's processes cannot write.
+  pub readonly_paths: GuardedPaths,
+  /// Runs the first process under a minimal init that forwards signals and
+  /// reaps zombies, for a workload that does neither as PID 1.
+  pub use_init: bool,
+  /// Lets the guest run VMs of its own. Needs an M3 or later; a boot that asks
+  /// for it elsewhere fails rather than boot without it.
+  pub nested_virtualization: bool,
+  /// Where the guest's serial console is written, replaced on every boot.
+  /// `None` is `bootlog.log` in the container's directory, which the next boot
+  /// clears.
+  pub boot_log: Option<PathBuf>,
+  /// **Experimental.** An OCI runtime (`runc`) to start processes with, as a
+  /// path in the *init* filesystem rather than the image's. The stock init
+  /// image carries none.
+  pub oci_runtime: Option<String>,
+  pub seccomp: Seccomp,
 }
 
 impl BootSpec {
@@ -114,6 +202,17 @@ impl BootSpec {
       workdir: None,
       network,
       rootfs_capacity_in_bytes: Self::DEFAULT_ROOTFS_CAPACITY_IN_BYTES,
+      hostname: None,
+      sysctl: BTreeMap::new(),
+      dns: None,
+      hosts: None,
+      masked_paths: GuardedPaths::Default,
+      readonly_paths: GuardedPaths::Default,
+      use_init: false,
+      nested_virtualization: false,
+      boot_log: None,
+      oci_runtime: None,
+      seccomp: Seccomp::Unconfined,
     }
   }
 }

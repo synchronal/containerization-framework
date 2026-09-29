@@ -37,6 +37,7 @@ struct BootSpec {
     /// The guest's address on the NAT network, as CIDR.
     var ipv4Address: String
     var ipv4Gateway: String
+    var configuration: ContainerConfiguration
 }
 
 /// What `ExecSpec` carries.
@@ -158,6 +159,9 @@ enum Session {
             config.mounts += mounts
             config.sockets = sockets
             nat.join(&config)
+            // Last, so a caller's DNS or boot log beats the defaults set above
+            // and by the manager.
+            try spec.configuration.apply(to: &config)
         }
 
         try await container.create()

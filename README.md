@@ -100,7 +100,11 @@ callers.
 The framework is larger than these bindings. Not exposed: signals to a guest
 process, `LinuxPod` (several containers in one VM), container statistics,
 filesystem freeze/thaw/trim, host↔guest file copy, registry authentication and
-push, OCI layout import/export, and Rosetta (so no linux/amd64 — arm64 only).
+push, OCI layout import/export, per-process rlimits and capabilities, and Rosetta
+(so no linux/amd64 — arm64 only).
+
+An OCI runtime (and so seccomp) is configurable, but requires an init image with
+`runc`.
 
 ## Versioning
 

@@ -67,9 +67,11 @@ func czbridge_boot(
     arguments: RustStr,
     working_directory: RustStr,
     ipv4_address: RustStr,
-    ipv4_gateway: RustStr
+    ipv4_gateway: RustStr,
+    configuration: RustStr
 ) -> Int32 {
     reporting {
+        let configuration = try decoding(ContainerConfiguration.self, from: configuration)
         let spec = BootSpec(
             name: name.toString(),
             storeRoot: store_root.toString(),
@@ -85,7 +87,8 @@ func czbridge_boot(
             arguments: lines(arguments),
             workingDirectory: working_directory.toString(),
             ipv4Address: ipv4_address.toString(),
-            ipv4Gateway: ipv4_gateway.toString()
+            ipv4Gateway: ipv4_gateway.toString(),
+            configuration: configuration
         )
 
         try blocking { try await Session.boot(spec) }

@@ -24,6 +24,8 @@ pub(crate) mod ffi {
       working_directory: &str,
       ipv4_address: &str,
       ipv4_gateway: &str,
+      // JSON: `wire::Configuration`, which nests.
+      configuration: &str,
     ) -> i32;
 
     // `term` is empty for a process that gets no terminal, or whose caller

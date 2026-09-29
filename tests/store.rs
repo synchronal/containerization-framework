@@ -7,7 +7,7 @@
 
 mod support;
 
-use containerization_framework::{Builder, INITFS_REFERENCE};
+use containerization_framework as cfw;
 
 #[test]
 fn provisions_a_bootable_store() {
@@ -16,8 +16,9 @@ fn provisions_a_bootable_store() {
   assert_eq!(store.ready(), Ok(()));
   assert!(store.kernel().is_file(), "the kernel should be in the store");
   assert!(
-    store.holds(INITFS_REFERENCE),
-    "the index should name {INITFS_REFERENCE}, and holds {:?}",
+    store.holds(cfw::INITFS_REFERENCE),
+    "the index should name {}, and holds {:?}",
+    cfw::INITFS_REFERENCE,
     store.images().expect("a readable index")
   );
 }
@@ -26,7 +27,7 @@ fn provisions_a_bootable_store() {
 fn provisions_idempotently() {
   let store = support::provisioned();
 
-  Builder::new(store.clone())
+  cfw::Builder::new(store.clone())
     .provision()
     .expect("a second provision should be a cheap no-op");
 

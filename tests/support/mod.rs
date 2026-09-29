@@ -9,9 +9,7 @@
 
 #![allow(dead_code)]
 
-use containerization_framework::{
-  BootSpec, BuildPlan, BuildStep, Builder, ExecRequest, Network, Resources, Session, Shell, Stdio, Store, UNATTACHED,
-};
+use containerization_framework as cfw;
 use std::fs::File;
 use std::io::Read;
 use std::os::fd::{FromRawFd, RawFd};
@@ -56,7 +54,7 @@ const LOCK_POLL: Duration = Duration::from_millis(250);
 
 /// Virtualization.framework's built-in NAT. `.1` is the gateway, `.255` the
 /// broadcast.
-const GATEWAY: &str = "192.168.64.1";
+pub const GATEWAY: &str = "192.168.64.1";
 const PREFIX: u32 = 24;
 const FIRST_HOST: u32 = 2;
 const LAST_HOST: u32 = 250;
@@ -66,8 +64,8 @@ pub fn home() -> PathBuf {
 }
 
 /// The suite's store, named but not touched.
-pub fn store() -> Store {
-  Store::at(home().join(STORE_IN_HOME))
+pub fn store() -> cfw::Store {
+  cfw::Store::at(home().join(STORE_IN_HOME))
 }
 
 /// The same store with a kernel and the init image in it.
@@ -75,7 +73,7 @@ pub fn store() -> Store {
 /// Cheap once there is nothing to do, so every test that needs a store calls
 /// it. The lock is for a first run, where two would download into the same
 /// directory at once.
-pub fn provisioned() -> Store {
+pub fn provisioned() -> cfw::Store {
   let store = store();
   std::fs::create_dir_all(store.root()).expect("the store directory should be creatable");
 
@@ -89,7 +87,7 @@ pub fn provisioned() -> Store {
     return store;
   }
 
-  Builder::new(store.clone())
+  cfw::Builder::new(store.clone())
     .provision()
     .expect("the store should provision");
 
@@ -97,7 +95,7 @@ pub fn provisioned() -> Store {
 }
 
 /// The same store with [`TEST_IMAGE`] in it, built if it is not there already.
-pub fn image() -> Store {
+pub fn image() -> cfw::Store {
   let store = provisioned();
 
   if store.holds(TEST_IMAGE) {
@@ -116,8 +114,8 @@ pub fn image() -> Store {
 }
 
 /// [`BASE_IMAGE`] plus one step leaving something a container can read back.
-fn build_image(store: &Store) {
-  let mut plan = BuildPlan::new(
+fn build_image(store: &cfw::Store) {
+  let mut plan = cfw::BuildPlan::new(
     "cfw-test-builder",
     BASE_IMAGE,
     TEST_IMAGE,
@@ -127,22 +125,22 @@ fn build_image(store: &Store) {
   );
 
   // Alpine carries no bash, which the default shell is.
-  plan.shell = Shell(["/bin/sh", "-ec"].map(String::from).to_vec());
+  plan.shell = cfw::Shell(["/bin/sh", "-ec"].map(String::from).to_vec());
   plan.rootfs_capacity_in_bytes = TEST_ROOTFS_CAPACITY_IN_BYTES;
-  plan.steps = vec![BuildStep {
+  plan.steps = vec![cfw::BuildStep {
     name: "marker".to_string(),
     script: format!("echo {MARKER} > {MARKER_PATH}"),
     user: None,
     cache_key: "marker-0".to_string(),
   }];
 
-  Builder::new(store.clone())
+  cfw::Builder::new(store.clone())
     .build(&plan)
     .expect("the test image should build");
 }
 
-pub fn resources() -> Resources {
-  Resources {
+pub fn resources() -> cfw::Resources {
+  cfw::Resources {
     cpus: TEST_CPUS,
     memory_in_bytes: TEST_MEMORY_IN_BYTES,
   }
@@ -152,7 +150,7 @@ pub fn resources() -> Resources {
 ///
 /// Nothing hands out leases, so the caller allocates. Hashed from the name:
 /// stable per container, distinct between concurrent ones.
-pub fn network(name: &str) -> Network {
+pub fn network(name: &str) -> cfw::Network {
   // FNV-1a: short and well spread.
   let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
 
@@ -166,7 +164,7 @@ pub fn network(name: &str) -> Network {
     .rsplit_once('.')
     .expect("the gateway is a dotted quad");
 
-  Network {
+  cfw::Network {
     ipv4_address: format!("{subnet}.{host}/{PREFIX}"),
     ipv4_gateway: GATEWAY.to_string(),
   }
@@ -177,7 +175,7 @@ pub fn network(name: &str) -> Network {
 /// The VM dies with this process whatever happens here, so dropping one is
 /// about the store: its rootfs clone would otherwise be left behind per run.
 pub struct Container {
-  session: Session,
+  session: cfw::Session,
   name: String,
 }
 
@@ -190,7 +188,18 @@ impl Container {
   /// concurrent tests would each do it again. So the unpack alone is
   /// serialized: a boot that finds it done waits for nobody.
   pub fn boot(name: &str) -> Self {
-    let session = Session::new(image());
+    Self::boot_with(name, |_| {})
+  }
+
+  /// The same, with the spec changed by `configure` before it boots.
+  pub fn boot_with(name: &str, configure: impl FnOnce(&mut cfw::BootSpec)) -> Self {
+    Self::try_boot_with(name, configure).unwrap_or_else(|error| panic!("{name} should boot: {error}"))
+  }
+
+  /// The same, reporting a boot that fails rather than panicking. The
+  /// container's directory goes either way.
+  pub fn try_boot_with(name: &str, configure: impl FnOnce(&mut cfw::BootSpec)) -> Result<Self, cfw::Error> {
+    let session = cfw::Session::new(image());
     let mut unpacking = None;
 
     if !is_unpacked(&session) {
@@ -202,7 +211,7 @@ impl Container {
       }
     }
 
-    let mut spec = BootSpec::new(name, TEST_IMAGE, resources(), network(name));
+    let mut spec = cfw::BootSpec::new(name, TEST_IMAGE, resources(), network(name));
 
     spec.rootfs_capacity_in_bytes = TEST_ROOTFS_CAPACITY_IN_BYTES;
 
@@ -212,21 +221,24 @@ impl Container {
       .map(String::from)
       .to_vec();
 
-    session
-      .boot(&spec)
-      .unwrap_or_else(|error| panic!("{name} should boot: {error}"));
+    configure(&mut spec);
+
+    let booted = session.boot(&spec);
 
     // Dropped here, not at the end of the test: the next boot waits on the
     // unpack, not on this container.
     drop(unpacking);
 
-    Self {
+    let container = Self {
       session,
       name: name.to_string(),
-    }
+    };
+
+    // Returned only now, so a failed boot's directory goes with `container`.
+    booted.map(|_| container)
   }
 
-  pub fn session(&self) -> &Session {
+  pub fn session(&self) -> &cfw::Session {
     &self.session
   }
 
@@ -238,14 +250,14 @@ impl Container {
   pub fn exec(&self, id: &str, arguments: &[&str]) -> i32 {
     self
       .session
-      .exec(&ExecRequest::new(
+      .exec(&cfw::ExecRequest::new(
         &self.name,
         id,
         arguments
           .iter()
           .map(|argument| argument.to_string())
           .collect(),
-        Stdio::nothing(),
+        cfw::Stdio::nothing(),
       ))
       .unwrap_or_else(|error| panic!("{arguments:?} should run in {}: {error}", self.name))
   }
@@ -257,16 +269,16 @@ impl Container {
   /// process exits, so what is run must write less than a pipe holds.
   pub fn capture(&self, id: &str, arguments: &[&str]) -> String {
     let pipe = Pipe::new();
-    let stdio = Stdio {
-      terminal: UNATTACHED,
-      stdin: UNATTACHED,
+    let stdio = cfw::Stdio {
+      terminal: cfw::UNATTACHED,
+      stdin: cfw::UNATTACHED,
       stdout: pipe.write,
-      stderr: UNATTACHED,
+      stderr: cfw::UNATTACHED,
     };
 
     let code = self
       .session
-      .exec(&ExecRequest::new(
+      .exec(&cfw::ExecRequest::new(
         &self.name,
         id,
         arguments
@@ -281,6 +293,11 @@ impl Container {
 
     pipe.drain()
   }
+
+  /// What a `/bin/sh` script wrote to stdout, which it must exit 0 from.
+  pub fn sh(&self, id: &str, script: &str) -> String {
+    self.capture(id, &["/bin/sh", "-c", script])
+  }
 }
 
 impl Drop for Container {
@@ -291,7 +308,7 @@ impl Drop for Container {
 
 /// Whether a boot would clone a rootfs rather than unpack one. A store that
 /// cannot say counts as not unpacked; the boot after it reports what is wrong.
-fn is_unpacked(session: &Session) -> bool {
+fn is_unpacked(session: &cfw::Session) -> bool {
   session.is_unpacked(TEST_IMAGE).unwrap_or(false)
 }
 
