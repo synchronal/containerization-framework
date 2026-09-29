@@ -11,10 +11,10 @@ import PackageDescription
 // directory is unspecified.
 let bridgingHeader = "\(URL(fileURLWithPath: #filePath).deletingLastPathComponent().path)/Sources/ContainerizationBridge/bridging-header.h"
 
-// Pinned exactly: the initfs in the `container` CLI's store (`vminit:0.45.0`)
+// Pinned exactly: the initfs in the `container` CLI's store (`vminit:0.47.0`)
 // carries a guest agent speaking that release's protocol. A newer library is a
 // runtime mismatch, not a compile error.
-let containerization: Version = "0.45.0"
+let containerization: Version = "0.47.0"
 
 let package = Package(
     name: "ContainerizationBridge",

@@ -253,7 +253,8 @@ enum Build {
                 plan.name,
                 image: base,
                 rootfs: block,
-                networking: false
+                networking: false,
+                vm: vmResources(cpus: plan.cpus, memoryInBytes: plan.memoryInBytes)
             ) { config in
                 config.cpus = plan.cpus
                 config.memoryInBytes = plan.memoryInBytes

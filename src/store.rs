@@ -25,7 +25,7 @@ const CONTAINERS: &str = "containers";
 /// and a mismatch fails at runtime, not build time.
 macro_rules! initfs_version {
   () => {
-    "0.45.0"
+    "0.47.0"
   };
 }
 

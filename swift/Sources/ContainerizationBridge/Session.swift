@@ -83,6 +83,15 @@ struct NAT {
     }
 }
 
+/// The VM a container of this size boots in, shared by sessions and builders.
+///
+/// Since 0.47.0 the library sizes the VM separately from the container's
+/// cgroup limits, and no longer adds headroom itself. This keeps the headroom
+/// it used to add: a core, and the guest kernel's and vminitd's memory.
+func vmResources(cpus: Int, memoryInBytes: UInt64) -> VMResources {
+    VMResources(cpus: cpus + 1, memoryInBytes: memoryInBytes + VMResources.guestMemoryOverhead)
+}
+
 /// The store's `containers` directory, shared by sessions and builders.
 func containers(in root: URL) -> URL {
     root.appending(path: "containers")
@@ -138,7 +147,8 @@ enum Session {
             spec.name,
             image: image,
             rootfs: rootfs,
-            networking: false
+            networking: false,
+            vm: vmResources(cpus: spec.cpus, memoryInBytes: spec.memoryInBytes)
         ) { config in
             config.cpus = spec.cpus
             config.memoryInBytes = spec.memoryInBytes
