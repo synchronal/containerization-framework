@@ -18,6 +18,8 @@ checks = [
   {name = "rust: check", shell = "cargo check --features strict --color always", remedy = "cargo fix --allow-dirty"},
   {name = "rust: clippy", shell = "cargo clippy -- -D warnings", remedy = "cargo clippy --fix --allow-dirty"},
   {check = "rust", command = "format-check"},
+  {name = "swift: format", shell = "bin/dev/format-swift --check", remedy = "bin/dev/format-swift --all"},
+  {name = "swift: lint", shell = "bin/dev/lint-swift"},
 ]
 
 [outdated]

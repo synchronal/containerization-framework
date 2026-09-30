@@ -20,106 +20,106 @@ import Foundation
 import SystemPackage
 
 struct ProvisionSpec: Sendable {
-    var storeRoot: String
-    /// Where the kernel is downloaded to, if nothing is there.
-    var kernelPath: String
-    var kernelURL: String
-    /// The kernel's path inside the downloaded archive.
-    var kernelInArchive: String
-    var initfsReference: String
-    /// Where the init image is unpacked to, if nothing is there.
-    var initfsPath: String
+  var storeRoot: String
+  /// Where the kernel is downloaded to, if nothing is there.
+  var kernelPath: String
+  var kernelURL: String
+  /// The kernel's path inside the downloaded archive.
+  var kernelInArchive: String
+  var initfsReference: String
+  /// Where the init image is unpacked to, if nothing is there.
+  var initfsPath: String
 }
 
 enum Provision {
-    static func run(_ spec: ProvisionSpec) async throws {
-        let root = URL(filePath: spec.storeRoot)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  static func run(_ spec: ProvisionSpec) async throws {
+    let root = URL(filePath: spec.storeRoot)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        async let kernel: Void = kernel(spec)
-        async let initfs: Void = initfs(spec, root: root)
+    async let kernel: Void = kernel(spec)
+    async let initfs: Void = initfs(spec, root: root)
 
-        _ = try await (kernel, initfs)
+    _ = try await (kernel, initfs)
+  }
+
+  /// Downloads and unpacks the kernel, unless it is already there.
+  private static func kernel(_ spec: ProvisionSpec) async throws {
+    let destination = URL(filePath: spec.kernelPath)
+
+    guard !FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) else {
+      return
     }
 
-    /// Downloads and unpacks the kernel, unless it is already there.
-    private static func kernel(_ spec: ProvisionSpec) async throws {
-        let destination = URL(filePath: spec.kernelPath)
-
-        guard !FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) else {
-            return
-        }
-
-        guard let url = URL(string: spec.kernelURL) else {
-            throw BridgeError.malformed("kernel url", spec.kernelURL)
-        }
-
-        note("downloading a kernel from \(url.absoluteString)")
-
-        // To a file, not memory: the archive is hundreds of megabytes and only
-        // one entry is wanted.
-        let (archive, response) = try await URLSession.shared.download(from: url)
-
-        defer { try? FileManager.default.removeItem(at: archive) }
-
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw BridgeError.kernelUnavailable(url.absoluteString, status)
-        }
-
-        note("unpacking \(spec.kernelInArchive)")
-
-        let binary = try extract(spec.kernelInArchive, from: archive)
-
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        // Written aside and moved, so an interrupted provision never leaves a
-        // half-written kernel that looks complete.
-        let partial = destination.appendingPathExtension("partial")
-        try binary.write(to: partial, options: .atomic)
-        _ = try FileManager.default.replaceItemAt(destination, withItemAt: partial)
+    guard let url = URL(string: spec.kernelURL) else {
+      throw BridgeError.malformed("kernel url", spec.kernelURL)
     }
 
-    /// Reads one file out of the archive, following a symlink: in Kata's release
-    /// `vmlinux.container` links to the versioned kernel beside it, and a link
-    /// entry has no contents.
-    private static func extract(_ path: String, from archive: URL) throws -> Data {
-        let (entry, data) = try ArchiveReader(file: archive).extractFile(path: path)
+    note("downloading a kernel from \(url.absoluteString)")
 
-        guard entry.fileType == .symbolicLink, let target = entry.symlinkTarget else {
-            guard !data.isEmpty else {
-                throw BridgeError.kernelMissing(path)
-            }
+    // To a file, not memory: the archive is hundreds of megabytes and only
+    // one entry is wanted.
+    let (archive, response) = try await URLSession.shared.download(from: url)
 
-            return data
-        }
+    defer { try? FileManager.default.removeItem(at: archive) }
 
-        // Resolved against the link's directory (`pushing` replaces outright
-        // when the target is absolute). A fresh reader, because extracting moved
-        // the old one past entries the target may precede.
-        let resolved = FilePath(path).removingLastComponent().pushing(FilePath(target)).string
-        let (_, contents) = try ArchiveReader(file: archive).extractFile(path: resolved)
-
-        guard !contents.isEmpty else {
-            throw BridgeError.kernelMissing(resolved)
-        }
-
-        return contents
+    if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
+      throw BridgeError.kernelUnavailable(url.absoluteString, status)
     }
 
-    /// Pulls and unpacks the init image, skipping whichever is done.
-    ///
-    /// `getInitImage` pulls on its own; the check exists to log first, since the
-    /// pull is the slow part of a first build and a silent wait looks like a
-    /// hang.
-    private static func initfs(_ spec: ProvisionSpec, root: URL) async throws {
-        let imageStore = try ImageStore(path: root)
+    note("unpacking \(spec.kernelInArchive)")
 
-        if (try? await imageStore.get(reference: spec.initfsReference)) == nil {
-            note("pulling \(spec.initfsReference)")
-        }
+    let binary = try extract(spec.kernelInArchive, from: archive)
 
-        _ = try await Initfs.mount(spec.initfsReference, at: URL(filePath: spec.initfsPath), in: imageStore)
+    try FileManager.default.createDirectory(
+      at: destination.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    // Written aside and moved, so an interrupted provision never leaves a
+    // half-written kernel that looks complete.
+    let partial = destination.appendingPathExtension("partial")
+    try binary.write(to: partial, options: .atomic)
+    _ = try FileManager.default.replaceItemAt(destination, withItemAt: partial)
+  }
+
+  /// Reads one file out of the archive, following a symlink: in Kata's release
+  /// `vmlinux.container` links to the versioned kernel beside it, and a link
+  /// entry has no contents.
+  private static func extract(_ path: String, from archive: URL) throws -> Data {
+    let (entry, data) = try ArchiveReader(file: archive).extractFile(path: path)
+
+    guard entry.fileType == .symbolicLink, let target = entry.symlinkTarget else {
+      guard !data.isEmpty else {
+        throw BridgeError.kernelMissing(path)
+      }
+
+      return data
     }
+
+    // Resolved against the link's directory (`pushing` replaces outright
+    // when the target is absolute). A fresh reader, because extracting moved
+    // the old one past entries the target may precede.
+    let resolved = FilePath(path).removingLastComponent().pushing(FilePath(target)).string
+    let (_, contents) = try ArchiveReader(file: archive).extractFile(path: resolved)
+
+    guard !contents.isEmpty else {
+      throw BridgeError.kernelMissing(resolved)
+    }
+
+    return contents
+  }
+
+  /// Pulls and unpacks the init image, skipping whichever is done.
+  ///
+  /// `getInitImage` pulls on its own; the check exists to log first, since the
+  /// pull is the slow part of a first build and a silent wait looks like a
+  /// hang.
+  private static func initfs(_ spec: ProvisionSpec, root: URL) async throws {
+    let imageStore = try ImageStore(path: root)
+
+    if (try? await imageStore.get(reference: spec.initfsReference)) == nil {
+      note("pulling \(spec.initfsReference)")
+    }
+
+    _ = try await Initfs.mount(spec.initfsReference, at: URL(filePath: spec.initfsPath), in: imageStore)
+  }
 }

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+format_swift() {
+  find ./swift -name '*.swift' -not -path './target' -exec swift-format format --configuration .swift-format.json -i {} \;
+}
+
+check_swift() {
+  contents="$(find ./swift -name '*.swift' -not -path './target' -exec cat \{\} \;)"
+  formatted="$(find ./swift -name '*.swift' -not -path './target' -exec swift-format format --configuration .swift-format.json \{\} \;)"
+
+  if [[ "${contents}" == "${formatted}" ]]; then
+    exit 0
+  else
+    echo "Swift files have not been properly formatted" >&2
+    exit 1
+  fi
+}
+
+case $1 in
+  --all)
+    format_swift
+    ;;
+
+  --check)
+    check_swift
+    ;;
+
+  *)
+    echo "unknown flag or file type: '$1'"
+    echo ""
+    echo "USAGE"
+    echo "  $0 --all"
+    echo "  $0 --check"
+    exit 1
+    ;;
+
+esac

@@ -14,43 +14,43 @@ import ContainerizationOCI
 import Synchronization
 
 struct Booted {
-    /// Held because dropping it drops the network interface.
-    let manager: ContainerManager
-    let container: LinuxContainer
-    /// The image's process configuration, chiefly its user.
-    ///
-    /// `ContainerManager.create` seeds the first process from this, but
-    /// `LinuxContainer.exec` starts from a bare config running as root, so each
-    /// attach seeds itself from this copy.
-    let imageConfig: ImageConfig?
+  /// Held because dropping it drops the network interface.
+  let manager: ContainerManager
+  let container: LinuxContainer
+  /// The image's process configuration, chiefly its user.
+  ///
+  /// `ContainerManager.create` seeds the first process from this, but
+  /// `LinuxContainer.exec` starts from a bare config running as root, so each
+  /// attach seeds itself from this copy.
+  let imageConfig: ImageConfig?
 }
 
 /// Accessed concurrently: bridged calls arrive on one Rust thread per attached
 /// terminal.
 final class Sessions: Sendable {
-    static let shared = Sessions()
+  static let shared = Sessions()
 
-    private let booted = Mutex<[String: Booted]>([:])
-    /// Keyed by exec id, which the bridge makes unique per attach.
-    private let processes = Mutex<[String: LinuxProcess]>([:])
+  private let booted = Mutex<[String: Booted]>([:])
+  /// Keyed by exec id, which the bridge makes unique per attach.
+  private let processes = Mutex<[String: LinuxProcess]>([:])
 
-    func insert(_ name: String, _ session: Booted) {
-        booted.withLock { $0[name] = session }
-    }
+  func insert(_ name: String, _ session: Booted) {
+    booted.withLock { $0[name] = session }
+  }
 
-    func get(_ name: String) -> Booted? {
-        booted.withLock { $0[name] }
-    }
+  func get(_ name: String) -> Booted? {
+    booted.withLock { $0[name] }
+  }
 
-    func insert(process: LinuxProcess, id: String) {
-        processes.withLock { $0[id] = process }
-    }
+  func insert(process: LinuxProcess, id: String) {
+    processes.withLock { $0[id] = process }
+  }
 
-    func process(_ id: String) -> LinuxProcess? {
-        processes.withLock { $0[id] }
-    }
+  func process(_ id: String) -> LinuxProcess? {
+    processes.withLock { $0[id] }
+  }
 
-    func remove(process id: String) {
-        _ = processes.withLock { $0.removeValue(forKey: id) }
-    }
+  func remove(process id: String) {
+    _ = processes.withLock { $0.removeValue(forKey: id) }
+  }
 }

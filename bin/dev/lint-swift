@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+check_swift() {
+  output="$(find . -name '*.swift' -not -path './target/*' -exec swift-format lint --configuration .swift-format.json -s {} 2>&1 \;)"
+
+  if [[ -z "${output}" ]]; then
+    exit 0
+  else
+    echo -e "Swift-format lint produced errors!" >&2
+    echo >&2
+    echo "${output}" >&2
+    exit 1
+  fi
+}
+
+check_swift

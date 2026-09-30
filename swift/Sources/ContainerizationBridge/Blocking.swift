@@ -9,23 +9,23 @@ import Foundation
 /// Rust calls in on its own threads, never on Swift's cooperative pool, so
 /// blocking here cannot deadlock the executor the body runs on.
 func blocking<T>(_ body: @escaping @Sendable () async throws -> T) throws -> T {
-    let semaphore = DispatchSemaphore(value: 0)
-    nonisolated(unsafe) var outcome: Result<T, any Error>?
+  let semaphore = DispatchSemaphore(value: 0)
+  nonisolated(unsafe) var outcome: Result<T, any Error>?
 
-    Task.detached {
-        do {
-            outcome = .success(try await body())
-        } catch {
-            outcome = .failure(error)
-        }
-        semaphore.signal()
+  Task.detached {
+    do {
+      outcome = .success(try await body())
+    } catch {
+      outcome = .failure(error)
     }
+    semaphore.signal()
+  }
 
-    semaphore.wait()
+  semaphore.wait()
 
-    guard let outcome else {
-        throw BridgeError.noOutcome
-    }
+  guard let outcome else {
+    throw BridgeError.noOutcome
+  }
 
-    return try outcome.get()
+  return try outcome.get()
 }
