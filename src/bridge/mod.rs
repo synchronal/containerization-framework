@@ -166,7 +166,13 @@ pub(crate) mod ffi {
   extern "Swift" {
     fn czbridge_last_error() -> String;
 
-    fn czbridge_boot(spec: RustBootSpec, store_root: &str, kernel_path: &str, initfs_reference: &str) -> i32;
+    fn czbridge_boot(
+      spec: RustBootSpec,
+      store_root: &str,
+      kernel_path: &str,
+      initfs_reference: &str,
+      initfs_path: &str,
+    ) -> i32;
 
     // Each descriptor is `-1` when the caller leaves it unattached.
     fn czbridge_exec(
@@ -179,7 +185,13 @@ pub(crate) mod ffi {
       stderr: i32,
     ) -> i32;
 
-    fn czbridge_build(plan: RustBuildPlan, store_root: &str, kernel_path: &str, initfs_reference: &str) -> i32;
+    fn czbridge_build(
+      plan: RustBuildPlan,
+      store_root: &str,
+      kernel_path: &str,
+      initfs_reference: &str,
+      initfs_path: &str,
+    ) -> i32;
 
     fn czbridge_provision(
       store_root: &str,
@@ -187,6 +199,7 @@ pub(crate) mod ffi {
       kernel_url: &str,
       kernel_in_archive: &str,
       initfs_reference: &str,
+      initfs_path: &str,
     ) -> i32;
 
     fn czbridge_resize(id: &str, terminal: i32) -> i32;

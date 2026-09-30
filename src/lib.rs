@@ -50,7 +50,9 @@ mod unsupported;
 pub use crate::error::Error;
 pub use crate::model::{BootSpec, BuildPlan, BuildStep, CachePolicy, Shell};
 pub use crate::stdio::{Stdio, UNATTACHED, is_tty, lend};
-pub use crate::store::{INITFS_REFERENCE, INITFS_VERSION, KERNEL_VERSION, Store, StoreError};
+pub use crate::store::{
+  INITFS_REFERENCE, INITFS_VERSION, KERNEL_IN_ARCHIVE, KERNEL_URL, KERNEL_VERSION, Store, StoreError,
+};
 
 #[cfg(target_os = "macos")]
 pub use crate::builder::Builder;

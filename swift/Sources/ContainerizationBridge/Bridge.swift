@@ -46,14 +46,16 @@ func czbridge_boot(
     spec: RustBootSpec,
     store_root: RustStr,
     kernel_path: RustStr,
-    initfs_reference: RustStr
+    initfs_reference: RustStr,
+    initfs_path: RustStr
 ) -> Int32 {
     reporting {
         let spec = try BootSpec(
             spec,
             storeRoot: store_root.toString(),
             kernelPath: kernel_path.toString(),
-            initfsReference: initfs_reference.toString()
+            initfsReference: initfs_reference.toString(),
+            initfsPath: initfs_path.toString()
         )
 
         try blocking { try await Session.boot(spec) }
@@ -67,14 +69,16 @@ func czbridge_build(
     plan: RustBuildPlan,
     store_root: RustStr,
     kernel_path: RustStr,
-    initfs_reference: RustStr
+    initfs_reference: RustStr,
+    initfs_path: RustStr
 ) -> Int32 {
     reporting {
         let plan = try BuildPlan(
             plan,
             storeRoot: store_root.toString(),
             kernelPath: kernel_path.toString(),
-            initfsReference: initfs_reference.toString()
+            initfsReference: initfs_reference.toString(),
+            initfsPath: initfs_path.toString()
         )
 
         try blocking { try await Build.run(plan) }
@@ -89,7 +93,8 @@ func czbridge_provision(
     kernel_path: RustStr,
     kernel_url: RustStr,
     kernel_in_archive: RustStr,
-    initfs_reference: RustStr
+    initfs_reference: RustStr,
+    initfs_path: RustStr
 ) -> Int32 {
     reporting {
         let spec = ProvisionSpec(
@@ -97,7 +102,8 @@ func czbridge_provision(
             kernelPath: kernel_path.toString(),
             kernelURL: kernel_url.toString(),
             kernelInArchive: kernel_in_archive.toString(),
-            initfsReference: initfs_reference.toString()
+            initfsReference: initfs_reference.toString(),
+            initfsPath: initfs_path.toString()
         )
 
         try blocking { try await Provision.run(spec) }

@@ -66,9 +66,21 @@ pub fn home() -> PathBuf {
   PathBuf::from(std::env::var("HOME").expect("a test runs with a home"))
 }
 
-/// The suite's store, named but not touched.
+/// The suite's store, named but not touched. Kernel and init image paths carry
+/// their versions, so a pin change fetches new ones.
 pub fn store() -> cfw::Store {
-  cfw::Store::at(home().join(STORE_IN_HOME))
+  let root = home().join(STORE_IN_HOME);
+
+  cfw::Store::at(
+    &root,
+    root
+      .join("kernels")
+      .join(format!("vmlinux-{}", cfw::KERNEL_VERSION)),
+    cfw::INITFS_REFERENCE,
+    root
+      .join("initfs")
+      .join(format!("vminit-{}.ext4", cfw::INITFS_VERSION)),
+  )
 }
 
 /// The same store with a kernel and the init image in it.

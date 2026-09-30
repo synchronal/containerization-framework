@@ -7,7 +7,14 @@ framework: Linux containers.
 use containerization_framework as cfw;
 use cfw::model::{Dns, LinuxProcessConfiguration, NatInterface, VmResources};
 
-let session = cfw::Session::new(cfw::Store::at("/Users/me/.cache/containers"));
+let cache = std::path::Path::new("/Users/me/.cache/containers");
+let store = cfw::Store::at(
+    cache,
+    cache.join(format!("vmlinux-{}", cfw::KERNEL_VERSION)),
+    cfw::INITFS_REFERENCE,
+    cache.join(format!("vminit-{}.ext4", cfw::INITFS_VERSION)),
+);
+let session = cfw::Session::new(store);
 
 let mut spec = cfw::BootSpec::new("example", "docker.io/library/debian:stable-slim");
 spec.vm = VmResources { cpus: 4, memory_in_bytes: (4 << 30) + VmResources::GUEST_MEMORY_OVERHEAD };
@@ -108,7 +115,7 @@ push, OCI layout import/export, per-process rlimits and capabilities, and Rosett
 (so no linux/amd64 — arm64 only).
 
 An OCI runtime (and so seccomp) is configurable, but requires an init image with
-`runc`, which Apple does not publish. `Store::with_initfs_reference` boots one.
+`runc`, which Apple does not publish. Pass one's reference to `Store::at`.
 
 ## Versioning
 
@@ -116,12 +123,12 @@ The Containerization release and the kernel are pinned separately, and a
 mismatch fails at runtime rather than at build time. `Session::version()` names
 both.
 
-A store boots Apple's `vminit` for the pinned release, or another image via
-`Store::with_initfs_reference` (its `vminitd` must match that release).
-
-As in Containerization, the init image is unpacked once per store, to
-`Store::initfs()`, and reused whatever image it came from. **Delete it after
-upgrading or switching images**, or VMs keep booting the old guest agent.
+The pins are public (`KERNEL_VERSION`, `KERNEL_URL`, `INITFS_VERSION`,
+`INITFS_REFERENCE`). As in Containerization, the caller chooses where the kernel
+and unpacked init image live (`Store::at`). Provisioning fills empty paths and
+leaves existing files alone, so name paths for the pinned versions, as above,
+to pick up upgrades. Another init image must carry the pinned release's
+`vminitd`.
 
 ## Testing
 

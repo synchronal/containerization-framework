@@ -42,6 +42,7 @@ impl Session {
       &self.store.root().display().to_string(),
       &self.store.kernel().display().to_string(),
       self.store.initfs_reference(),
+      &self.store.initfs().display().to_string(),
     );
 
     checked(code)

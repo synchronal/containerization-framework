@@ -1,9 +1,7 @@
 #![cfg(feature = "integration")]
 
-//! Which init image a VM boots.
-//!
-//! As in Containerization, a store unpacks its init image once, to
-//! `initfs.ext4`, and boots that file from then on.
+//! Which kernel and init image a VM boots: the ones at the paths its store
+//! names.
 
 mod support;
 
@@ -11,28 +9,37 @@ use containerization_framework as cfw;
 use support::Container;
 
 #[test]
-fn boots_the_init_image_unpacked_into_the_store() {
+fn boots_the_kernel_and_init_image_at_the_stores_paths() {
   let container = Container::boot("cfw-test-initfs");
+  let store = container.session().store();
 
   assert_eq!(container.exec("true", &["/bin/true"]), 0);
   assert!(
-    container.session().store().initfs().is_file(),
-    "the init image should be unpacked where Containerization puts it"
+    store.kernel().is_file(),
+    "the kernel should be at {}",
+    store.kernel().display()
+  );
+  assert!(
+    store.initfs().is_file(),
+    "the init image should be unpacked to {}",
+    store.initfs().display()
   );
 }
 
-/// The default image by digest: the only other reference available without
-/// publishing our own.
+/// The pinned image by digest: the only other init image we have.
 #[test]
-fn boots_the_init_image_its_store_is_given() {
+fn boots_the_init_image_where_the_caller_puts_it() {
+  let unpacked = tempfile::tempdir().expect("a temporary directory");
+  let initfs = unpacked.path().join("vminit-pinned.ext4");
+
   let store = support::image();
   let digest = support::digest(&store, cfw::INITFS_REFERENCE);
   let (repository, _) = cfw::INITFS_REFERENCE
     .rsplit_once(':')
-    .expect("the default init image is tagged");
+    .expect("the pinned init image is tagged");
   let by_digest = format!("{repository}@{digest}");
 
-  let pinned = store.clone().with_initfs_reference(&by_digest);
+  let pinned = cfw::Store::at(store.root(), store.kernel(), &by_digest, &initfs);
 
   cfw::Builder::new(pinned.clone())
     .provision()
@@ -41,6 +48,11 @@ fn boots_the_init_image_its_store_is_given() {
     pinned.ready(),
     Ok(()),
     "a store is ready once it holds the image it boots"
+  );
+  assert!(
+    initfs.is_file(),
+    "provisioning should unpack the init image to {}",
+    initfs.display()
   );
 
   let container = Container::try_boot_in(pinned, "cfw-test-initfs-pinned", |_| {})

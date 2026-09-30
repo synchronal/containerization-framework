@@ -61,6 +61,7 @@ struct BuildPlan: Sendable {
     var storeRoot: String
     var kernelPath: String
     var initfsReference: String
+    var initfsPath: String
     /// The image every step runs on top of, registry-qualified.
     var base: String
     /// What the finished image is registered as.
@@ -95,11 +96,18 @@ struct BuildPlan: Sendable {
     /// Delete unreferenced blobs and unpacked rootfs once the image is stored.
     var reclaim: Bool
 
-    init(_ plan: RustBuildPlanRef, storeRoot: String, kernelPath: String, initfsReference: String) throws {
+    init(
+        _ plan: RustBuildPlanRef,
+        storeRoot: String,
+        kernelPath: String,
+        initfsReference: String,
+        initfsPath: String
+    ) throws {
         name = plan.name().toString()
         self.storeRoot = storeRoot
         self.kernelPath = kernelPath
         self.initfsReference = initfsReference
+        self.initfsPath = initfsPath
         base = plan.base().toString()
         tag = plan.tag().toString()
         cpus = Int(plan.cpus())
@@ -270,9 +278,9 @@ enum Build {
         environment: [String]
     ) async throws {
         let kernel = Kernel(path: URL(filePath: plan.kernelPath), platform: .linuxArm)
-        var manager = try await ContainerManager(
+        var manager = try ContainerManager(
             kernel: kernel,
-            initfsReference: plan.initfsReference,
+            initfs: try await Initfs.mount(plan.initfsReference, at: URL(filePath: plan.initfsPath), in: imageStore),
             imageStore: imageStore,
             network: nil
         )

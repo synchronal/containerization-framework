@@ -8,8 +8,10 @@
   and read-only paths, init process, nested virtualization, boot log, OCI
   runtime, seccomp; block and `tmpfs` mounts; multiple interfaces with IPv6,
   MAC and MTU; process user as uid/gid/umask/groups
-- `Store::with_initfs_reference` selects the init image; `Store::initfs` is
-  where it is unpacked
+- The caller chooses where the kernel and unpacked init image live, and which
+  init image to boot. The pins (`KERNEL_URL`, `KERNEL_IN_ARCHIVE`,
+  `KERNEL_VERSION`, `INITFS_REFERENCE`, `INITFS_VERSION`) are public on every
+  platform
 - The model crosses to Swift as swift-bridge opaque types, not JSON
 
 ## Breaking
@@ -36,10 +38,25 @@ so code that boots containers or runs processes need updating.
   `permissions: Some(0o666)` to keep the old mode.
 - **Missing images are pulled.** Booting an image the store doesn't hold used to
   fail; now it downloads it.
-- **Changing the init image needs a manual step.** As in Containerization, a
-  store unpacks its init image once and reuses it. After upgrading this crate,
-  or switching images with `Store::with_initfs_reference`, delete the file at
-  `Store::initfs()`, or VMs keep running the old one.
+
+### Creating a store
+
+`Store::at` now also takes the kernel's path, the init image's reference, and
+where to unpack it; this crate no longer chooses them. Provisioning fills empty
+paths and leaves existing files alone, so name paths for the pinned versions to
+pick up upgrades:
+
+```rust
+let store = Store::at(
+    &root,
+    root.join(format!("vmlinux-{KERNEL_VERSION}")),
+    INITFS_REFERENCE,
+    root.join(format!("vminit-{INITFS_VERSION}.ext4")),
+);
+```
+
+To reuse an existing store's files, pass `root.join("kernels/default.kernel-arm64")`
+and `root.join("initfs.ext4")`.
 
 ### Booting a container
 

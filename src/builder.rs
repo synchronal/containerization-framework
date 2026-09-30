@@ -35,6 +35,7 @@ impl Builder {
       &self.store.root().display().to_string(),
       &self.store.kernel().display().to_string(),
       self.store.initfs_reference(),
+      &self.store.initfs().display().to_string(),
     );
 
     checked(code)
@@ -42,8 +43,8 @@ impl Builder {
       .map_err(|error| Error::failed(format!("build {}", plan.tag), error))
   }
 
-  /// Fetches the kernel and the init image into the store if either is
-  /// missing. Idempotent, and cheap when there is nothing to do.
+  /// Fetches the kernel to [`Store::kernel`] and unpacks the init image to
+  /// [`Store::initfs`], if missing. Idempotent and cheap.
   pub fn provision(&self) -> Result<(), Error> {
     let code = ffi::czbridge_provision(
       &self.store.root().display().to_string(),
@@ -51,6 +52,7 @@ impl Builder {
       KERNEL_URL,
       KERNEL_IN_ARCHIVE,
       self.store.initfs_reference(),
+      &self.store.initfs().display().to_string(),
     );
 
     checked(code)

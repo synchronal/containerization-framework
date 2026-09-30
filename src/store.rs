@@ -1,11 +1,14 @@
 //! Where the boot artefacts live.
 //!
 //! Containerization's `ImageStore` layout, which `ContainerManager` opens as-is:
-//! an image index in `state.json`, blobs under `content/blobs/sha256`, the
-//! kernel under `kernels`, and one rootfs per container under `containers/<id>`.
+//! an image index in `state.json`, blobs under `content/blobs/sha256`, and one
+//! rootfs per container under `containers/<id>`.
 //!
 //! Ours: `build-cache` (the builder's step snapshots) and `unpacked` (each
 //! image's rootfs, unpacked once and cloned per container).
+//!
+//! The kernel and unpacked init image live wherever the caller says, as with
+//! Containerization's `Kernel(path:)` and `ContainerManager(initfs:)`.
 //!
 //! Everything is re-creatable by `provision` and `build`, hence `~/.cache`.
 
@@ -13,13 +16,12 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-const KERNEL: &str = "kernels/default.kernel-arm64";
 /// Map of reference to OCI descriptor.
 const INDEX: &str = "state.json";
 const CONTAINERS: &str = "containers";
 
-/// The default init image: the initfs carrying `vminitd`, the agent the
-/// library talks to over vsock. [`Store::with_initfs_reference`] replaces it.
+/// The init image release this crate is pinned to: the initfs carrying
+/// `vminitd`, the agent the library talks to over vsock.
 ///
 /// Must match the `containerization` release in
 /// this crate's `swift/Package.swift`: they share a protocol,
@@ -45,9 +47,7 @@ pub const INITFS_REFERENCE: &str = concat!("ghcr.io/apple/containerization/vmini
 /// pins. Downloaded, since no one publishes a kernel as an image.
 pub const KERNEL_VERSION: &str = kernel_version!();
 
-/// Where the kernel comes from. Only the provisioner reads these, and only
-/// macOS has one.
-#[cfg(target_os = "macos")]
+/// The archive [`KERNEL_VERSION`] is published in.
 pub const KERNEL_URL: &str = concat!(
   "https://github.com/kata-containers/kata-containers/releases/download/",
   kernel_version!(),
@@ -55,16 +55,15 @@ pub const KERNEL_URL: &str = concat!(
   kernel_version!(),
   "-arm64.tar.xz"
 );
-#[cfg(target_os = "macos")]
+/// The kernel's path inside [`KERNEL_URL`]'s archive.
 pub const KERNEL_IN_ARCHIVE: &str = "opt/kata/share/kata-containers/vmlinux.container";
-
-/// Where `ContainerManager` unpacks the init image, once per store.
-const INITFS: &str = "initfs.ext4";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Store {
   root: PathBuf,
+  kernel: PathBuf,
   initfs_reference: String,
+  initfs: PathBuf,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -93,37 +92,43 @@ impl std::error::Error for StoreError {}
 
 impl Store {
   /// Names a store without touching it; the first `build` provisions it.
-  /// Its VMs boot [`INITFS_REFERENCE`].
-  pub fn at(root: impl Into<PathBuf>) -> Self {
+  ///
+  /// - `root`: the image store.
+  /// - `kernel`: the kernel VMs boot.
+  /// - `initfs_reference`: the init image, e.g. [`INITFS_REFERENCE`]; its
+  ///   `vminitd` must match this crate's Containerization release.
+  /// - `initfs`: where that image is unpacked and booted from.
+  ///
+  /// Provisioning fills an empty path and leaves an existing file alone, so
+  /// name paths for [`KERNEL_VERSION`] and [`INITFS_VERSION`] to pick up pin
+  /// changes.
+  pub fn at(
+    root: impl Into<PathBuf>,
+    kernel: impl Into<PathBuf>,
+    initfs_reference: impl Into<String>,
+    initfs: impl Into<PathBuf>,
+  ) -> Self {
     Self {
       root: root.into(),
-      initfs_reference: INITFS_REFERENCE.to_string(),
+      kernel: kernel.into(),
+      initfs_reference: initfs_reference.into(),
+      initfs: initfs.into(),
     }
   }
 
-  /// The same store, booting the init image `reference` instead (e.g.
-  /// [`INITFS_REFERENCE`] plus `runc`). Its `vminitd` must match this crate's
-  /// Containerization release. Provisioning pulls it.
-  ///
-  /// As in Containerization, the init image is unpacked once, to
-  /// [`Store::initfs`], and reused whatever image it came from: delete that
-  /// file to switch images or pick up an upgrade.
-  pub fn with_initfs_reference(self, reference: impl Into<String>) -> Self {
-    Self {
-      initfs_reference: reference.into(),
-      ..self
-    }
+  /// The kernel this store's VMs boot.
+  pub fn kernel(&self) -> &Path {
+    &self.kernel
   }
 
-  /// The init image this store provisions and unpacks.
+  /// The init image this store provisions.
   pub fn initfs_reference(&self) -> &str {
     &self.initfs_reference
   }
 
-  /// The unpacked init image every VM boots. See
-  /// [`Store::with_initfs_reference`].
-  pub fn initfs(&self) -> PathBuf {
-    self.root.join(INITFS)
+  /// Where that init image is unpacked, and booted from.
+  pub fn initfs(&self) -> &Path {
+    &self.initfs
   }
 
   /// Whether this store holds what a boot needs, naming the first thing
@@ -133,10 +138,10 @@ impl Store {
       return Err(StoreError::Missing(self.root.clone()));
     }
 
-    if !self.kernel().is_file() {
+    if !self.kernel.is_file() {
       return Err(StoreError::Incomplete {
         root: self.root.clone(),
-        missing: format!("kernel at {KERNEL}"),
+        missing: format!("kernel at {}", self.kernel.display()),
       });
     }
 
@@ -152,10 +157,6 @@ impl Store {
 
   pub fn root(&self) -> &Path {
     &self.root
-  }
-
-  pub fn kernel(&self) -> PathBuf {
-    self.root.join(KERNEL)
   }
 
   /// A container's rootfs, kernel copy, and boot log.
@@ -195,28 +196,104 @@ impl Store {
 mod tests {
   use super::*;
 
+  const CUSTOM_INIT_IMAGE: &str = "docker.io/example/vminit:0.47.0-runc";
+
+  /// A store at `root`, its kernel and init image beside the image store.
+  fn store_at(root: &Path) -> Store {
+    Store::at(root, root.join("vmlinux"), INITFS_REFERENCE, root.join("vminit.ext4"))
+  }
+
+  /// Puts an (empty) kernel where the store boots one from.
+  fn place_kernel(store: &Store) {
+    std::fs::write(store.kernel(), "").expect("kernel");
+  }
+
+  /// As Foundation writes it, slashes escaped. An unescaped fixture hid a bug.
+  fn index_holding(reference: &str) -> String {
+    format!("{{\"{}\":{{}}}}", reference.replace('/', "\\/"))
+  }
+
+  #[test]
+  fn boots_the_kernel_and_init_image_it_is_given() {
+    let store = Store::at("/store", "/cache/vmlinux", CUSTOM_INIT_IMAGE, "/cache/vminit-runc.ext4");
+
+    assert_eq!(store.root(), Path::new("/store"));
+    assert_eq!(store.kernel(), Path::new("/cache/vmlinux"));
+    assert_eq!(store.initfs_reference(), CUSTOM_INIT_IMAGE);
+    assert_eq!(store.initfs(), Path::new("/cache/vminit-runc.ext4"));
+  }
+
   #[test]
   fn is_not_ready_before_anything_has_provisioned_it() {
     assert_eq!(
-      Store::at("/nonexistent/images").ready(),
+      store_at(Path::new("/nonexistent/images")).ready(),
       Err(StoreError::Missing(PathBuf::from("/nonexistent/images")))
+    );
+  }
+
+  #[test]
+  fn names_the_kernel_it_could_not_find() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    let store = store_at(root.path());
+
+    let error = store.ready().expect_err("a store with no kernel");
+
+    assert!(
+      error
+        .to_string()
+        .contains(&store.kernel().display().to_string()),
+      "error should name the kernel's path: {error}"
     );
   }
 
   #[test]
   fn names_the_reference_it_could_not_find() {
     let root = tempfile::tempdir().expect("a temp dir");
-    std::fs::create_dir_all(root.path().join("kernels")).expect("kernels");
-    std::fs::write(root.path().join(KERNEL), "").expect("kernel");
+    let store = store_at(root.path());
+    place_kernel(&store);
     std::fs::write(root.path().join(INDEX), "{}").expect("index");
 
-    let error = Store::at(root.path())
-      .ready()
-      .expect_err("an incomplete store");
+    let error = store.ready().expect_err("an incomplete store");
 
     assert!(
       error.to_string().contains(INITFS_REFERENCE),
       "error should name the missing image: {error}"
+    );
+  }
+
+  #[test]
+  fn is_ready_only_with_the_init_image_it_boots() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    let store = Store::at(
+      root.path(),
+      root.path().join("vmlinux"),
+      CUSTOM_INIT_IMAGE,
+      root.path().join("runc.ext4"),
+    );
+    place_kernel(&store);
+    std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
+
+    let error = store
+      .ready()
+      .expect_err("a store holding another init image");
+
+    assert!(
+      error.to_string().contains(CUSTOM_INIT_IMAGE),
+      "error should name the missing image: {error}"
+    );
+  }
+
+  #[test]
+  fn is_ready_when_it_holds_the_kernel_and_the_initfs() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    let store = store_at(root.path());
+    place_kernel(&store);
+    std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
+
+    store.ready().expect("a complete store");
+    assert_eq!(
+      store.container_dir("session-cb"),
+      root.path().join("containers/session-cb")
     );
   }
 
@@ -226,16 +303,11 @@ mod tests {
     let root = tempfile::tempdir().expect("a temp dir");
 
     assert_eq!(
-      Store::at(root.path())
+      store_at(root.path())
         .images()
         .expect("an empty store is readable"),
       Vec::<String>::new()
     );
-  }
-
-  /// As Foundation writes it, slashes escaped. An unescaped fixture hid a bug.
-  fn index_holding(reference: &str) -> String {
-    format!("{{\"{}\":{{}}}}", reference.replace('/', "\\/"))
   }
 
   /// As Containerization writes it: nested objects, escaped slashes, and an
@@ -249,10 +321,10 @@ mod tests {
     )
     .expect("index");
 
-    let store = Store::at(root.path());
-
     assert_eq!(
-      store.images().expect("the index should be readable"),
+      store_at(root.path())
+        .images()
+        .expect("the index should be readable"),
       ["docker.io/library/debian:stable-slim", "example/base:latest"]
     );
   }
@@ -262,7 +334,7 @@ mod tests {
     let root = tempfile::tempdir().expect("a temp dir");
     std::fs::write(root.path().join(INDEX), "{\"truncated").expect("index");
 
-    let store = Store::at(root.path());
+    let store = store_at(root.path());
 
     assert!(matches!(
       store.images(),
@@ -276,63 +348,9 @@ mod tests {
     let root = tempfile::tempdir().expect("a temp dir");
     std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
 
-    let store = Store::at(root.path());
+    let store = store_at(root.path());
 
     assert!(store.holds(INITFS_REFERENCE));
     assert!(!store.holds("ghcr.io/apple/containerization/vminit:0.0.0"));
-  }
-
-  #[test]
-  fn is_ready_when_it_holds_the_kernel_and_the_initfs() {
-    let root = tempfile::tempdir().expect("a temp dir");
-    std::fs::create_dir_all(root.path().join("kernels")).expect("kernels");
-    std::fs::write(root.path().join(KERNEL), "").expect("kernel");
-    std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
-
-    let store = Store::at(root.path());
-
-    store.ready().expect("a complete store");
-    assert_eq!(store.root(), root.path());
-    assert_eq!(store.kernel(), root.path().join(KERNEL));
-    assert_eq!(
-      store.container_dir("session-cb"),
-      root.path().join("containers/session-cb")
-    );
-  }
-
-  const CUSTOM_INIT_IMAGE: &str = "docker.io/example/vminit:0.47.0-runc";
-
-  #[test]
-  fn boots_the_default_init_image_unless_told_otherwise() {
-    let store = Store::at("/store");
-
-    assert_eq!(store.initfs_reference(), INITFS_REFERENCE);
-
-    let custom = store.with_initfs_reference(CUSTOM_INIT_IMAGE);
-    assert_eq!(custom.initfs_reference(), CUSTOM_INIT_IMAGE);
-    assert_eq!(custom.root(), Path::new("/store"), "and is the same store");
-    assert_eq!(
-      custom.initfs(),
-      Path::new("/store/initfs.ext4"),
-      "unpacked where Containerization unpacks any init image"
-    );
-  }
-
-  #[test]
-  fn is_ready_only_with_the_init_image_it_boots() {
-    let root = tempfile::tempdir().expect("a temp dir");
-    std::fs::create_dir_all(root.path().join("kernels")).expect("kernels");
-    std::fs::write(root.path().join(KERNEL), "").expect("kernel");
-    std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
-
-    let error = Store::at(root.path())
-      .with_initfs_reference(CUSTOM_INIT_IMAGE)
-      .ready()
-      .expect_err("the default init image is not the one it boots");
-
-    assert!(
-      error.to_string().contains(CUSTOM_INIT_IMAGE),
-      "error should name the missing image: {error}"
-    );
   }
 }

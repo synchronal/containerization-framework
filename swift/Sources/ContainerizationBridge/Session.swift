@@ -18,6 +18,7 @@ struct BootSpec: Sendable {
     var storeRoot: String
     var kernelPath: String
     var initfsReference: String
+    var initfsPath: String
     var id: String
     var reference: String
     /// Ceiling for the image's unpacked rootfs, which is sparse.
@@ -25,10 +26,17 @@ struct BootSpec: Sendable {
     var vm: VMResources
     var configuration: ContainerSettings
 
-    init(_ spec: RustBootSpecRef, storeRoot: String, kernelPath: String, initfsReference: String) throws {
+    init(
+        _ spec: RustBootSpecRef,
+        storeRoot: String,
+        kernelPath: String,
+        initfsReference: String,
+        initfsPath: String
+    ) throws {
         self.storeRoot = storeRoot
         self.kernelPath = kernelPath
         self.initfsReference = initfsReference
+        self.initfsPath = initfsPath
         id = spec.id().toString()
         reference = spec.reference().toString()
         rootfsSizeInBytes = spec.rootfs_size_in_bytes()
@@ -83,10 +91,11 @@ enum Session {
         // `cctl` uses) fails with VMNET_MEM_FAILURE from an unprivileged
         // process, which is why the `container` CLI runs vmnet as a separate
         // helper. Virtualization's own NAT needs no extra privilege.
-        var manager = try await ContainerManager(
+        let imageStore = try ImageStore(path: root)
+        var manager = try ContainerManager(
             kernel: kernel,
-            initfsReference: spec.initfsReference,
-            root: root,
+            initfs: try await Initfs.mount(spec.initfsReference, at: URL(filePath: spec.initfsPath), in: imageStore),
+            imageStore: imageStore,
             network: nil
         )
 
