@@ -1,6 +1,8 @@
 # Changelog
 
-# Unreleased
+## Unreleased
+
+## v0.2.0
 
 - Update Containerization to 0.47.0
 - Update configuration to match Containerization's types, names, and
@@ -14,12 +16,12 @@
   platform
 - The model crosses to Swift as swift-bridge opaque types, not JSON
 
-## Breaking
+### Breaking
 
 Container and process settings now use Containerization's types and defaults,
 so code that boots containers or runs processes need updating.
 
-### Changes with no compile errors
+#### Changes with no compile errors
 
 - **Containers no longer get DNS automatically.** Previously every container
   resolved names through the network gateway. Now nothing is written to
@@ -39,7 +41,7 @@ so code that boots containers or runs processes need updating.
 - **Missing images are pulled.** Booting an image the store doesn't hold used to
   fail; now it downloads it.
 
-### Creating a store
+#### Creating a store
 
 `Store::at` now also takes the kernel's path, the init image's reference, and
 where to unpack it; this crate no longer chooses them. Provisioning fills empty
@@ -58,7 +60,7 @@ let store = Store::at(
 To reuse an existing store's files, pass `root.join("kernels/default.kernel-arm64")`
 and `root.join("initfs.ext4")`.
 
-### Booting a container
+#### Booting a container
 
 `BootSpec::new` now takes only an id and an image; everything else is set on
 its fields, which start with Containerization's defaults.
@@ -117,19 +119,19 @@ session.exec("example", "hello", &LinuxProcessConfiguration::new(&["/bin/echo", 
 - `term` is gone. A process on a terminal gets `TERM=xterm` unless you set
   `TERM` in its environment.
 
-### Building an image
+#### Building an image
 
 `BuildPlan::new(name, base, tag, interface, base_key)` no longer takes
 resources. Set `cpus`, `memory_in_bytes` and `vm` on the plan as for a
 container. `network` is now `interface`, `rootfs_capacity_in_bytes` is
 `rootfs_size_in_bytes`, and `mounts` holds `Mount`s (`BuildMount` is gone).
 
-### Moved types
+#### Moved types
 
 `Mount`, `Direction` and the new configuration types live in `model`, not at the
 crate root. `ExecRequest`, `Network`, `Resources`, `SocketRelay` and
 `BuildMount` are gone; the table above shows their replacements.
 
-# v0.1.0
+## v0.1.0
 
 - Initial release
