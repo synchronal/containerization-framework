@@ -11,7 +11,7 @@
 /// and a mismatch fails at runtime, not build time.
 macro_rules! initfs_version {
   () => {
-    "0.47.0"
+    "0.48.0"
   };
 }
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update Containerization to 0.48.0
+
 ## v0.2.1
 
 - Off macOS, errors name what was attempted (`cannot boot session-one:

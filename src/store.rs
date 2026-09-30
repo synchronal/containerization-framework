@@ -162,7 +162,7 @@ mod tests {
   use super::*;
   use crate::pins::INITFS_REFERENCE;
 
-  const CUSTOM_INIT_IMAGE: &str = "docker.io/example/vminit:0.47.0-runc";
+  const CUSTOM_INIT_IMAGE: &str = "docker.io/example/vminit:0.48.0-runc";
 
   /// A store at `root`, its kernel and init image beside the image store.
   fn store_at(root: &Path) -> Store {
