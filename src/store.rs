@@ -167,10 +167,22 @@ impl Store {
   /// Every image the store holds, as `name:tag`, sorted. No index yet means
   /// none, not an error: that's a first run.
   pub fn images(&self) -> Result<Vec<String>, StoreError> {
+    Ok(self.references()?.into_keys().collect())
+  }
+
+  /// Whether the index names an image. An unreadable index names none.
+  pub fn holds(&self, reference: &str) -> bool {
+    self
+      .references()
+      .is_ok_and(|references| references.contains_key(reference))
+  }
+
+  /// The index's references, their descriptors skipped rather than parsed.
+  fn references(&self) -> Result<BTreeMap<String, serde::de::IgnoredAny>, StoreError> {
     let index = self.root.join(INDEX);
 
     if !index.exists() {
-      return Ok(Vec::new());
+      return Ok(BTreeMap::new());
     }
 
     let unreadable = |source: String| StoreError::Unreadable {
@@ -178,17 +190,8 @@ impl Store {
       source,
     };
     let text = std::fs::read_to_string(&index).map_err(|source| unreadable(source.to_string()))?;
-    let references: BTreeMap<String, serde_json::Value> =
-      serde_json::from_str(&text).map_err(|source| unreadable(source.to_string()))?;
 
-    Ok(references.into_keys().collect())
-  }
-
-  /// Whether the index names an image. An unreadable index names none.
-  pub fn holds(&self, reference: &str) -> bool {
-    self
-      .images()
-      .is_ok_and(|references| references.iter().any(|held| held == reference))
+    serde_json::from_str(&text).map_err(|source| unreadable(source.to_string()))
   }
 }
 
