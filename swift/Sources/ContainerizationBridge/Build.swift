@@ -11,127 +11,13 @@
 //
 // A build also removes stale builder rootfs and unreferenced blobs.
 //
-// The export is the fragile step: users, modes, symlinks, hardlinks and extended
-// attributes must survive EXT4Reader's inode reading and libarchive's pax
-// format. Only a session on the built image verifies they did.
+// The export is the fragile step; see `Ingest.swift`.
 //===----------------------------------------------------------------------===//
 
 import Containerization
-import ContainerizationEXT4
 import ContainerizationExtras
 import ContainerizationOCI
 import Foundation
-import Synchronization
-import SystemPackage
-
-/// A step's shell script, and who runs it.
-struct BuildStep: Sendable {
-    /// The step's label in the build log.
-    var name: String
-    /// The guest user, as the image names it. Root when absent.
-    var user: String?
-    var script: String
-    /// Unsalted; see `Keys`.
-    var cacheKey: String
-
-    init(_ step: RustBuildStepRef) {
-        name = step.name().toString()
-        user = step.user()?.toString()
-        script = step.script().toString()
-        cacheKey = step.cache_key().toString()
-    }
-}
-
-/// How this build treats its rootfs snapshots. Snapshots are written whether
-/// or not they are read.
-struct CachePolicy: Sendable {
-    /// Resume from the deepest matching snapshot.
-    var restore: Bool
-    /// Snapshots kept, most recently used first.
-    var keep: Int
-    /// Anything unused this long goes regardless.
-    var keepForSeconds: Double
-}
-
-/// `BuildPlan`, and the store it builds into.
-struct BuildPlan: Sendable {
-    /// The builder container's id; its store directory is removed before and
-    /// after the build.
-    var name: String
-    var storeRoot: String
-    var kernelPath: String
-    var initfsReference: String
-    var initfsPath: String
-    /// The image every step runs on top of, registry-qualified.
-    var base: String
-    /// What the finished image is registered as.
-    var tag: String
-    /// The builder's cgroup limits, and its VM.
-    var cpus: Int
-    var memoryInBytes: UInt64
-    var vm: VMResources
-    var rootfsSizeInBytes: UInt64
-    /// Shared into every step: what scripts read instead of `COPY`.
-    var mounts: [Containerization.Mount]
-    var steps: [BuildStep]
-    /// `NAME=VALUE`, written into the image config and visible to every step,
-    /// like `ENV`.
-    var environment: [String]
-    /// The finished image's OCI labels, as the caller named them.
-    var labels: [String: String]
-    /// The user and directory the finished image runs as.
-    var user: String?
-    var workingDirectory: String?
-    /// The builder's network; steps resolve through its gateway.
-    var interface: NATInterface
-    var baseKey: String
-    var cache: CachePolicy
-    /// What runs each step's script, with the script appended. Defaults to
-    /// `bash -euo pipefail -c` on the Rust side: the generated scripts chain
-    /// with `&&`, and a silent mid-step failure would be baked into the image.
-    var shell: [String]
-    /// The builder's first process. Steps are `exec`s and need the container
-    /// to outlive them; the base's `Cmd` would exit.
-    var keepalive: [String]
-    /// Delete unreferenced blobs and unpacked rootfs once the image is stored.
-    var reclaim: Bool
-
-    init(
-        _ plan: RustBuildPlanRef,
-        storeRoot: String,
-        kernelPath: String,
-        initfsReference: String,
-        initfsPath: String
-    ) throws {
-        name = plan.name().toString()
-        self.storeRoot = storeRoot
-        self.kernelPath = kernelPath
-        self.initfsReference = initfsReference
-        self.initfsPath = initfsPath
-        base = plan.base().toString()
-        tag = plan.tag().toString()
-        cpus = Int(plan.cpus())
-        memoryInBytes = plan.memory_in_bytes()
-        vm = VMResources(cpus: Int(plan.vm_cpus()), memoryInBytes: plan.vm_memory_in_bytes())
-        rootfsSizeInBytes = plan.rootfs_size_in_bytes()
-        mounts = list(plan.mounts_len()) { Containerization.Mount(plan.mounts_at($0)) }
-        steps = list(plan.steps_len()) { BuildStep(plan.steps_at($0)) }
-        environment = strings(plan.environment_len(), plan.environment_at)
-        labels = dictionary(plan.labels_len(), plan.label_key_at, plan.label_value_at)
-        user = plan.user()?.toString()
-        workingDirectory = plan.working_directory()?.toString()
-        interface = try NATInterface(plan.interface())
-        baseKey = plan.base_key().toString()
-        cache = CachePolicy(
-            restore: plan.cache_restore(),
-            keep: Int(plan.cache_keep()),
-            keepForSeconds: Double(plan.cache_keep_for_seconds())
-        )
-        shell = strings(plan.shell_len(), plan.shell_at)
-        keepalive = strings(plan.keepalive_len(), plan.keepalive_at)
-        reclaim = plan.reclaim()
-    }
-}
 
 enum Build {
     static let cacheDirectory = "build-cache"
@@ -431,93 +317,6 @@ enum Build {
         }
     }
 
-    /// Exports the built rootfs and writes it into the store as a single-layer
-    /// image, returning the index descriptor the reference points at.
-    ///
-    /// The layer is an uncompressed tar: nothing pushes this image, and an
-    /// uncompressed blob's digest is also its diffID, so both are correct in
-    /// one pass. (Containerization's `InitImage.create` has a standing `TODO`
-    /// for writing a gzip layer's compressed digest as its diffID.)
-    private static func ingest(
-        rootfs: URL,
-        plan: BuildPlan,
-        base: ImageConfig?,
-        environment: [String],
-        platform: Platform,
-        contentStore: ContentStore
-    ) async throws -> Descriptor {
-        let layer = rootfs.deletingLastPathComponent().appending(path: "layer.tar")
-        try? FileManager.default.removeItem(at: layer)
-
-        let reader = try EXT4.EXT4Reader(blockDevice: FilePath(rootfs.path(percentEncoded: false)))
-        try reader.export(archive: FilePath(layer.path(percentEncoded: false)))
-
-        let index = Box<Descriptor>()
-        let user = plan.user ?? base?.user
-        let workingDirectory = plan.workingDirectory ?? base?.workingDir
-        // The base's labels carry over, as `LABEL` does; the plan's win on a
-        // key both set.
-        let labels = (base?.labels ?? [:]).merging(plan.labels) { _, mine in mine }
-        let entrypoint = base?.entrypoint
-        let command = base?.cmd
-
-        try await contentStore.ingest { directory in
-            let writer = try ContentWriter(for: directory)
-
-            var result = try writer.create(from: layer)
-            let layerDescriptor = Descriptor(
-                mediaType: MediaTypes.imageLayer,
-                digest: result.digest.digestString,
-                size: result.size
-            )
-            let diffID = result.digest.digestString
-
-            let config = ContainerizationOCI.Image(
-                architecture: platform.architecture,
-                os: platform.os,
-                variant: platform.variant,
-                config: ImageConfig(
-                    user: user,
-                    env: environment,
-                    entrypoint: entrypoint,
-                    cmd: command,
-                    workingDir: workingDirectory,
-                    labels: labels
-                ),
-                rootfs: Rootfs(type: "layers", diffIDs: [diffID])
-            )
-            result = try writer.create(from: config)
-            let configDescriptor = Descriptor(
-                mediaType: MediaTypes.imageConfig,
-                digest: result.digest.digestString,
-                size: result.size
-            )
-
-            result = try writer.create(from: Manifest(config: configDescriptor, layers: [layerDescriptor]))
-            let manifestDescriptor = Descriptor(
-                mediaType: MediaTypes.imageManifest,
-                digest: result.digest.digestString,
-                size: result.size,
-                platform: platform
-            )
-
-            result = try writer.create(from: Index(manifests: [manifestDescriptor]))
-            index.value = Descriptor(
-                mediaType: MediaTypes.index,
-                digest: result.digest.digestString,
-                size: result.size
-            )
-        }
-
-        try? FileManager.default.removeItem(at: layer)
-
-        guard let descriptor = index.value else {
-            throw BridgeError.notIngested(plan.tag)
-        }
-
-        return descriptor
-    }
-
     /// `ENV` semantics: the plan's variables override the base's, and everything
     /// else the base declares is kept, in the base's order.
     private static func merge(_ base: [String], _ additions: [String]) -> [String] {
@@ -531,16 +330,5 @@ enum Build {
         merged.append(contentsOf: additions)
 
         return merged
-    }
-}
-
-/// Carries a result out of `ingest`'s `@Sendable` body, which cannot return one
-/// or capture a bare `Mutex`.
-private final class Box<Value: Sendable>: Sendable {
-    private let stored = Mutex<Value?>(nil)
-
-    var value: Value? {
-        get { stored.withLock { $0 } }
-        set { stored.withLock { $0 = newValue } }
     }
 }

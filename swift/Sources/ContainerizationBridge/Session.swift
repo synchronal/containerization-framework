@@ -13,38 +13,6 @@ import ContainerizationOCI
 import ContainerizationOS
 import Foundation
 
-/// `BootSpec`, and the store it boots from.
-struct BootSpec: Sendable {
-    var storeRoot: String
-    var kernelPath: String
-    var initfsReference: String
-    var initfsPath: String
-    var id: String
-    var reference: String
-    /// Ceiling for the image's unpacked rootfs, which is sparse.
-    var rootfsSizeInBytes: UInt64
-    var vm: VMResources
-    var configuration: ContainerSettings
-
-    init(
-        _ spec: RustBootSpecRef,
-        storeRoot: String,
-        kernelPath: String,
-        initfsReference: String,
-        initfsPath: String
-    ) throws {
-        self.storeRoot = storeRoot
-        self.kernelPath = kernelPath
-        self.initfsReference = initfsReference
-        self.initfsPath = initfsPath
-        id = spec.id().toString()
-        reference = spec.reference().toString()
-        rootfsSizeInBytes = spec.rootfs_size_in_bytes()
-        vm = VMResources(cpus: Int(spec.vm_cpus()), memoryInBytes: spec.vm_memory_in_bytes())
-        configuration = try ContainerSettings(spec.configuration())
-    }
-}
-
 /// A process to run in a booted session, and the descriptors it runs against.
 struct ExecRequest {
     var name: String
@@ -60,19 +28,6 @@ struct ExecRequest {
     var stdin: Int32
     var stdout: Int32
     var stderr: Int32
-}
-
-/// The store's `containers` directory, shared by sessions and builders.
-func containers(in root: URL) -> URL {
-    root.appending(path: "containers")
-}
-
-/// A container's directory (its rootfs and the library's boot log) and the
-/// rootfs within it.
-func container(_ name: String, in root: URL) -> (directory: URL, rootfs: URL) {
-    let directory = containers(in: root).appending(path: name)
-
-    return (directory, directory.appending(path: "rootfs.ext4"))
 }
 
 enum Session {

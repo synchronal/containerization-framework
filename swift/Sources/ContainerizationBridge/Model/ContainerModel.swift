@@ -1,5 +1,6 @@
 //===----------------------------------------------------------------------===//
-// The Rust model, read into Containerization's own types.
+// The Rust model, read into Containerization's own types: a container to boot,
+// and a process to run in one. `BuildModel.swift` is an image to build.
 //
 // Read once, on the calling thread, from the opaque Rust values (`RustMount`,
 // `RustBootSpec`, ...) into `Sendable` types the async work can carry. Fields
@@ -12,21 +13,6 @@ import ContainerizationOCI
 import Foundation
 // For `FilePermissions` (relayed socket mode).
 import SystemPackage
-
-/// A list Rust lends by index: `x_len`, `x_at`.
-func list<Element>(_ count: UInt, _ element: (UInt) throws -> Element) rethrows -> [Element] {
-    try (0..<count).map(element)
-}
-
-/// A list of strings Rust lends by index.
-func strings(_ count: UInt, _ element: (UInt) -> RustStr) -> [String] {
-    list(count) { element($0).toString() }
-}
-
-/// A map Rust lends by index: `x_len`, `x_key_at`, `x_value_at`.
-func dictionary(_ count: UInt, _ key: (UInt) -> RustStr, _ value: (UInt) -> RustStr) -> [String: String] {
-    Dictionary(uniqueKeysWithValues: list(count) { (key($0).toString(), value($0).toString()) })
-}
 
 extension Containerization.Mount {
     init(_ mount: RustMountRef) {
@@ -236,5 +222,37 @@ struct ContainerSettings: Sendable {
         config.ociRuntimePath = ociRuntimePath
         config.seccompProfile = seccompProfile
         config.useInit = useInit
+    }
+}
+
+/// `BootSpec`, and the store it boots from.
+struct BootSpec: Sendable {
+    var storeRoot: String
+    var kernelPath: String
+    var initfsReference: String
+    var initfsPath: String
+    var id: String
+    var reference: String
+    /// Ceiling for the image's unpacked rootfs, which is sparse.
+    var rootfsSizeInBytes: UInt64
+    var vm: VMResources
+    var configuration: ContainerSettings
+
+    init(
+        _ spec: RustBootSpecRef,
+        storeRoot: String,
+        kernelPath: String,
+        initfsReference: String,
+        initfsPath: String
+    ) throws {
+        self.storeRoot = storeRoot
+        self.kernelPath = kernelPath
+        self.initfsReference = initfsReference
+        self.initfsPath = initfsPath
+        id = spec.id().toString()
+        reference = spec.reference().toString()
+        rootfsSizeInBytes = spec.rootfs_size_in_bytes()
+        vm = VMResources(cpus: Int(spec.vm_cpus()), memoryInBytes: spec.vm_memory_in_bytes())
+        configuration = try ContainerSettings(spec.configuration())
     }
 }

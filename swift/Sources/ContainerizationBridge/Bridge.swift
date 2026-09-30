@@ -9,7 +9,7 @@
 // `@_cdecl` shims call with them, so they are part of the contract.
 //
 // Nested data crosses as opaque Rust values, read into Containerization's
-// types (`Model.swift`, `BuildPlan`) before any async work.
+// types (`Model/`) before any async work.
 //===----------------------------------------------------------------------===//
 
 import Foundation
