@@ -8,8 +8,8 @@
 // Argument labels are the Rust parameter names; swift-bridge's generated
 // `@_cdecl` shims call with them, so they are part of the contract.
 //
-// Lists cross as newline-separated strings, so no element may contain a
-// newline; `spec::lines` writes them on the Rust side.
+// Nested data crosses as opaque Rust values, read into Containerization's
+// types (`Model.swift`, `BuildPlan`) before any async work.
 //===----------------------------------------------------------------------===//
 
 import Foundation
@@ -37,58 +37,23 @@ func note(_ message: String) {
     try? FileHandle.standardError.write(contentsOf: Data("\(message)\n".utf8))
 }
 
-private func decoding<T: Decodable>(_ type: T.Type, from json: RustStr) throws -> T {
-    try JSONDecoder().decode(type, from: Data(json.toString().utf8))
-}
-
-private func lines(_ text: RustStr) -> [String] {
-    let string = text.toString()
-
-    return string.isEmpty ? [] : string.components(separatedBy: "\n")
-}
-
 func czbridge_last_error() -> String {
     lastError.withLock { $0 }
 }
 
 /// Boots a session's VM and leaves it running, owned by this process.
 func czbridge_boot(
-    name: RustStr,
+    spec: RustBootSpec,
     store_root: RustStr,
     kernel_path: RustStr,
-    initfs_reference: RustStr,
-    image_reference: RustStr,
-    cpus: Int32,
-    memory_in_bytes: UInt64,
-    rootfs_capacity_in_bytes: UInt64,
-    mounts: RustStr,
-    sockets: RustStr,
-    environment: RustStr,
-    arguments: RustStr,
-    working_directory: RustStr,
-    ipv4_address: RustStr,
-    ipv4_gateway: RustStr,
-    configuration: RustStr
+    initfs_reference: RustStr
 ) -> Int32 {
     reporting {
-        let configuration = try decoding(ContainerConfiguration.self, from: configuration)
-        let spec = BootSpec(
-            name: name.toString(),
+        let spec = try BootSpec(
+            spec,
             storeRoot: store_root.toString(),
             kernelPath: kernel_path.toString(),
-            initfsReference: initfs_reference.toString(),
-            imageReference: image_reference.toString(),
-            cpus: Int(cpus),
-            memoryInBytes: memory_in_bytes,
-            rootfsCapacityInBytes: rootfs_capacity_in_bytes,
-            mounts: lines(mounts),
-            sockets: lines(sockets),
-            environment: lines(environment),
-            arguments: lines(arguments),
-            workingDirectory: working_directory.toString(),
-            ipv4Address: ipv4_address.toString(),
-            ipv4Gateway: ipv4_gateway.toString(),
-            configuration: configuration
+            initfsReference: initfs_reference.toString()
         )
 
         try blocking { try await Session.boot(spec) }
@@ -98,12 +63,19 @@ func czbridge_boot(
 }
 
 /// Builds an image from a plan, with no builder and no daemon.
-///
-/// The plan crosses as JSON because it nests and build steps are arbitrary
-/// shell that may contain newlines.
-func czbridge_build(plan: RustStr) -> Int32 {
+func czbridge_build(
+    plan: RustBuildPlan,
+    store_root: RustStr,
+    kernel_path: RustStr,
+    initfs_reference: RustStr
+) -> Int32 {
     reporting {
-        let plan = try decoding(BuildPlan.self, from: plan)
+        let plan = try BuildPlan(
+            plan,
+            storeRoot: store_root.toString(),
+            kernelPath: kernel_path.toString(),
+            initfsReference: initfs_reference.toString()
+        )
 
         try blocking { try await Build.run(plan) }
 
@@ -112,9 +84,21 @@ func czbridge_build(plan: RustStr) -> Int32 {
 }
 
 /// Puts a kernel and an init image in the store, fetching whatever is missing.
-func czbridge_provision(spec: RustStr) -> Int32 {
+func czbridge_provision(
+    store_root: RustStr,
+    kernel_path: RustStr,
+    kernel_url: RustStr,
+    kernel_in_archive: RustStr,
+    initfs_reference: RustStr
+) -> Int32 {
     reporting {
-        let spec = try decoding(ProvisionSpec.self, from: spec)
+        let spec = ProvisionSpec(
+            storeRoot: store_root.toString(),
+            kernelPath: kernel_path.toString(),
+            kernelURL: kernel_url.toString(),
+            kernelInArchive: kernel_in_archive.toString(),
+            initfsReference: initfs_reference.toString()
+        )
 
         try blocking { try await Provision.run(spec) }
 
@@ -126,33 +110,21 @@ func czbridge_provision(spec: RustStr) -> Int32 {
 /// exit code.
 ///
 /// `terminal` is a descriptor in this process: its own, or one a joining caller
-/// passed over the control socket. `-1` runs without a terminal. An empty
-/// `user` means the image's default, and an empty `term` leaves `TERM` to the
-/// image.
+/// passed over the control socket. `-1` runs without a terminal.
 func czbridge_exec(
     name: RustStr,
     id: RustStr,
-    arguments: RustStr,
-    environment: RustStr,
-    user: RustStr,
-    working_directory: RustStr,
-    term: RustStr,
+    configuration: RustLinuxProcessConfiguration,
     terminal: Int32,
     stdin: Int32,
     stdout: Int32,
     stderr: Int32
 ) -> Int32 {
     reporting {
-        let user = user.toString()
-        let term = term.toString()
         let request = ExecRequest(
             name: name.toString(),
             id: id.toString(),
-            arguments: lines(arguments),
-            environment: lines(environment),
-            user: user.isEmpty ? nil : user,
-            workingDirectory: working_directory.toString(),
-            term: term.isEmpty ? nil : term,
+            configuration: ProcessSettings(configuration),
             terminal: terminal,
             stdin: stdin,
             stdout: stdout,

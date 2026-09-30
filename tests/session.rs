@@ -53,11 +53,6 @@ fn boots_and_runs_processes() {
     container.name(),
     "an unnamed host should take the container's name"
   );
-  assert_eq!(
-    container.sh("resolv", "cat /etc/resolv.conf").trim(),
-    format!("nameserver {}", support::GATEWAY),
-    "a container given no DNS should resolve through its gateway"
-  );
   assert!(
     container
       .sh("pid-one", "tr '\\0' ' ' < /proc/1/cmdline")

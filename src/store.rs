@@ -18,7 +18,8 @@ const KERNEL: &str = "kernels/default.kernel-arm64";
 const INDEX: &str = "state.json";
 const CONTAINERS: &str = "containers";
 
-/// The initfs carrying `vminitd`, the agent the library talks to over vsock.
+/// The default init image: the initfs carrying `vminitd`, the agent the
+/// library talks to over vsock. [`Store::with_initfs_reference`] replaces it.
 ///
 /// Must match the `containerization` release in
 /// this crate's `swift/Package.swift`: they share a protocol,
@@ -57,9 +58,13 @@ pub const KERNEL_URL: &str = concat!(
 #[cfg(target_os = "macos")]
 pub const KERNEL_IN_ARCHIVE: &str = "opt/kata/share/kata-containers/vmlinux.container";
 
+/// Where `ContainerManager` unpacks the init image, once per store.
+const INITFS: &str = "initfs.ext4";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Store {
   root: PathBuf,
+  initfs_reference: String,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -88,8 +93,37 @@ impl std::error::Error for StoreError {}
 
 impl Store {
   /// Names a store without touching it; the first `build` provisions it.
+  /// Its VMs boot [`INITFS_REFERENCE`].
   pub fn at(root: impl Into<PathBuf>) -> Self {
-    Self { root: root.into() }
+    Self {
+      root: root.into(),
+      initfs_reference: INITFS_REFERENCE.to_string(),
+    }
+  }
+
+  /// The same store, booting the init image `reference` instead (e.g.
+  /// [`INITFS_REFERENCE`] plus `runc`). Its `vminitd` must match this crate's
+  /// Containerization release. Provisioning pulls it.
+  ///
+  /// As in Containerization, the init image is unpacked once, to
+  /// [`Store::initfs`], and reused whatever image it came from: delete that
+  /// file to switch images or pick up an upgrade.
+  pub fn with_initfs_reference(self, reference: impl Into<String>) -> Self {
+    Self {
+      initfs_reference: reference.into(),
+      ..self
+    }
+  }
+
+  /// The init image this store provisions and unpacks.
+  pub fn initfs_reference(&self) -> &str {
+    &self.initfs_reference
+  }
+
+  /// The unpacked init image every VM boots. See
+  /// [`Store::with_initfs_reference`].
+  pub fn initfs(&self) -> PathBuf {
+    self.root.join(INITFS)
   }
 
   /// Whether this store holds what a boot needs, naming the first thing
@@ -106,10 +140,10 @@ impl Store {
       });
     }
 
-    if !self.holds(INITFS_REFERENCE) {
+    if !self.holds(&self.initfs_reference) {
       return Err(StoreError::Incomplete {
         root: self.root.clone(),
-        missing: format!("{INITFS_REFERENCE} in {INDEX}"),
+        missing: format!("{} in {INDEX}", self.initfs_reference),
       });
     }
 
@@ -215,9 +249,7 @@ mod tests {
     )
     .expect("index");
 
-    let store = Store {
-      root: root.path().to_path_buf(),
-    };
+    let store = Store::at(root.path());
 
     assert_eq!(
       store.images().expect("the index should be readable"),
@@ -244,9 +276,7 @@ mod tests {
     let root = tempfile::tempdir().expect("a temp dir");
     std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
 
-    let store = Store {
-      root: root.path().to_path_buf(),
-    };
+    let store = Store::at(root.path());
 
     assert!(store.holds(INITFS_REFERENCE));
     assert!(!store.holds("ghcr.io/apple/containerization/vminit:0.0.0"));
@@ -267,6 +297,42 @@ mod tests {
     assert_eq!(
       store.container_dir("session-cb"),
       root.path().join("containers/session-cb")
+    );
+  }
+
+  const CUSTOM_INIT_IMAGE: &str = "docker.io/example/vminit:0.47.0-runc";
+
+  #[test]
+  fn boots_the_default_init_image_unless_told_otherwise() {
+    let store = Store::at("/store");
+
+    assert_eq!(store.initfs_reference(), INITFS_REFERENCE);
+
+    let custom = store.with_initfs_reference(CUSTOM_INIT_IMAGE);
+    assert_eq!(custom.initfs_reference(), CUSTOM_INIT_IMAGE);
+    assert_eq!(custom.root(), Path::new("/store"), "and is the same store");
+    assert_eq!(
+      custom.initfs(),
+      Path::new("/store/initfs.ext4"),
+      "unpacked where Containerization unpacks any init image"
+    );
+  }
+
+  #[test]
+  fn is_ready_only_with_the_init_image_it_boots() {
+    let root = tempfile::tempdir().expect("a temp dir");
+    std::fs::create_dir_all(root.path().join("kernels")).expect("kernels");
+    std::fs::write(root.path().join(KERNEL), "").expect("kernel");
+    std::fs::write(root.path().join(INDEX), index_holding(INITFS_REFERENCE)).expect("index");
+
+    let error = Store::at(root.path())
+      .with_initfs_reference(CUSTOM_INIT_IMAGE)
+      .ready()
+      .expect_err("the default init image is not the one it boots");
+
+    assert!(
+      error.to_string().contains(CUSTOM_INIT_IMAGE),
+      "error should name the missing image: {error}"
     );
   }
 }

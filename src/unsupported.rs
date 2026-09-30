@@ -6,7 +6,8 @@
 //! macOS and stops building elsewhere.
 
 use crate::error::Error;
-use crate::model::{BootSpec, BuildPlan, ExecRequest};
+use crate::model;
+use crate::stdio::Stdio;
 use crate::store::{Store, StoreError};
 use std::os::fd::RawFd;
 
@@ -27,11 +28,17 @@ impl Session {
     &self.store
   }
 
-  pub fn boot(&self, _spec: &BootSpec) -> Result<(), Error> {
+  pub fn boot(&self, _spec: &model::BootSpec) -> Result<(), Error> {
     Err(unsupported())
   }
 
-  pub fn exec(&self, _request: &ExecRequest) -> Result<i32, Error> {
+  pub fn exec(
+    &self,
+    _name: &str,
+    _id: &str,
+    _configuration: &model::LinuxProcessConfiguration,
+    _stdio: Stdio,
+  ) -> Result<i32, Error> {
     Err(unsupported())
   }
 
@@ -75,7 +82,7 @@ impl Builder {
     &self.store
   }
 
-  pub fn build(&self, _plan: &BuildPlan) -> Result<(), Error> {
+  pub fn build(&self, _plan: &model::BuildPlan) -> Result<(), Error> {
     Err(unsupported())
   }
 

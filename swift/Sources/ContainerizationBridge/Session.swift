@@ -1,10 +1,10 @@
 //===----------------------------------------------------------------------===//
 // Booting a session's VM, and running processes in it.
 //
-// Modeled on `cctl`'s RunCommand, except: the image is read from the store, not
-// pulled; the boot process is a keepalive, not the workload; and a process
-// attaches to whichever terminal asked (the owner's, or one a joining caller
-// passed over the control socket).
+// `ContainerManager.create`, `create`, `start`, as `cctl`'s RunCommand, except:
+// the rootfs is unpacked once and cloned per container (`Unpacked`); interfaces
+// are the caller's, on Virtualization's NAT; and a process attaches to whichever
+// terminal asked (the owner's, or a joining caller's).
 //===----------------------------------------------------------------------===//
 
 import Containerization
@@ -12,46 +12,36 @@ import ContainerizationExtras
 import ContainerizationOCI
 import ContainerizationOS
 import Foundation
-// For `FilePermissions` (relayed socket mode).
-import SystemPackage
 
-/// What `RunSpec` carries, flattened for the bridge.
-struct BootSpec {
-    var name: String
+/// `BootSpec`, and the store it boots from.
+struct BootSpec: Sendable {
     var storeRoot: String
     var kernelPath: String
     var initfsReference: String
-    var imageReference: String
-    var cpus: Int
-    var memoryInBytes: UInt64
+    var id: String
+    var reference: String
     /// Ceiling for the image's unpacked rootfs, which is sparse.
-    var rootfsCapacityInBytes: UInt64
-    /// `source\tdestination\tro?`, one per line.
-    var mounts: [String]
-    /// `source\tdestination\tmode\tdirection`, one per line. Sockets are
-    /// relayed, not mounted.
-    var sockets: [String]
-    var environment: [String]
-    var arguments: [String]
-    var workingDirectory: String
-    /// The guest's address on the NAT network, as CIDR.
-    var ipv4Address: String
-    var ipv4Gateway: String
-    var configuration: ContainerConfiguration
+    var rootfsSizeInBytes: UInt64
+    var vm: VMResources
+    var configuration: ContainerSettings
+
+    init(_ spec: RustBootSpecRef, storeRoot: String, kernelPath: String, initfsReference: String) throws {
+        self.storeRoot = storeRoot
+        self.kernelPath = kernelPath
+        self.initfsReference = initfsReference
+        id = spec.id().toString()
+        reference = spec.reference().toString()
+        rootfsSizeInBytes = spec.rootfs_size_in_bytes()
+        vm = VMResources(cpus: Int(spec.vm_cpus()), memoryInBytes: spec.vm_memory_in_bytes())
+        configuration = try ContainerSettings(spec.configuration())
+    }
 }
 
-/// What `ExecSpec` carries.
+/// A process to run in a booted session, and the descriptors it runs against.
 struct ExecRequest {
     var name: String
     var id: String
-    var arguments: [String]
-    var environment: [String]
-    /// The guest user, as the image names it. The image's default when absent.
-    var user: String?
-    var workingDirectory: String
-    /// What a process on a terminal reports as `TERM`. Nil leaves it to the
-    /// image, and is ignored by a process without one.
-    var term: String?
+    var configuration: ProcessSettings
     /// The terminal the process reads and is sized against, or `-1` for a
     /// caller that has none and attaches `stdin` instead.
     var terminal: Int32
@@ -62,35 +52,6 @@ struct ExecRequest {
     var stdin: Int32
     var stdout: Int32
     var stderr: Int32
-}
-
-/// Virtualization's built-in NAT, as a guest joins it.
-///
-/// Static, since nothing hands out leases: vminitd sets the address directly.
-/// The Rust side chooses it; see `spec::nat_address`.
-struct NAT {
-    let interface: NATInterface
-    let gateway: String
-
-    init(address: String, gateway: String) throws {
-        interface = NATInterface(ipv4Address: try CIDRv4(address), ipv4Gateway: try IPv4Address(gateway))
-        self.gateway = gateway
-    }
-
-    /// Sets the guest's only interface, resolving through the gateway.
-    func join(_ config: inout LinuxContainer.Configuration) {
-        config.interfaces = [interface]
-        config.dns = DNS(nameservers: [gateway])
-    }
-}
-
-/// The VM a container of this size boots in, shared by sessions and builders.
-///
-/// Since 0.47.0 the library sizes the VM separately from the container's
-/// cgroup limits, and no longer adds headroom itself. This keeps the headroom
-/// it used to add: a core, and the guest kernel's and vminitd's memory.
-func vmResources(cpus: Int, memoryInBytes: UInt64) -> VMResources {
-    VMResources(cpus: cpus + 1, memoryInBytes: memoryInBytes + VMResources.guestMemoryOverhead)
 }
 
 /// The store's `containers` directory, shared by sessions and builders.
@@ -118,7 +79,7 @@ enum Session {
         let root = URL(filePath: spec.storeRoot)
         let kernel = Kernel(path: URL(filePath: spec.kernelPath), platform: .linuxArm)
 
-        // No `Network`; the interface is built below. `VmnetNetwork` (what
+        // No `Network`; the interfaces are the caller's. `VmnetNetwork` (what
         // `cctl` uses) fails with VMNET_MEM_FAILURE from an unprivileged
         // process, which is why the `container` CLI runs vmnet as a separate
         // helper. Virtualization's own NAT needs no extra privilege.
@@ -129,103 +90,36 @@ enum Session {
             network: nil
         )
 
-        // Not `create(reference:)`, which unpacks a new rootfs every run. On
-        // this path we must create the container directory; the library writes
-        // its boot log there.
-        let image = try await manager.imageStore.get(reference: spec.imageReference)
-        let paths = container(spec.name, in: root)
+        // Pulled if missing, like `create(reference:)`, which we avoid because
+        // it unpacks every run. So we create the container directory (where the
+        // boot log goes) ourselves.
+        let image = try await manager.imageStore.get(reference: spec.reference, pull: true)
+        let paths = container(spec.id, in: root)
         try FileManager.default.createDirectory(at: paths.directory, withIntermediateDirectories: true)
-        let rootfs = try await Unpacked(store: root, capacityInBytes: spec.rootfsCapacityInBytes)
+        let rootfs = try await Unpacked(store: root, capacityInBytes: spec.rootfsSizeInBytes)
             .rootfs(for: image, at: paths.rootfs)
 
-        let mounts = try spec.mounts.map(share)
-        let sockets = try spec.sockets.map(relay)
-        let nat = try NAT(address: spec.ipv4Address, gateway: spec.ipv4Gateway)
-
-        // `networking: false`: the manager has no `Network` to allocate from,
-        // and the interface is set here.
+        // `networking: false`: the manager has no `Network` to allocate from.
         let container = try await manager.create(
-            spec.name,
+            spec.id,
             image: image,
             rootfs: rootfs,
             networking: false,
-            vm: vmResources(cpus: spec.cpus, memoryInBytes: spec.memoryInBytes)
+            vm: spec.vm
         ) { config in
-            config.cpus = spec.cpus
-            config.memoryInBytes = spec.memoryInBytes
-            config.process.arguments = spec.arguments
-            config.process.workingDirectory = spec.workingDirectory
-            config.process.environmentVariables += spec.environment
-            config.mounts += mounts
-            config.sockets = sockets
-            nat.join(&config)
-            // Last, so a caller's DNS or boot log beats the defaults set above
-            // and by the manager.
-            try spec.configuration.apply(to: &config)
+            spec.configuration.apply(to: &config)
         }
 
         try await container.create()
         try await container.start()
 
-        // Kept for `exec`, which needs the image's user.
+        // Kept for seeding `exec`.
         let imageConfig = try? await image.config(for: .current).config
 
         Sessions.shared.insert(
-            spec.name,
+            spec.id,
             Booted(manager: manager, container: container, imageConfig: imageConfig)
         )
-    }
-
-    /// `source\tdestination\tmode\tdirection`, as `wire::sockets` writes it,
-    /// the mode in octal.
-    ///
-    /// The mode is the caller's: 0666 lets an unprivileged guest user open a
-    /// socket the guest owns as root, and a caller that knows its guest user
-    /// can narrow it. Confinement comes from the directory, not the mode.
-    private static func relay(_ socket: String) throws -> UnixSocketConfiguration {
-        let parts = try fields(socket, count: 4, kind: "socket")
-
-        // `CModeT` is 16-bit, so a mode that doesn't fit is malformed rather
-        // than silently truncated to a wider one the caller meant.
-        guard let mode = CModeT(parts[2], radix: 8) else {
-            throw BridgeError.malformed("socket mode", String(parts[2]))
-        }
-
-        let direction: UnixSocketConfiguration.Direction =
-            switch parts[3] {
-            case "into": .into
-            case "outof": .outOf
-            default: throw BridgeError.malformed("socket direction", String(parts[3]))
-            }
-
-        return UnixSocketConfiguration(
-            source: URL(filePath: String(parts[0])),
-            destination: URL(filePath: String(parts[1])),
-            permissions: FilePermissions(rawValue: mode),
-            direction: direction
-        )
-    }
-
-    /// `source\tdestination\tro?`, as `spec::mounts` writes it.
-    private static func share(_ mount: String) throws -> Containerization.Mount {
-        let parts = try fields(mount, count: 3, kind: "mount")
-
-        return .share(
-            source: String(parts[0]),
-            destination: String(parts[1]),
-            options: parts[2] == "ro" ? ["ro"] : []
-        )
-    }
-
-    /// A tab-separated line's fields, throwing unless there are exactly `count`.
-    private static func fields(_ line: String, count: Int, kind: String) throws -> [Substring] {
-        let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
-
-        guard fields.count == count else {
-            throw BridgeError.malformed(kind, line)
-        }
-
-        return fields
     }
 
     /// Runs a process to completion in an already-booted session and returns its
@@ -260,9 +154,8 @@ enum Session {
         }
 
         let process = try await booted.container.exec(request.id) { config in
-            // Seeded from the image: a bare exec config runs as uid 0 with only
-            // a default PATH, so an image ending in a non-root `USER` would
-            // still run this process as root.
+            // Seeded from the image like the first process: a bare exec config
+            // runs as root with only a default PATH, ignoring the image's `USER`.
             if let imageConfig {
                 let fallback = config.environmentVariables
                 config = .init(from: imageConfig)
@@ -274,14 +167,7 @@ enum Session {
                 }
             }
 
-            config.arguments = request.arguments
-            // Ours last, so a variable the session sets beats the image's.
-            config.environmentVariables += request.environment
-            config.workingDirectory = request.workingDirectory
-
-            if let user = request.user {
-                config.user = User(username: user)
-            }
+            request.configuration.apply(to: &config)
 
             // Not `setTerminalIO`, which writes back to the terminal it reads.
             // The caller's stdout may be somewhere else entirely, and this is
@@ -291,8 +177,9 @@ enum Session {
             if let terminal {
                 config.terminal = true
 
-                if let term = request.term {
-                    config.environmentVariables.append("TERM=\(term)")
+                // What `setTerminalIO` sets, unless the caller chose.
+                if !config.environmentVariables.contains(where: { $0.hasPrefix("TERM=") }) {
+                    config.environmentVariables.append("TERM=xterm")
                 }
 
                 config.stdin = terminal

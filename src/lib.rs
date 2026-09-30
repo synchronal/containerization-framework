@@ -19,14 +19,17 @@
 //! # Shape
 //!
 //! [`Builder`] turns a [`BuildPlan`] into an image in the [`Store`].
-//! [`Session`] boots a [`BootSpec`]'s container from one and runs
-//! [`ExecRequest`]s in it. A container belongs to the process that booted it
-//! and dies with it; reaching one from elsewhere is the caller's to arrange.
+//! [`Session`] boots a [`BootSpec`]'s container from one and runs processes
+//! in it. A container belongs to the process that booted it and dies with it;
+//! reaching one from elsewhere is the caller's to arrange.
+//!
+//! Configuration types in [`model`] mirror Containerization's, with the same
+//! names and defaults.
 //!
 //! [Containerization]: https://github.com/apple/containerization
 
-// `boot` carries a whole `BootSpec` as scalars since no struct crosses the
-// bridge, and swift-bridge refuses an `allow` inside its module.
+// `exec` passes a process's descriptors as scalars beside its configuration,
+// and swift-bridge refuses an `allow` inside its module.
 #![cfg_attr(target_os = "macos", allow(clippy::too_many_arguments))]
 
 pub mod error;
@@ -40,17 +43,12 @@ mod bridge;
 mod builder;
 #[cfg(target_os = "macos")]
 mod session;
-#[cfg(target_os = "macos")]
-mod wire;
 
 #[cfg(not(target_os = "macos"))]
 mod unsupported;
 
 pub use crate::error::Error;
-pub use crate::model::{
-  BootSpec, BuildMount, BuildPlan, BuildStep, CachePolicy, Direction, ExecRequest, Mount, Network, Resources, Shell,
-  SocketRelay,
-};
+pub use crate::model::{BootSpec, BuildPlan, BuildStep, CachePolicy, Shell};
 pub use crate::stdio::{Stdio, UNATTACHED, is_tty, lend};
 pub use crate::store::{INITFS_REFERENCE, INITFS_VERSION, KERNEL_VERSION, Store, StoreError};
 

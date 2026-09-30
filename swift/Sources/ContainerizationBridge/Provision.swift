@@ -19,7 +19,7 @@ import ContainerizationOCI
 import Foundation
 import SystemPackage
 
-struct ProvisionSpec: Decodable {
+struct ProvisionSpec: Sendable {
     var storeRoot: String
     /// Inside the store, so removing the store removes it.
     var kernelPath: String
@@ -27,15 +27,6 @@ struct ProvisionSpec: Decodable {
     /// The kernel's path inside the downloaded archive.
     var kernelInArchive: String
     var initfsReference: String
-
-    enum CodingKeys: String, CodingKey {
-        case storeRoot
-        case kernelPath
-        // serde's camelCase of `kernel_url`.
-        case kernelURL = "kernelUrl"
-        case kernelInArchive
-        case initfsReference
-    }
 }
 
 enum Provision {

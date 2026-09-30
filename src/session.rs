@@ -9,9 +9,10 @@
 //! came from.
 
 use crate::error::Error;
-use crate::model::{BootSpec, ExecRequest};
-use crate::store::{INITFS_REFERENCE, Store, StoreError};
-use crate::{checked, ffi, wire};
+use crate::model;
+use crate::stdio::Stdio;
+use crate::store::{Store, StoreError};
+use crate::{checked, ffi};
 use std::os::fd::RawFd;
 
 pub struct Session {
@@ -27,59 +28,49 @@ impl Session {
     &self.store
   }
 
-  /// Boots `spec`'s VM and leaves it running, owned by this process.
+  /// Creates and starts `spec`'s container, owned by this process
+  /// (`ContainerManager.create`, `create`, `start`).
   ///
   /// The container's directory is cleared first: the VM dies with its process,
   /// so nothing cleaned up after the previous run, and a container always
   /// starts from a fresh clone of its image's unpacked rootfs.
-  pub fn boot(&self, spec: &BootSpec) -> Result<(), Error> {
-    let _ = std::fs::remove_dir_all(self.store.container_dir(&spec.name));
-
-    let configuration = serde_json::to_string(&wire::Configuration::from(spec))
-      .map_err(|error| Error::failed(format!("boot {}", spec.name), error))?;
+  pub fn boot(&self, spec: &model::BootSpec) -> Result<(), Error> {
+    let _ = std::fs::remove_dir_all(self.store.container_dir(&spec.id));
 
     let code = ffi::czbridge_boot(
-      &spec.name,
+      spec.clone(),
       &self.store.root().display().to_string(),
       &self.store.kernel().display().to_string(),
-      INITFS_REFERENCE,
-      &spec.image,
-      spec.resources.cpus as i32,
-      spec.resources.memory_in_bytes,
-      spec.rootfs_capacity_in_bytes,
-      &wire::lines(&wire::mounts(&spec.mounts)),
-      &wire::lines(&wire::sockets(&spec.sockets)),
-      &wire::lines(&spec.environment),
-      &wire::lines(&spec.arguments),
-      &wire::working_directory(spec.workdir.as_deref()),
-      &spec.network.ipv4_address,
-      &spec.network.ipv4_gateway,
-      &configuration,
+      self.store.initfs_reference(),
     );
 
     checked(code)
       .map(|_| ())
-      .map_err(|error| Error::failed(format!("boot {}", spec.name), error))
+      .map_err(|error| Error::failed(format!("boot {}", spec.id), error))
   }
 
-  /// Runs a process in a booted container and blocks until it exits, returning
-  /// its exit code.
+  /// Runs a process in container `name` until it exits, returning its exit
+  /// code. `LinuxContainer.exec`, seeded from the image like the first process.
   ///
-  /// The descriptors in `request.stdio` are closed when the process ends, so
-  /// pass [`crate::Stdio::try_clone`]'s result to keep your own streams open.
-  pub fn exec(&self, request: &ExecRequest) -> Result<i32, Error> {
+  /// `id` names the process for [`Session::resize`]. `stdio` is closed when
+  /// the process ends; pass [`Stdio::try_clone`] to keep your own streams. A
+  /// terminal gets `TERM=xterm` (as `setTerminalIO`) unless the environment
+  /// sets it.
+  pub fn exec(
+    &self,
+    name: &str,
+    id: &str,
+    configuration: &model::LinuxProcessConfiguration,
+    stdio: Stdio,
+  ) -> Result<i32, Error> {
     let code = ffi::czbridge_exec(
-      &request.name,
-      &request.id,
-      &wire::lines(&request.arguments),
-      &wire::lines(&request.environment),
-      request.user.as_deref().unwrap_or(""),
-      &wire::working_directory(request.workdir.as_deref()),
-      request.term.as_deref().unwrap_or(""),
-      request.stdio.terminal,
-      request.stdio.stdin,
-      request.stdio.stdout,
-      request.stdio.stderr,
+      name,
+      id,
+      configuration.clone(),
+      stdio.terminal,
+      stdio.stdin,
+      stdio.stdout,
+      stdio.stderr,
     );
 
     checked(code).map_err(|error| Error::failed("exec", error))

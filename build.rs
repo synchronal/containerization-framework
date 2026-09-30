@@ -18,6 +18,8 @@ use std::process::Command;
 /// swift-bridge's generated header directory; `bridging-header.h` imports it.
 const BRIDGE: &str = "containerization-bridge";
 const PACKAGE: &str = "ContainerizationBridge";
+/// The file holding the `#[swift_bridge::bridge]` module.
+const BRIDGE_MODULE: &str = "src/bridge/mod.rs";
 
 /// Never copied into the staged package: SwiftPM's build directory, and glue
 /// this script regenerates.
@@ -210,7 +212,7 @@ fn link_swift_runtime() {
 
 fn main() {
   println!("cargo:rerun-if-changed=build.rs");
-  println!("cargo:rerun-if-changed=src/bridge.rs");
+  println!("cargo:rerun-if-changed={BRIDGE_MODULE}");
 
   if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
     return;
@@ -231,7 +233,7 @@ fn main() {
   // `OUT_DIR` survives between builds.
   let _ = std::fs::remove_dir_all(&glue);
 
-  swift_bridge_build::parse_bridges(vec![manifest_dir().join("src/bridge.rs")]).write_all_concatenated(&glue, BRIDGE);
+  swift_bridge_build::parse_bridges(vec![manifest_dir().join(BRIDGE_MODULE)]).write_all_concatenated(&glue, BRIDGE);
   publish_bridge_shims(&glue);
   mirror(&glue, &staged.join("Sources").join(PACKAGE).join("generated"), &[]);
 

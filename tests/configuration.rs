@@ -1,6 +1,6 @@
 #![cfg(feature = "integration")]
 
-//! Configuring a container beyond its process, mounts and network.
+//! Configuring a container and its processes.
 //!
 //! What only a booted guest can show: that each setting reaches the container,
 //! and that one the framework refuses fails the boot rather than being dropped.
@@ -36,18 +36,23 @@ fn is_mounted_over(container: &Container, id: &str, path: &str) -> bool {
 #[test]
 fn names_resolves_and_tunes_the_container() {
   let container = Container::boot_with("cfw-test-config-names", |spec| {
-    spec.hostname = Some("configured-host".into());
-    spec.sysctl = [("net.core.somaxconn".to_string(), "4096".to_string())].into();
-    spec.dns = Some(cfw::model::Dns {
+    let configuration = &mut spec.configuration;
+
+    configuration.hostname = Some("configured-host".into());
+    configuration.sysctl = [("net.core.somaxconn".to_string(), "4096".to_string())].into();
+    configuration.dns = Some(cfw::model::Dns {
       nameservers: vec![support::GATEWAY.into(), "1.1.1.1".into()],
       domain: Some("example.test".into()),
       search_domains: vec!["a.test".into(), "b.test".into()],
       options: vec!["ndots:2".into()],
     });
-    spec.hosts = Some(vec![
-      cfw::model::HostsEntry::new("127.0.0.1", &["localhost"]),
-      cfw::model::HostsEntry::new(support::GATEWAY, &["host.internal", "host"]),
-    ]);
+    configuration.hosts = Some(cfw::model::Hosts {
+      entries: vec![
+        cfw::model::HostsEntry::new("127.0.0.1", &["localhost"]),
+        cfw::model::HostsEntry::new(support::GATEWAY, &["host.internal", "host"]),
+      ],
+      comment: Some("written by the suite".into()),
+    });
   });
 
   assert_eq!(container.sh("hostname", "hostname").trim(), "configured-host");
@@ -62,21 +67,75 @@ fn names_resolves_and_tunes_the_container() {
     format!(
       "nameserver {}\nnameserver 1.1.1.1\ndomain example.test\nsearch a.test b.test\noptions ndots:2\n",
       support::GATEWAY
-    ),
-    "the caller's DNS should replace the gateway's, not join it"
+    )
   );
   assert_eq!(
     container.sh("hosts", "cat /etc/hosts"),
-    format!("127.0.0.1 localhost\n{} host.internal host\n", support::GATEWAY),
+    format!(
+      "# written by the suite\n127.0.0.1 localhost\n{} host.internal host\n",
+      support::GATEWAY
+    ),
     "the image's /etc/hosts should be replaced whole"
+  );
+}
+
+#[test]
+fn mounts_what_it_is_given() {
+  let shared = tempfile::tempdir().expect("a temporary directory");
+  std::fs::write(shared.path().join("greeting"), "shared from the host").expect("a file to share");
+  let source = shared.path().display().to_string();
+
+  let container = Container::boot_with("cfw-test-config-mounts", |spec| {
+    let mounts = &mut spec.configuration.mounts;
+
+    mounts.push(cfw::model::Mount::share(&source, "/shared", &["ro"]));
+    mounts.push(cfw::model::Mount::any("tmpfs", "tmpfs", "/scratch", &["size=1m"]));
+  });
+
+  assert_eq!(container.sh("shared", "cat /shared/greeting"), "shared from the host");
+  assert!(
+    container
+      .sh("shared-readonly", &write_error("/shared/probe"))
+      .contains("Read-only file system"),
+    "a share mounted `ro` should refuse a write"
+  );
+  assert_eq!(
+    container
+      .sh("tmpfs", "grep ' /scratch ' /proc/self/mountinfo | grep -o ' - tmpfs '")
+      .trim(),
+    "- tmpfs",
+    "a mount the guest makes by itself should be made"
+  );
+  assert!(
+    is_mounted_over(&container, "standard", "/dev/shm"),
+    "extending the mounts should keep the standard ones"
+  );
+}
+
+#[test]
+fn runs_a_process_as_configured() {
+  let container = Container::boot("cfw-test-config-process");
+
+  let configuration = cfw::model::LinuxProcessConfiguration {
+    environment_variables: vec!["GREETING=configured".into()],
+    working_directory: Some("/tmp".into()),
+    user: Some(cfw::model::User::named("nobody")),
+    ..cfw::model::LinuxProcessConfiguration::new(&["/bin/sh", "-c", "pwd; id -un; echo $GREETING"])
+  };
+
+  assert_eq!(
+    container.capture_with("process", &configuration),
+    "/tmp\nnobody\nconfigured\n"
   );
 }
 
 #[test]
 fn guards_paths_beyond_the_standard_ones() {
   let container = Container::boot_with("cfw-test-config-guarded", |spec| {
-    spec.masked_paths = cfw::model::GuardedPaths::DefaultAnd(vec![support::MARKER_PATH.into()]);
-    spec.readonly_paths = cfw::model::GuardedPaths::DefaultAnd(vec!["/etc".into()]);
+    let configuration = &mut spec.configuration;
+
+    configuration.masked_paths.push(support::MARKER_PATH.into());
+    configuration.readonly_paths.push("/etc".into());
   });
 
   assert!(
@@ -111,8 +170,8 @@ fn guards_paths_beyond_the_standard_ones() {
 #[test]
 fn drops_the_standard_guards_when_told() {
   let container = Container::boot_with("cfw-test-config-unguarded", |spec| {
-    spec.masked_paths = cfw::model::GuardedPaths::Only(vec![]);
-    spec.readonly_paths = cfw::model::GuardedPaths::Only(vec![]);
+    spec.configuration.masked_paths.clear();
+    spec.configuration.readonly_paths.clear();
   });
 
   assert!(
@@ -132,7 +191,7 @@ fn drops_the_standard_guards_when_told() {
 #[test]
 fn runs_its_first_process_under_an_init() {
   let container = Container::boot_with("cfw-test-config-init", |spec| {
-    spec.use_init = true;
+    spec.configuration.use_init = true;
   });
 
   let pid_one = container.sh("pid-one", "tr '\\0' ' ' < /proc/1/cmdline");
@@ -148,7 +207,7 @@ fn writes_its_boot_log_where_told() {
   let log = logs.path().join("boot.log");
 
   let container = Container::boot_with("cfw-test-config-boot-log", |spec| {
-    spec.boot_log = Some(log.clone());
+    spec.configuration.boot_log = Some(cfw::model::BootLog::file(&log));
   });
 
   assert!(
@@ -172,7 +231,7 @@ fn writes_its_boot_log_where_told() {
 #[test]
 fn boots_with_nested_virtualization_where_the_host_has_it() {
   let booted = Container::try_boot_with("cfw-test-config-nested", |spec| {
-    spec.nested_virtualization = true;
+    spec.configuration.virtualization = true;
   });
 
   match booted {
@@ -191,7 +250,7 @@ fn boots_with_nested_virtualization_where_the_host_has_it() {
 #[test]
 fn refuses_seccomp_without_an_oci_runtime() {
   let refused = Container::try_boot_with("cfw-test-config-seccomp", |spec| {
-    spec.seccomp = cfw::model::Seccomp::Default;
+    spec.configuration.seccomp_profile = cfw::model::SeccompProfile::Default;
   });
 
   let error = refused
@@ -203,8 +262,8 @@ fn refuses_seccomp_without_an_oci_runtime() {
 #[test]
 fn refuses_a_seccomp_profile_that_is_not_one() {
   let refused = Container::try_boot_with("cfw-test-config-seccomp-profile", |spec| {
-    spec.oci_runtime = Some("/sbin/runc".into());
-    spec.seccomp = cfw::model::Seccomp::Profile("not json".into());
+    spec.configuration.oci_runtime_path = Some("/sbin/runc".into());
+    spec.configuration.seccomp_profile = cfw::model::SeccompProfile::Profile("not json".into());
   });
 
   let error = refused
@@ -218,7 +277,7 @@ fn refuses_a_seccomp_profile_that_is_not_one() {
 #[test]
 fn refuses_an_oci_runtime_the_init_image_lacks() {
   let refused = Container::try_boot_with("cfw-test-config-oci-runtime", |spec| {
-    spec.oci_runtime = Some("/sbin/no-such-runtime".into());
+    spec.configuration.oci_runtime_path = Some("/sbin/no-such-runtime".into());
   });
 
   let error = refused
@@ -232,7 +291,7 @@ fn refuses_an_oci_runtime_the_init_image_lacks() {
 #[test]
 fn refuses_a_nameserver_that_is_not_an_address() {
   let refused = Container::try_boot_with("cfw-test-config-nameserver", |spec| {
-    spec.dns = Some(cfw::model::Dns {
+    spec.configuration.dns = Some(cfw::model::Dns {
       nameservers: vec!["dns.example.test".into()],
       ..Default::default()
     });

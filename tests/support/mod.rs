@@ -41,7 +41,10 @@ const TEST_MEMORY_IN_BYTES: u64 = 512 * 1024 * 1024;
 /// The rootfs ceiling, against the crate's 8 GiB default: the block is made at
 /// this size when the image is unpacked and cloned at it for every container,
 /// and nothing here writes more than a marker file.
-const TEST_ROOTFS_CAPACITY_IN_BYTES: u64 = 1024 * 1024 * 1024;
+const TEST_ROOTFS_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
+
+/// Holds a container open; the base's own `Cmd` would exit at once.
+const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
 
 /// Nextest runs each test in a process of its own, so a `Mutex` would not do.
 const PROVISION_LOCK: &str = ".provision.lock";
@@ -119,14 +122,16 @@ fn build_image(store: &cfw::Store) {
     "cfw-test-builder",
     BASE_IMAGE,
     TEST_IMAGE,
-    resources(),
-    network("cfw-test-builder"),
+    interface("cfw-test-builder"),
     "base-0",
   );
 
+  plan.cpus = TEST_CPUS;
+  plan.memory_in_bytes = TEST_MEMORY_IN_BYTES;
+  plan.vm = vm();
   // Alpine carries no bash, which the default shell is.
   plan.shell = cfw::Shell(["/bin/sh", "-ec"].map(String::from).to_vec());
-  plan.rootfs_capacity_in_bytes = TEST_ROOTFS_CAPACITY_IN_BYTES;
+  plan.rootfs_size_in_bytes = TEST_ROOTFS_SIZE_IN_BYTES;
   plan.steps = vec![cfw::BuildStep {
     name: "marker".to_string(),
     script: format!("echo {MARKER} > {MARKER_PATH}"),
@@ -139,10 +144,19 @@ fn build_image(store: &cfw::Store) {
     .expect("the test image should build");
 }
 
-pub fn resources() -> cfw::Resources {
-  cfw::Resources {
+/// A VM for the test limits plus guest overhead.
+pub fn vm() -> cfw::model::VmResources {
+  cfw::model::VmResources {
     cpus: TEST_CPUS,
-    memory_in_bytes: TEST_MEMORY_IN_BYTES,
+    memory_in_bytes: TEST_MEMORY_IN_BYTES + cfw::model::VmResources::GUEST_MEMORY_OVERHEAD,
+  }
+}
+
+/// Resolve through the NAT's gateway.
+pub fn gateway_dns() -> cfw::model::Dns {
+  cfw::model::Dns {
+    nameservers: vec![GATEWAY.to_string()],
+    ..Default::default()
   }
 }
 
@@ -150,7 +164,7 @@ pub fn resources() -> cfw::Resources {
 ///
 /// Nothing hands out leases, so the caller allocates. Hashed from the name:
 /// stable per container, distinct between concurrent ones.
-pub fn network(name: &str) -> cfw::Network {
+pub fn interface(name: &str) -> cfw::model::NatInterface {
   // FNV-1a: short and well spread.
   let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
 
@@ -164,10 +178,7 @@ pub fn network(name: &str) -> cfw::Network {
     .rsplit_once('.')
     .expect("the gateway is a dotted quad");
 
-  cfw::Network {
-    ipv4_address: format!("{subnet}.{host}/{PREFIX}"),
-    ipv4_gateway: GATEWAY.to_string(),
-  }
+  cfw::model::NatInterface::new(format!("{subnet}.{host}/{PREFIX}"), GATEWAY)
 }
 
 /// A booted container, and the session that owns it.
@@ -199,7 +210,17 @@ impl Container {
   /// The same, reporting a boot that fails rather than panicking. The
   /// container's directory goes either way.
   pub fn try_boot_with(name: &str, configure: impl FnOnce(&mut cfw::BootSpec)) -> Result<Self, cfw::Error> {
-    let session = cfw::Session::new(image());
+    Self::try_boot_in(image(), name, configure)
+  }
+
+  /// The same, from `store` rather than the suite's own, which must already
+  /// hold [`TEST_IMAGE`].
+  pub fn try_boot_in(
+    store: cfw::Store,
+    name: &str,
+    configure: impl FnOnce(&mut cfw::BootSpec),
+  ) -> Result<Self, cfw::Error> {
+    let session = cfw::Session::new(store);
     let mut unpacking = None;
 
     if !is_unpacked(&session) {
@@ -211,15 +232,15 @@ impl Container {
       }
     }
 
-    let mut spec = cfw::BootSpec::new(name, TEST_IMAGE, resources(), network(name));
+    let mut spec = cfw::BootSpec::new(name, TEST_IMAGE);
 
-    spec.rootfs_capacity_in_bytes = TEST_ROOTFS_CAPACITY_IN_BYTES;
-
-    // The first process takes the container with it when it exits, and the
-    // base's own `Cmd` would exit at once.
-    spec.arguments = ["/bin/sh", "-c", "while :; do sleep 86400; done"]
-      .map(String::from)
-      .to_vec();
+    spec.rootfs_size_in_bytes = TEST_ROOTFS_SIZE_IN_BYTES;
+    spec.vm = vm();
+    spec.configuration.process = cfw::model::LinuxProcessConfiguration::new(&KEEPALIVE);
+    spec.configuration.cpus = TEST_CPUS;
+    spec.configuration.memory_in_bytes = TEST_MEMORY_IN_BYTES;
+    spec.configuration.interfaces = vec![interface(name)];
+    spec.configuration.dns = Some(gateway_dns());
 
     configure(&mut spec);
 
@@ -250,15 +271,12 @@ impl Container {
   pub fn exec(&self, id: &str, arguments: &[&str]) -> i32 {
     self
       .session
-      .exec(&cfw::ExecRequest::new(
+      .exec(
         &self.name,
         id,
-        arguments
-          .iter()
-          .map(|argument| argument.to_string())
-          .collect(),
+        &cfw::model::LinuxProcessConfiguration::new(arguments),
         cfw::Stdio::nothing(),
-      ))
+      )
       .unwrap_or_else(|error| panic!("{arguments:?} should run in {}: {error}", self.name))
   }
 
@@ -268,6 +286,11 @@ impl Container {
   /// descriptors over rather than relaying bytes. Nothing drains it until the
   /// process exits, so what is run must write less than a pipe holds.
   pub fn capture(&self, id: &str, arguments: &[&str]) -> String {
+    self.capture_with(id, &cfw::model::LinuxProcessConfiguration::new(arguments))
+  }
+
+  /// The same, for a process configured beyond its arguments.
+  pub fn capture_with(&self, id: &str, configuration: &cfw::model::LinuxProcessConfiguration) -> String {
     let pipe = Pipe::new();
     let stdio = cfw::Stdio {
       terminal: cfw::UNATTACHED,
@@ -276,17 +299,10 @@ impl Container {
       stderr: cfw::UNATTACHED,
     };
 
+    let arguments = &configuration.arguments;
     let code = self
       .session
-      .exec(&cfw::ExecRequest::new(
-        &self.name,
-        id,
-        arguments
-          .iter()
-          .map(|argument| argument.to_string())
-          .collect(),
-        stdio,
-      ))
+      .exec(&self.name, id, configuration, stdio)
       .unwrap_or_else(|error| panic!("{arguments:?} should run in {}: {error}", self.name));
 
     assert_eq!(code, 0, "{arguments:?} failed in {}", self.name);
@@ -304,6 +320,17 @@ impl Drop for Container {
   fn drop(&mut self) {
     let _ = std::fs::remove_dir_all(self.session.store().container_dir(&self.name));
   }
+}
+
+/// The digest the store's index records for `reference`.
+pub fn digest(store: &cfw::Store, reference: &str) -> String {
+  let index = std::fs::read_to_string(store.root().join("state.json")).expect("a readable index");
+  let references: serde_json::Value = serde_json::from_str(&index).expect("a parseable index");
+
+  references[reference]["digest"]
+    .as_str()
+    .unwrap_or_else(|| panic!("the index should record a digest for {reference}"))
+    .to_string()
 }
 
 /// Whether a boot would clone a rootfs rather than unpack one. A store that

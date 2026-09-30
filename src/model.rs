@@ -1,79 +1,185 @@
-//! What a caller describes to this crate: a container to boot, a process to run
-//! in one, and an image to build.
+//! What a caller describes: a container to boot, a process to run in one, and
+//! an image to build.
 //!
-//! Plain data, and platform-free, so a caller compiles against it anywhere. The
-//! wire these become is private to `session` and `builder`.
+//! Container and process types mirror Containerization's
+//! (`LinuxContainer.Configuration`, `LinuxProcessConfiguration`, `Mount`, ...)
+//! in names, shapes and defaults, so its documentation applies. Fields the
+//! image seeds are `Option`s here; `None` keeps the image's.
+//!
+//! Plain, platform-free data. Swift reads it in place through the bridge.
 
-use crate::stdio::Stdio;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-/// What a VM is given. Always set by the caller: nothing here defaults it,
-/// because a sensible size depends on the workload, not on the framework.
+const MIB: u64 = 1024 * 1024;
+const GIB: u64 = 1024 * MIB;
+
+/// The VM a container runs in. `VMResources`.
+///
+/// Sized apart from the container's cgroup limits
+/// ([`LinuxContainerConfiguration`]), with no headroom added.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Resources {
+pub struct VmResources {
   pub cpus: u32,
+  /// Rounded up to the VMM's alignment.
   pub memory_in_bytes: u64,
 }
 
-/// A host directory shared into the guest.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Mount {
-  pub readonly: bool,
-  pub source: PathBuf,
-  pub target: PathBuf,
+impl VmResources {
+  /// Memory for the guest kernel and `vminitd`. Never added for you.
+  pub const GUEST_MEMORY_OVERHEAD: u64 = 128 * MIB;
 }
 
-/// Which way a relayed socket is reached.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Direction {
-  /// The guest connects; the listener is on the host.
-  IntoGuest,
-  /// The host connects; the listener is in the guest.
-  OutOfGuest,
-}
-
-/// A unix socket relayed between host and guest.
-///
-/// Not a [`Mount`]: mounting a socket relays nothing, so Containerization
-/// configures relays separately.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SocketRelay {
-  pub source: PathBuf,
-  pub target: PathBuf,
-  /// Mode of the socket this creates. `0o666` lets an unprivileged guest user
-  /// open one the guest owns as root; narrow it when that user is known.
-  pub mode: u32,
-  pub direction: Direction,
-}
-
-impl SocketRelay {
-  /// A host socket the guest reaches, world-accessible inside the guest.
-  pub fn into_guest(source: impl Into<PathBuf>, target: impl Into<PathBuf>) -> Self {
+/// 4 vCPUs and 1024 MiB, as `VMResources.default`.
+impl Default for VmResources {
+  fn default() -> Self {
     Self {
-      source: source.into(),
-      target: target.into(),
-      mode: 0o666,
-      direction: Direction::IntoGuest,
+      cpus: 4,
+      memory_in_bytes: GIB,
     }
   }
 }
 
-/// The guest's only network interface: Virtualization.framework's built-in NAT.
-///
-/// Static, because nothing hands out leases — the guest agent sets the address
-/// directly — so the caller allocates. Collisions with other guests on the
-/// shared network go undetected.
+/// The device backing a mount, with its options. `Mount.RuntimeOptions`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Network {
-  /// The guest's address, as CIDR.
-  pub ipv4_address: String,
-  pub ipv4_gateway: String,
+pub enum RuntimeOptions {
+  /// A host image file, as a block device.
+  Virtioblk(Vec<String>),
+  /// A shared host directory.
+  Virtiofs(Vec<String>),
+  /// Made by the guest alone (`proc`, `tmpfs`).
+  Any(Vec<String>),
 }
 
-/// The guest's `/etc/resolv.conf`.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+/// A filesystem mount exposed to a container. `Mount`.
+///
+/// Build one with [`Mount::share`], [`Mount::block`] or [`Mount::any`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Mount {
+  /// The filesystem type, as the mount syscall takes it.
+  pub r#type: String,
+  pub source: String,
+  pub destination: String,
+  pub options: Vec<String>,
+  pub runtime_options: RuntimeOptions,
+}
+
+impl Mount {
+  /// A host directory shared over virtiofs; `"ro"` makes it read-only.
+  pub fn share(source: impl Into<String>, destination: impl Into<String>, options: &[&str]) -> Self {
+    Self {
+      r#type: "virtiofs".to_string(),
+      source: source.into(),
+      destination: destination.into(),
+      options: strings(options),
+      runtime_options: RuntimeOptions::Virtiofs(Vec::new()),
+    }
+  }
+
+  /// A filesystem image on the host, attached as a block device.
+  pub fn block(
+    format: impl Into<String>,
+    source: impl Into<String>,
+    destination: impl Into<String>,
+    options: &[&str],
+  ) -> Self {
+    Self {
+      r#type: format.into(),
+      source: source.into(),
+      destination: destination.into(),
+      options: strings(options),
+      runtime_options: RuntimeOptions::Virtioblk(Vec::new()),
+    }
+  }
+
+  /// A mount the guest makes by itself, such as a `tmpfs`.
+  pub fn any(
+    r#type: impl Into<String>,
+    source: impl Into<String>,
+    destination: impl Into<String>,
+    options: &[&str],
+  ) -> Self {
+    Self {
+      r#type: r#type.into(),
+      source: source.into(),
+      destination: destination.into(),
+      options: strings(options),
+      runtime_options: RuntimeOptions::Any(Vec::new()),
+    }
+  }
+}
+
+fn strings(values: &[&str]) -> Vec<String> {
+  values.iter().map(|value| value.to_string()).collect()
+}
+
+/// Which way a relayed socket is reached. `UnixSocketConfiguration.Direction`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Direction {
+  /// A host socket shared into the guest.
+  #[default]
+  Into,
+  /// A guest socket shared onto the host.
+  OutOf,
+}
+
+/// A unix socket relayed between host and guest. `UnixSocketConfiguration`.
+///
+/// Not a [`Mount`]: mounting a socket relays nothing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UnixSocketConfiguration {
+  /// On the host for [`Direction::Into`], in the guest for [`Direction::OutOf`].
+  pub source: PathBuf,
+  /// In the guest for [`Direction::Into`], on the host for [`Direction::OutOf`].
+  pub destination: PathBuf,
+  /// Mode of the socket this creates. `None` leaves it to the relay.
+  pub permissions: Option<u32>,
+  pub direction: Direction,
+}
+
+impl UnixSocketConfiguration {
+  /// A socket relayed into the guest with the relay's own mode.
+  pub fn new(source: impl Into<PathBuf>, destination: impl Into<PathBuf>) -> Self {
+    Self {
+      source: source.into(),
+      destination: destination.into(),
+      permissions: None,
+      direction: Direction::Into,
+    }
+  }
+}
+
+/// An interface on Virtualization.framework's NAT. `NATInterface`.
+///
+/// Addresses are static and caller-allocated; collisions go undetected.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NatInterface {
+  /// As CIDR.
+  pub ipv4_address: String,
+  pub ipv4_gateway: Option<String>,
+  /// As CIDR.
+  pub ipv6_address: Option<String>,
+  pub ipv6_gateway: Option<String>,
+  pub mac_address: Option<String>,
+  pub mtu: u32,
+}
+
+impl NatInterface {
+  pub fn new(ipv4_address: impl Into<String>, ipv4_gateway: impl Into<String>) -> Self {
+    Self {
+      ipv4_address: ipv4_address.into(),
+      ipv4_gateway: Some(ipv4_gateway.into()),
+      ipv6_address: None,
+      ipv6_gateway: None,
+      mac_address: None,
+      mtu: 1500,
+    }
+  }
+}
+
+/// The guest's `/etc/resolv.conf`. `DNS`.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Dns {
   /// IPv4 or IPv6 addresses. A hostname is refused at boot.
   pub nameservers: Vec<String>,
@@ -83,7 +189,25 @@ pub struct Dns {
   pub options: Vec<String>,
 }
 
-/// One line of the guest's `/etc/hosts`.
+impl Dns {
+  /// `DNS.defaultNameservers`.
+  pub fn default_nameservers() -> Vec<String> {
+    strings(&["1.1.1.1"])
+  }
+}
+
+impl Default for Dns {
+  fn default() -> Self {
+    Self {
+      nameservers: Self::default_nameservers(),
+      domain: None,
+      search_domains: Vec::new(),
+      options: Vec::new(),
+    }
+  }
+}
+
+/// One line of the guest's `/etc/hosts`. `Hosts.Entry`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HostsEntry {
   pub ip_address: String,
@@ -95,33 +219,61 @@ impl HostsEntry {
   pub fn new(ip_address: impl Into<String>, hostnames: &[&str]) -> Self {
     Self {
       ip_address: ip_address.into(),
-      hostnames: hostnames.iter().map(|name| name.to_string()).collect(),
+      hostnames: strings(hostnames),
       comment: None,
     }
   }
 }
 
-/// Guest paths Containerization guards by default — masking some, making
-/// others read-only — and what a container does with that set.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub enum GuardedPaths {
-  /// The OCI standard set, as Containerization defines it: `/proc/kcore`,
-  /// `/sys/firmware` and the like.
-  #[default]
-  Default,
-  /// The standard set, and these too.
-  DefaultAnd(Vec<String>),
-  /// These alone. Empty guards nothing.
-  Only(Vec<String>),
+/// The guest's `/etc/hosts`, written whole. `Hosts`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Hosts {
+  pub entries: Vec<HostsEntry>,
+  /// Rendered at the top of the file.
+  pub comment: Option<String>,
 }
 
-/// The seccomp filter on a container's processes.
+/// `Hosts.default`: localhost and the standard IPv6 names.
+impl Default for Hosts {
+  fn default() -> Self {
+    Self {
+      entries: vec![
+        HostsEntry::new("127.0.0.1", &["localhost"]),
+        HostsEntry::new("::1", &["localhost", "ip6-localhost", "ip6-loopback"]),
+        HostsEntry::new("fe00::", &["ip6-localnet"]),
+        HostsEntry::new("ff00::", &["ip6-mcastprefix"]),
+        HostsEntry::new("ff02::1", &["ip6-allnodes"]),
+        HostsEntry::new("ff02::2", &["ip6-allrouters"]),
+      ],
+      comment: None,
+    }
+  }
+}
+
+/// Where the guest's serial console is written. `BootLog.file`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BootLog {
+  pub path: PathBuf,
+  /// Otherwise the file is replaced.
+  pub append: bool,
+}
+
+impl BootLog {
+  /// Appending, as `BootLog.file(path:)` does by default.
+  pub fn file(path: impl Into<PathBuf>) -> Self {
+    Self {
+      path: path.into(),
+      append: true,
+    }
+  }
+}
+
+/// A container's seccomp filter. `LinuxContainer.Configuration.SeccompProfile`.
 ///
-/// Only an OCI runtime installs one, so anything but `Unconfined` needs
-/// [`BootSpec::oci_runtime`], and a boot without one fails rather than run
-/// unfiltered.
+/// Only an OCI runtime installs one: anything but `Unconfined` without
+/// [`LinuxContainerConfiguration::oci_runtime_path`] fails the boot.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub enum Seccomp {
+pub enum SeccompProfile {
   #[default]
   Unconfined,
   /// containerd's allowlist, resolved against the process's capabilities.
@@ -131,125 +283,194 @@ pub enum Seccomp {
   Profile(String),
 }
 
-/// A container to create and start.
-///
-/// Mounts keep their declared order, which matters for nested paths. Sockets
-/// are relayed after them; nothing nests in a socket, so that is safe.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BootSpec {
-  /// The container's id, and its directory in the store.
-  pub name: String,
-  /// Registry-qualified: nothing expands `debian:stable-slim`.
-  pub image: String,
-  pub resources: Resources,
-  /// The container's first process. It outlives every `exec`, so a workload
-  /// that exits takes the container with it — pass a keepalive to hold one open.
-  pub arguments: Vec<String>,
-  /// `NAME=VALUE`, already resolved against wherever the caller takes values
-  /// from. Nothing here reads the host environment.
-  pub environment: Vec<String>,
-  pub mounts: Vec<Mount>,
-  pub sockets: Vec<SocketRelay>,
-  pub workdir: Option<PathBuf>,
-  pub network: Network,
-  /// Ceiling for an image's unpacked rootfs. Sparse, so a ceiling rather than
-  /// an allocation, but no container may outgrow it.
-  pub rootfs_capacity_in_bytes: u64,
-  /// `None` is the container's name.
-  pub hostname: Option<String>,
-  /// Kernel parameters set in the container, by dotted name
-  /// (`net.core.somaxconn`).
-  pub sysctl: BTreeMap<String, String>,
-  /// `None` resolves through the network's gateway.
-  pub dns: Option<Dns>,
-  /// Replaces the image's `/etc/hosts` whole, so include `localhost` when that
-  /// should still resolve. `None` keeps the image's.
-  pub hosts: Option<Vec<HostsEntry>>,
-  /// Paths hidden from the container's processes.
-  pub masked_paths: GuardedPaths,
-  /// Paths the container's processes cannot write.
-  pub readonly_paths: GuardedPaths,
-  /// Runs the first process under a minimal init that forwards signals and
-  /// reaps zombies, for a workload that does neither as PID 1.
-  pub use_init: bool,
-  /// Lets the guest run VMs of its own. Needs an M3 or later; a boot that asks
-  /// for it elsewhere fails rather than boot without it.
-  pub nested_virtualization: bool,
-  /// Where the guest's serial console is written, replaced on every boot.
-  /// `None` is `bootlog.log` in the container's directory, which the next boot
-  /// clears.
-  pub boot_log: Option<PathBuf>,
-  /// **Experimental.** An OCI runtime (`runc`) to start processes with, as a
-  /// path in the *init* filesystem rather than the image's. The stock init
-  /// image carries none.
-  pub oci_runtime: Option<String>,
-  pub seccomp: Seccomp,
+/// Who a process runs as. `User`, from the OCI runtime spec.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct User {
+  pub uid: u32,
+  pub gid: u32,
+  pub umask: Option<u32>,
+  pub additional_gids: Vec<u32>,
+  /// A name the guest resolves, e.g. from an image's `USER`. Empty for none.
+  pub username: String,
 }
 
-impl BootSpec {
-  /// `ContainerManager`'s own default rootfs ceiling.
-  pub const DEFAULT_ROOTFS_CAPACITY_IN_BYTES: u64 = 8 * 1024 * 1024 * 1024;
-
-  pub fn new(name: impl Into<String>, image: impl Into<String>, resources: Resources, network: Network) -> Self {
+impl User {
+  /// A user the guest looks up by name, or as `uid[:gid]`.
+  pub fn named(username: impl Into<String>) -> Self {
     Self {
-      name: name.into(),
-      image: image.into(),
-      resources,
-      arguments: Vec::new(),
-      environment: Vec::new(),
-      mounts: Vec::new(),
-      sockets: Vec::new(),
-      workdir: None,
-      network,
-      rootfs_capacity_in_bytes: Self::DEFAULT_ROOTFS_CAPACITY_IN_BYTES,
-      hostname: None,
-      sysctl: BTreeMap::new(),
-      dns: None,
-      hosts: None,
-      masked_paths: GuardedPaths::Default,
-      readonly_paths: GuardedPaths::Default,
-      use_init: false,
-      nested_virtualization: false,
-      boot_log: None,
-      oci_runtime: None,
-      seccomp: Seccomp::Unconfined,
+      username: username.into(),
+      ..Self::default()
     }
   }
 }
 
-/// A process to run in an already-booted container.
-#[derive(Debug)]
-pub struct ExecRequest {
-  /// The container to run it in.
-  pub name: String,
-  /// Distinguishes concurrent processes in one container; a resize names it.
-  pub id: String,
-  pub arguments: Vec<String>,
-  /// `NAME=VALUE`. Applied over the image's own, so these win.
-  pub environment: Vec<String>,
-  /// The guest user, as the image names it. `None` is the image's default.
-  pub user: Option<String>,
-  pub workdir: Option<PathBuf>,
-  /// `TERM` for a process on a terminal. Ignored without one.
-  pub term: Option<String>,
-  /// The descriptors the process runs against.
-  pub stdio: Stdio,
+/// A process in a container. `LinuxProcessConfiguration`.
+///
+/// Seeded from the image, as `ContainerManager` does; `None` keeps the image's.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct LinuxProcessConfiguration {
+  /// `None` is the image's entrypoint and command.
+  pub arguments: Option<Vec<String>>,
+  /// `NAME=VALUE`, appended to the image's, so these win.
+  pub environment_variables: Vec<String>,
+  /// `None` is the image's, or `/`.
+  pub working_directory: Option<String>,
+  /// `None` is the image's `USER`, or root.
+  pub user: Option<User>,
 }
 
-impl ExecRequest {
-  /// What a terminal reports itself as when the caller says nothing.
-  pub const DEFAULT_TERM: &'static str = "xterm";
-
-  pub fn new(name: impl Into<String>, id: impl Into<String>, arguments: Vec<String>, stdio: Stdio) -> Self {
+impl LinuxProcessConfiguration {
+  /// Runs `arguments`, everything else the image's.
+  pub fn new(arguments: &[&str]) -> Self {
     Self {
-      name: name.into(),
+      arguments: Some(strings(arguments)),
+      ..Self::default()
+    }
+  }
+}
+
+/// A container. `LinuxContainer.Configuration`, with the same defaults.
+///
+/// `mounts`, `masked_paths` and `readonly_paths` start as the standard sets:
+/// push to extend, replace to opt out.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LinuxContainerConfiguration {
+  /// The first process; when it exits, the container goes with it.
+  pub process: LinuxProcessConfiguration,
+  /// CPU cgroup limit, in cores. The VM is [`BootSpec::vm`].
+  pub cpus: u32,
+  /// Memory cgroup limit. The VM is [`BootSpec::vm`].
+  pub memory_in_bytes: u64,
+  /// `None` is the container's id.
+  pub hostname: Option<String>,
+  /// Kernel parameters, by dotted name (`net.core.somaxconn`).
+  pub sysctl: BTreeMap<String, String>,
+  /// The first is the default route. Empty means no network.
+  pub interfaces: Vec<NatInterface>,
+  pub sockets: Vec<UnixSocketConfiguration>,
+  /// In order, which matters for nested paths.
+  pub mounts: Vec<Mount>,
+  /// Paths hidden from the container's processes.
+  pub masked_paths: Vec<String>,
+  /// Paths the container's processes cannot write.
+  pub readonly_paths: Vec<String>,
+  /// `None` keeps the image's `resolv.conf`, which usually resolves nothing;
+  /// set it when the container has an interface.
+  pub dns: Option<Dns>,
+  /// `None` keeps the image's `/etc/hosts`.
+  pub hosts: Option<Hosts>,
+  /// Nested virtualization. M3 or later; elsewhere the boot fails.
+  pub virtualization: bool,
+  /// `None` is `bootlog.log` in the container's directory.
+  pub boot_log: Option<BootLog>,
+  /// **Experimental.** An OCI runtime (`runc`), as a path in the *init*
+  /// filesystem. The default init image has none.
+  pub oci_runtime_path: Option<String>,
+  pub seccomp_profile: SeccompProfile,
+  /// Run the first process under a minimal init (signal forwarding, reaping).
+  pub use_init: bool,
+}
+
+impl LinuxContainerConfiguration {
+  /// `LinuxContainer.defaultMounts()`.
+  pub fn default_mounts() -> Vec<Mount> {
+    let defaults = ["nosuid", "noexec", "nodev"];
+
+    vec![
+      Mount::any("proc", "proc", "/proc", &[]),
+      Mount::any("sysfs", "sysfs", "/sys", &defaults),
+      Mount::any("devtmpfs", "none", "/dev", &["nosuid", "mode=755"]),
+      Mount::any("mqueue", "mqueue", "/dev/mqueue", &defaults),
+      Mount::any(
+        "tmpfs",
+        "tmpfs",
+        "/dev/shm",
+        &["nosuid", "noexec", "nodev", "mode=1777", "size=65536k"],
+      ),
+      Mount::any("cgroup2", "none", "/sys/fs/cgroup", &defaults),
+      Mount::any(
+        "devpts",
+        "devpts",
+        "/dev/pts",
+        &["nosuid", "noexec", "newinstance", "gid=5", "mode=0620", "ptmxmode=0666"],
+      ),
+    ]
+  }
+
+  /// `LinuxContainer.defaultMaskedPaths()`: the OCI runtime spec's.
+  pub fn default_masked_paths() -> Vec<String> {
+    strings(&[
+      "/proc/asound",
+      "/proc/acpi",
+      "/proc/kcore",
+      "/proc/keys",
+      "/proc/latency_stats",
+      "/proc/timer_list",
+      "/proc/timer_stats",
+      "/proc/sched_debug",
+      "/proc/scsi",
+      "/sys/firmware",
+      "/sys/devices/virtual/powercap",
+    ])
+  }
+
+  /// `LinuxContainer.defaultReadonlyPaths()`: the OCI runtime spec's.
+  pub fn default_readonly_paths() -> Vec<String> {
+    strings(&["/proc/bus", "/proc/fs", "/proc/irq", "/proc/sys", "/proc/sysrq-trigger"])
+  }
+}
+
+impl Default for LinuxContainerConfiguration {
+  fn default() -> Self {
+    Self {
+      process: LinuxProcessConfiguration::default(),
+      cpus: 4,
+      memory_in_bytes: GIB,
+      hostname: None,
+      sysctl: BTreeMap::new(),
+      interfaces: Vec::new(),
+      sockets: Vec::new(),
+      mounts: Self::default_mounts(),
+      masked_paths: Self::default_masked_paths(),
+      readonly_paths: Self::default_readonly_paths(),
+      dns: None,
+      hosts: None,
+      virtualization: false,
+      boot_log: None,
+      oci_runtime_path: None,
+      seccomp_profile: SeccompProfile::Unconfined,
+      use_init: false,
+    }
+  }
+}
+
+/// A container to create and start: `ContainerManager.create`'s arguments.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BootSpec {
+  /// The container's id, and its directory in the store.
+  pub id: String,
+  /// Registry-qualified (nothing expands `debian:stable-slim`). Pulled if
+  /// missing.
+  pub reference: String,
+  /// Sparse ceiling for the unpacked rootfs. Applies only to an image's first
+  /// boot: later ones clone that unpack.
+  pub rootfs_size_in_bytes: u64,
+  pub vm: VmResources,
+  pub configuration: LinuxContainerConfiguration,
+}
+
+impl BootSpec {
+  /// `ContainerManager.create`'s own default.
+  pub const DEFAULT_ROOTFS_SIZE_IN_BYTES: u64 = 8 * GIB;
+
+  /// Everything else at Containerization's defaults.
+  pub fn new(id: impl Into<String>, reference: impl Into<String>) -> Self {
+    Self {
       id: id.into(),
-      arguments,
-      environment: Vec::new(),
-      user: None,
-      workdir: None,
-      term: Some(Self::DEFAULT_TERM.to_string()),
-      stdio,
+      reference: reference.into(),
+      rootfs_size_in_bytes: Self::DEFAULT_ROOTFS_SIZE_IN_BYTES,
+      vm: VmResources::default(),
+      configuration: LinuxContainerConfiguration::default(),
     }
   }
 }
@@ -269,15 +490,6 @@ pub struct BuildStep {
   pub cache_key: String,
 }
 
-/// A host directory shared into every step of a build: what a step reads in
-/// place of `COPY`.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BuildMount {
-  pub destination: String,
-  pub readonly: bool,
-  pub source: PathBuf,
-}
-
 /// What runs a step's script, with the script appended as the final argument.
 ///
 /// The default is `bash -euo pipefail -c`, not `sh -c`: a silent mid-step
@@ -288,11 +500,7 @@ pub struct Shell(pub Vec<String>);
 
 impl Default for Shell {
   fn default() -> Self {
-    Self(
-      ["/bin/bash", "-euo", "pipefail", "-c"]
-        .map(String::from)
-        .to_vec(),
-    )
+    Self(strings(&["/bin/bash", "-euo", "pipefail", "-c"]))
   }
 }
 
@@ -321,6 +529,9 @@ impl Default for CachePolicy {
 }
 
 /// An image to build: a base, steps, and what the result runs as.
+///
+/// The builder is an ordinary container that resolves DNS through its
+/// interface's gateway.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BuildPlan {
   /// The builder container's id, and its directory in the store, removed
@@ -330,10 +541,12 @@ pub struct BuildPlan {
   pub base: String,
   /// What the finished image is registered as.
   pub tag: String,
-  /// The builder's own resources, not those of a container run from the image.
-  pub resources: Resources,
-  /// Host directories shared into every step, where the caller asked for them.
-  pub mounts: Vec<BuildMount>,
+  /// The builder's own limits and VM, not the image's.
+  pub cpus: u32,
+  pub memory_in_bytes: u64,
+  pub vm: VmResources,
+  /// Shared into every step: what a step reads instead of `COPY`.
+  pub mounts: Vec<Mount>,
   pub steps: Vec<BuildStep>,
   /// `NAME=VALUE`, visible to every step and written into the image config,
   /// like `ENV`. The base's own are kept unless a name here overrides one.
@@ -344,11 +557,11 @@ pub struct BuildPlan {
   /// The user and directory the finished image runs as. `None` keeps the base's.
   pub user: Option<String>,
   pub workdir: Option<PathBuf>,
-  pub network: Network,
+  pub interface: NatInterface,
   /// The rootfs before any step. See [`BuildStep::cache_key`].
   pub base_key: String,
   /// Ceiling for the builder's rootfs. Every step's result must fit.
-  pub rootfs_capacity_in_bytes: u64,
+  pub rootfs_size_in_bytes: u64,
   pub cache: CachePolicy,
   /// What runs each step's script.
   pub shell: Shell,
@@ -364,37 +577,111 @@ pub struct BuildPlan {
 impl BuildPlan {
   /// Holds the builder open while steps run as `exec`s.
   pub fn default_keepalive() -> Vec<String> {
-    ["/bin/sh", "-c", "while :; do sleep 86400; done"]
-      .map(String::from)
-      .to_vec()
+    strings(&["/bin/sh", "-c", "while :; do sleep 86400; done"])
   }
 
+  /// Everything else at Containerization's defaults.
   pub fn new(
     name: impl Into<String>,
     base: impl Into<String>,
     tag: impl Into<String>,
-    resources: Resources,
-    network: Network,
+    interface: NatInterface,
     base_key: impl Into<String>,
   ) -> Self {
+    let container = LinuxContainerConfiguration::default();
+
     Self {
       name: name.into(),
       base: base.into(),
       tag: tag.into(),
-      resources,
+      cpus: container.cpus,
+      memory_in_bytes: container.memory_in_bytes,
+      vm: VmResources::default(),
       mounts: Vec::new(),
       steps: Vec::new(),
       environment: Vec::new(),
       labels: BTreeMap::new(),
       user: None,
       workdir: None,
-      network,
+      interface,
       base_key: base_key.into(),
-      rootfs_capacity_in_bytes: BootSpec::DEFAULT_ROOTFS_CAPACITY_IN_BYTES,
+      rootfs_size_in_bytes: BootSpec::DEFAULT_ROOTFS_SIZE_IN_BYTES,
       cache: CachePolicy::default(),
       shell: Shell::default(),
       keepalive: Self::default_keepalive(),
       reclaim: true,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn defaults_a_container_as_containerization_does() {
+    let configuration = LinuxContainerConfiguration::default();
+
+    assert_eq!(configuration.cpus, 4);
+    assert_eq!(configuration.memory_in_bytes, GIB);
+    assert_eq!(configuration.mounts.len(), 7);
+    assert!(
+      configuration
+        .masked_paths
+        .contains(&"/proc/kcore".to_string())
+    );
+    assert!(
+      configuration
+        .readonly_paths
+        .contains(&"/proc/sys".to_string())
+    );
+    assert_eq!(configuration.dns, None, "nothing writes resolv.conf unless asked");
+    assert_eq!(configuration.seccomp_profile, SeccompProfile::Unconfined);
+  }
+
+  #[test]
+  fn defaults_the_rest_as_containerization_does() {
+    assert_eq!(VmResources::default().memory_in_bytes, GIB);
+    assert_eq!(Dns::default().nameservers, ["1.1.1.1"]);
+    assert_eq!(Hosts::default().entries.len(), 6);
+    assert!(BootLog::file("/boot.log").append);
+    assert_eq!(UnixSocketConfiguration::new("/a", "/b").direction, Direction::Into);
+    assert_eq!(NatInterface::new("10.0.0.2/24", "10.0.0.1").mtu, 1500);
+    assert_eq!(BootSpec::new("id", "image").rootfs_size_in_bytes, 8 * GIB);
+  }
+
+  #[test]
+  fn builds_with_bash_failing_a_step_and_reclaims_after() {
+    let plan = BuildPlan::new(
+      "builder",
+      "docker.io/library/debian:stable-slim",
+      "example/base:latest",
+      NatInterface::new("192.168.64.7/24", "192.168.64.1"),
+      "basekey",
+    );
+
+    assert_eq!(plan.shell.0, ["/bin/bash", "-euo", "pipefail", "-c"]);
+    assert!(plan.cache.restore);
+    assert_eq!(plan.cache.keep, 24);
+    assert_eq!(plan.cache.keep_for, Duration::from_secs(14 * 24 * 60 * 60));
+    assert!(plan.reclaim);
+    assert_eq!(plan.rootfs_size_in_bytes, 8 * GIB);
+  }
+
+  #[test]
+  fn builds_mounts_of_each_kind() {
+    let share = Mount::share("/Users/user/workspace", "/workspace", &["ro"]);
+    assert_eq!(share.r#type, "virtiofs");
+    assert_eq!(share.options, ["ro"]);
+    assert_eq!(share.runtime_options, RuntimeOptions::Virtiofs(vec![]));
+
+    assert_eq!(
+      Mount::block("ext4", "/images/data.ext4", "/data", &[]).runtime_options,
+      RuntimeOptions::Virtioblk(vec![])
+    );
+    assert_eq!(
+      Mount::any("tmpfs", "tmpfs", "/scratch", &[]).runtime_options,
+      RuntimeOptions::Any(vec![])
+    );
   }
 }

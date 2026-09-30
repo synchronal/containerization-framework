@@ -4,7 +4,7 @@
 containers = { max-threads = 4 }
 
 [[profile.default.overrides]]
-filter = 'binary(session) | binary(configuration)'
+filter = 'binary(session) | binary(configuration) | binary(initfs)'
 test-group = 'containers'
 # Stuck, not slow: a container starts in about a second once unpacked.
 slow-timeout = { period = "120s", terminate-after = 3 }

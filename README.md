@@ -4,29 +4,27 @@ Rust bindings for Apple's [Containerization](https://github.com/apple/containeri
 framework: Linux containers.
 
 ```rust
-use containerization_framework::{BootSpec, ExecRequest, Network, Resources, Session, Stdio, Store};
+use containerization_framework as cfw;
+use cfw::model::{Dns, LinuxProcessConfiguration, NatInterface, VmResources};
 
-let session = Session::new(Store::at("/Users/me/.cache/containers"));
+let session = cfw::Session::new(cfw::Store::at("/Users/me/.cache/containers"));
 
-session.boot(&BootSpec {
-    arguments: vec!["/bin/sleep".into(), "infinity".into()],
-    ..BootSpec::new(
-        "example",
-        "docker.io/library/debian:stable-slim",
-        Resources { cpus: 4, memory_in_bytes: 4 << 30 },
-        Network {
-            ipv4_address: "192.168.64.7/24".into(),
-            ipv4_gateway: "192.168.64.1".into(),
-        },
-    )
-})?;
+let mut spec = cfw::BootSpec::new("example", "docker.io/library/debian:stable-slim");
+spec.vm = VmResources { cpus: 4, memory_in_bytes: (4 << 30) + VmResources::GUEST_MEMORY_OVERHEAD };
+spec.configuration.cpus = 4;
+spec.configuration.memory_in_bytes = 4 << 30;
+spec.configuration.process = LinuxProcessConfiguration::new(&["/bin/sleep", "infinity"]);
+spec.configuration.interfaces = vec![NatInterface::new("192.168.64.7/24", "192.168.64.1")];
+spec.configuration.dns = Some(Dns { nameservers: vec!["192.168.64.1".into()], ..Dns::default() });
 
-let code = session.exec(&ExecRequest::new(
+session.boot(&spec)?;
+
+let code = session.exec(
     "example",
     "hello",
-    vec!["/bin/echo".into(), "hello".into()],
-    Stdio::inherit(false),
-))?;
+    &LinuxProcessConfiguration::new(&["/bin/echo", "hello"]),
+    cfw::Stdio::inherit(false),
+)?;
 ```
 
 A container belongs to the process that booted it and dies with it. Nothing
@@ -88,7 +86,13 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
   block, boot it, run each step, and store the result as a single-layer image.
   No daemon, no builder image, no Dockerfile.
 - [`Session`] boots a [`BootSpec`]'s container from an image and runs
-  [`ExecRequest`]s in it.
+  processes in it.
+
+Configuration types in `model` mirror Containerization's
+(`LinuxContainerConfiguration`, `LinuxProcessConfiguration`, `Mount`, ...), with
+the same names and defaults, so its documentation applies. One difference:
+fields the image seeds (arguments, working directory, user) are `Option`s, and
+`None` keeps the image's.
 
 Build caching is by rootfs snapshot rather than by layer: a rebuild resumes from
 the deepest step whose `cache_key` still matches. This crate only stores and
@@ -104,13 +108,20 @@ push, OCI layout import/export, per-process rlimits and capabilities, and Rosett
 (so no linux/amd64 — arm64 only).
 
 An OCI runtime (and so seccomp) is configurable, but requires an init image with
-`runc`.
+`runc`, which Apple does not publish. `Store::with_initfs_reference` boots one.
 
 ## Versioning
 
 The Containerization release and the kernel are pinned separately, and a
 mismatch fails at runtime rather than at build time. `Session::version()` names
 both.
+
+A store boots Apple's `vminit` for the pinned release, or another image via
+`Store::with_initfs_reference` (its `vminitd` must match that release).
+
+As in Containerization, the init image is unpacked once per store, to
+`Store::initfs()`, and reused whatever image it came from. **Delete it after
+upgrading or switching images**, or VMs keep booting the old guest agent.
 
 ## Testing
 
