@@ -7,8 +7,8 @@
 //! structs: swift-bridge can't put a `String`-holding struct in a `Vec`
 //! (declined upstream, swift-bridge#305). They're `Rust`-prefixed to avoid
 //! Containerization's `Mount`, `User`, etc., and passed as owned clones since
-//! swift-bridge can't pass them to Swift by reference. (No doc comments inside
-//! the module: swift-bridge can't parse them.)
+//! swift-bridge can't pass them to Swift by reference; Swift then reads them in
+//! place. (No doc comments inside the module: swift-bridge can't parse them.)
 
 mod accessors;
 
@@ -47,9 +47,11 @@ pub(crate) mod ffi {
     fn mount_type(self: &RustMount) -> &str;
     fn source(self: &RustMount) -> &str;
     fn destination(self: &RustMount) -> &str;
-    fn options(self: &RustMount) -> Vec<String>;
+    fn options_len(self: &RustMount) -> usize;
+    fn options_at(self: &RustMount, index: usize) -> &str;
     fn runtime_kind(self: &RustMount) -> RuntimeKind;
-    fn runtime_options(self: &RustMount) -> Vec<String>;
+    fn runtime_options_len(self: &RustMount) -> usize;
+    fn runtime_options_at(self: &RustMount, index: usize) -> &str;
 
     type RustUnixSocketConfiguration;
     fn source(self: &RustUnixSocketConfiguration) -> String;
@@ -59,26 +61,31 @@ pub(crate) mod ffi {
 
     type RustNatInterface;
     fn ipv4_address(self: &RustNatInterface) -> &str;
-    fn ipv4_gateway(self: &RustNatInterface) -> Option<String>;
-    fn ipv6_address(self: &RustNatInterface) -> Option<String>;
-    fn ipv6_gateway(self: &RustNatInterface) -> Option<String>;
-    fn mac_address(self: &RustNatInterface) -> Option<String>;
+    fn ipv4_gateway(self: &RustNatInterface) -> Option<&str>;
+    fn ipv6_address(self: &RustNatInterface) -> Option<&str>;
+    fn ipv6_gateway(self: &RustNatInterface) -> Option<&str>;
+    fn mac_address(self: &RustNatInterface) -> Option<&str>;
     fn mtu(self: &RustNatInterface) -> u32;
 
     type RustDns;
-    fn nameservers(self: &RustDns) -> Vec<String>;
-    fn domain(self: &RustDns) -> Option<String>;
-    fn search_domains(self: &RustDns) -> Vec<String>;
-    fn options(self: &RustDns) -> Vec<String>;
+    fn nameservers_len(self: &RustDns) -> usize;
+    fn nameservers_at(self: &RustDns, index: usize) -> &str;
+    fn domain(self: &RustDns) -> Option<&str>;
+    fn search_domains_len(self: &RustDns) -> usize;
+    fn search_domains_at(self: &RustDns, index: usize) -> &str;
+    fn options_len(self: &RustDns) -> usize;
+    fn options_at(self: &RustDns, index: usize) -> &str;
 
     type RustHostsEntry;
     fn ip_address(self: &RustHostsEntry) -> &str;
-    fn hostnames(self: &RustHostsEntry) -> Vec<String>;
-    fn comment(self: &RustHostsEntry) -> Option<String>;
+    fn hostnames_len(self: &RustHostsEntry) -> usize;
+    fn hostnames_at(self: &RustHostsEntry, index: usize) -> &str;
+    fn comment(self: &RustHostsEntry) -> Option<&str>;
 
     type RustHosts;
-    fn entries(self: &RustHosts) -> Vec<RustHostsEntry>;
-    fn comment(self: &RustHosts) -> Option<String>;
+    fn entries_len(self: &RustHosts) -> usize;
+    fn entries_at(self: &RustHosts, index: usize) -> &RustHostsEntry;
+    fn comment(self: &RustHosts) -> Option<&str>;
 
     type RustBootLog;
     fn path(self: &RustBootLog) -> String;
@@ -88,14 +95,17 @@ pub(crate) mod ffi {
     fn uid(self: &RustUser) -> u32;
     fn gid(self: &RustUser) -> u32;
     fn umask(self: &RustUser) -> Option<u32>;
-    fn additional_gids(self: &RustUser) -> Vec<u32>;
+    fn additional_gids_len(self: &RustUser) -> usize;
+    fn additional_gids_at(self: &RustUser, index: usize) -> u32;
     fn username(self: &RustUser) -> &str;
 
     type RustLinuxProcessConfiguration;
     fn has_arguments(self: &RustLinuxProcessConfiguration) -> bool;
-    fn arguments(self: &RustLinuxProcessConfiguration) -> Vec<String>;
-    fn environment_variables(self: &RustLinuxProcessConfiguration) -> Vec<String>;
-    fn working_directory(self: &RustLinuxProcessConfiguration) -> Option<String>;
+    fn arguments_len(self: &RustLinuxProcessConfiguration) -> usize;
+    fn arguments_at(self: &RustLinuxProcessConfiguration, index: usize) -> &str;
+    fn environment_variables_len(self: &RustLinuxProcessConfiguration) -> usize;
+    fn environment_variables_at(self: &RustLinuxProcessConfiguration, index: usize) -> &str;
+    fn working_directory(self: &RustLinuxProcessConfiguration) -> Option<&str>;
     fn has_user(self: &RustLinuxProcessConfiguration) -> bool;
     fn user(self: &RustLinuxProcessConfiguration) -> &RustUser;
 
@@ -103,14 +113,20 @@ pub(crate) mod ffi {
     fn process(self: &RustLinuxContainerConfiguration) -> &RustLinuxProcessConfiguration;
     fn cpus(self: &RustLinuxContainerConfiguration) -> u32;
     fn memory_in_bytes(self: &RustLinuxContainerConfiguration) -> u64;
-    fn hostname(self: &RustLinuxContainerConfiguration) -> Option<String>;
-    fn sysctl_keys(self: &RustLinuxContainerConfiguration) -> Vec<String>;
-    fn sysctl(self: &RustLinuxContainerConfiguration, key: &str) -> Option<String>;
-    fn interfaces(self: &RustLinuxContainerConfiguration) -> Vec<RustNatInterface>;
-    fn sockets(self: &RustLinuxContainerConfiguration) -> Vec<RustUnixSocketConfiguration>;
-    fn mounts(self: &RustLinuxContainerConfiguration) -> Vec<RustMount>;
-    fn masked_paths(self: &RustLinuxContainerConfiguration) -> Vec<String>;
-    fn readonly_paths(self: &RustLinuxContainerConfiguration) -> Vec<String>;
+    fn hostname(self: &RustLinuxContainerConfiguration) -> Option<&str>;
+    fn sysctl_len(self: &RustLinuxContainerConfiguration) -> usize;
+    fn sysctl_key_at(self: &RustLinuxContainerConfiguration, index: usize) -> &str;
+    fn sysctl_value_at(self: &RustLinuxContainerConfiguration, index: usize) -> &str;
+    fn interfaces_len(self: &RustLinuxContainerConfiguration) -> usize;
+    fn interfaces_at(self: &RustLinuxContainerConfiguration, index: usize) -> &RustNatInterface;
+    fn sockets_len(self: &RustLinuxContainerConfiguration) -> usize;
+    fn sockets_at(self: &RustLinuxContainerConfiguration, index: usize) -> &RustUnixSocketConfiguration;
+    fn mounts_len(self: &RustLinuxContainerConfiguration) -> usize;
+    fn mounts_at(self: &RustLinuxContainerConfiguration, index: usize) -> &RustMount;
+    fn masked_paths_len(self: &RustLinuxContainerConfiguration) -> usize;
+    fn masked_paths_at(self: &RustLinuxContainerConfiguration, index: usize) -> &str;
+    fn readonly_paths_len(self: &RustLinuxContainerConfiguration) -> usize;
+    fn readonly_paths_at(self: &RustLinuxContainerConfiguration, index: usize) -> &str;
     fn has_dns(self: &RustLinuxContainerConfiguration) -> bool;
     fn dns(self: &RustLinuxContainerConfiguration) -> &RustDns;
     fn has_hosts(self: &RustLinuxContainerConfiguration) -> bool;
@@ -118,9 +134,9 @@ pub(crate) mod ffi {
     fn virtualization(self: &RustLinuxContainerConfiguration) -> bool;
     fn has_boot_log(self: &RustLinuxContainerConfiguration) -> bool;
     fn boot_log(self: &RustLinuxContainerConfiguration) -> &RustBootLog;
-    fn oci_runtime_path(self: &RustLinuxContainerConfiguration) -> Option<String>;
+    fn oci_runtime_path(self: &RustLinuxContainerConfiguration) -> Option<&str>;
     fn seccomp_mode(self: &RustLinuxContainerConfiguration) -> SeccompMode;
-    fn seccomp_profile(self: &RustLinuxContainerConfiguration) -> Option<String>;
+    fn seccomp_profile(self: &RustLinuxContainerConfiguration) -> Option<&str>;
     fn use_init(self: &RustLinuxContainerConfiguration) -> bool;
 
     type RustBootSpec;
@@ -134,7 +150,7 @@ pub(crate) mod ffi {
     type RustBuildStep;
     fn name(self: &RustBuildStep) -> &str;
     fn script(self: &RustBuildStep) -> &str;
-    fn user(self: &RustBuildStep) -> Option<String>;
+    fn user(self: &RustBuildStep) -> Option<&str>;
     fn cache_key(self: &RustBuildStep) -> &str;
 
     type RustBuildPlan;
@@ -145,12 +161,16 @@ pub(crate) mod ffi {
     fn memory_in_bytes(self: &RustBuildPlan) -> u64;
     fn vm_cpus(self: &RustBuildPlan) -> u32;
     fn vm_memory_in_bytes(self: &RustBuildPlan) -> u64;
-    fn mounts(self: &RustBuildPlan) -> Vec<RustMount>;
-    fn steps(self: &RustBuildPlan) -> Vec<RustBuildStep>;
-    fn environment(self: &RustBuildPlan) -> Vec<String>;
-    fn label_keys(self: &RustBuildPlan) -> Vec<String>;
-    fn label(self: &RustBuildPlan, key: &str) -> Option<String>;
-    fn user(self: &RustBuildPlan) -> Option<String>;
+    fn mounts_len(self: &RustBuildPlan) -> usize;
+    fn mounts_at(self: &RustBuildPlan, index: usize) -> &RustMount;
+    fn steps_len(self: &RustBuildPlan) -> usize;
+    fn steps_at(self: &RustBuildPlan, index: usize) -> &RustBuildStep;
+    fn environment_len(self: &RustBuildPlan) -> usize;
+    fn environment_at(self: &RustBuildPlan, index: usize) -> &str;
+    fn labels_len(self: &RustBuildPlan) -> usize;
+    fn label_key_at(self: &RustBuildPlan, index: usize) -> &str;
+    fn label_value_at(self: &RustBuildPlan, index: usize) -> &str;
+    fn user(self: &RustBuildPlan) -> Option<&str>;
     fn working_directory(self: &RustBuildPlan) -> Option<String>;
     fn interface(self: &RustBuildPlan) -> &RustNatInterface;
     fn base_key(self: &RustBuildPlan) -> &str;
@@ -158,8 +178,10 @@ pub(crate) mod ffi {
     fn cache_restore(self: &RustBuildPlan) -> bool;
     fn cache_keep(self: &RustBuildPlan) -> u64;
     fn cache_keep_for_seconds(self: &RustBuildPlan) -> u64;
-    fn shell(self: &RustBuildPlan) -> Vec<String>;
-    fn keepalive(self: &RustBuildPlan) -> Vec<String>;
+    fn shell_len(self: &RustBuildPlan) -> usize;
+    fn shell_at(self: &RustBuildPlan, index: usize) -> &str;
+    fn keepalive_len(self: &RustBuildPlan) -> usize;
+    fn keepalive_at(self: &RustBuildPlan, index: usize) -> &str;
     fn reclaim(self: &RustBuildPlan) -> bool;
   }
 

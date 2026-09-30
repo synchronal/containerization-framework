@@ -1,14 +1,26 @@
 //! Crate-private getters Swift reads the model through.
 //!
-//! Shapes swift-bridge can't return become pairs: optional nested value →
-//! `has_x` + `x`; map → keys + lookup; enum → mode + payload.
+//! Each lends what the model holds, so Swift's copy is the only one. Shapes
+//! swift-bridge can't return become sets: optional nested value → `has_x` +
+//! `x`; list → `x_len` + `x_at`; map → length + key and value at an index;
+//! enum → mode + payload. Swift asks for an index only below the length.
 
 use super::ffi::{RuntimeKind, SeccompMode, SocketDirection};
 use crate::model;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 fn path(path: &Path) -> String {
   path.display().to_string()
+}
+
+/// The `index`th entry of a sorted map.
+fn entry_at(map: &BTreeMap<String, String>, index: usize) -> (&str, &str) {
+  map
+    .iter()
+    .nth(index)
+    .map(|(key, value)| (key.as_str(), value.as_str()))
+    .expect("Swift asks for an entry only below the length")
 }
 
 impl model::Mount {
@@ -24,8 +36,12 @@ impl model::Mount {
     &self.destination
   }
 
-  pub(crate) fn options(&self) -> Vec<String> {
-    self.options.clone()
+  pub(crate) fn options_len(&self) -> usize {
+    self.options.len()
+  }
+
+  pub(crate) fn options_at(&self, index: usize) -> &str {
+    &self.options[index]
   }
 
   pub(crate) fn runtime_kind(&self) -> RuntimeKind {
@@ -36,11 +52,20 @@ impl model::Mount {
     }
   }
 
-  pub(crate) fn runtime_options(&self) -> Vec<String> {
+  pub(crate) fn runtime_options_len(&self) -> usize {
+    self.runtime_option_values().len()
+  }
+
+  pub(crate) fn runtime_options_at(&self, index: usize) -> &str {
+    &self.runtime_option_values()[index]
+  }
+
+  /// What the runtime options carry, whatever their kind.
+  fn runtime_option_values(&self) -> &[String] {
     match &self.runtime_options {
       model::RuntimeOptions::Virtioblk(options)
       | model::RuntimeOptions::Virtiofs(options)
-      | model::RuntimeOptions::Any(options) => options.clone(),
+      | model::RuntimeOptions::Any(options) => options,
     }
   }
 }
@@ -71,20 +96,20 @@ impl model::NatInterface {
     &self.ipv4_address
   }
 
-  pub(crate) fn ipv4_gateway(&self) -> Option<String> {
-    self.ipv4_gateway.clone()
+  pub(crate) fn ipv4_gateway(&self) -> Option<&str> {
+    self.ipv4_gateway.as_deref()
   }
 
-  pub(crate) fn ipv6_address(&self) -> Option<String> {
-    self.ipv6_address.clone()
+  pub(crate) fn ipv6_address(&self) -> Option<&str> {
+    self.ipv6_address.as_deref()
   }
 
-  pub(crate) fn ipv6_gateway(&self) -> Option<String> {
-    self.ipv6_gateway.clone()
+  pub(crate) fn ipv6_gateway(&self) -> Option<&str> {
+    self.ipv6_gateway.as_deref()
   }
 
-  pub(crate) fn mac_address(&self) -> Option<String> {
-    self.mac_address.clone()
+  pub(crate) fn mac_address(&self) -> Option<&str> {
+    self.mac_address.as_deref()
   }
 
   pub(crate) fn mtu(&self) -> u32 {
@@ -93,20 +118,32 @@ impl model::NatInterface {
 }
 
 impl model::Dns {
-  pub(crate) fn nameservers(&self) -> Vec<String> {
-    self.nameservers.clone()
+  pub(crate) fn nameservers_len(&self) -> usize {
+    self.nameservers.len()
   }
 
-  pub(crate) fn domain(&self) -> Option<String> {
-    self.domain.clone()
+  pub(crate) fn nameservers_at(&self, index: usize) -> &str {
+    &self.nameservers[index]
   }
 
-  pub(crate) fn search_domains(&self) -> Vec<String> {
-    self.search_domains.clone()
+  pub(crate) fn domain(&self) -> Option<&str> {
+    self.domain.as_deref()
   }
 
-  pub(crate) fn options(&self) -> Vec<String> {
-    self.options.clone()
+  pub(crate) fn search_domains_len(&self) -> usize {
+    self.search_domains.len()
+  }
+
+  pub(crate) fn search_domains_at(&self, index: usize) -> &str {
+    &self.search_domains[index]
+  }
+
+  pub(crate) fn options_len(&self) -> usize {
+    self.options.len()
+  }
+
+  pub(crate) fn options_at(&self, index: usize) -> &str {
+    &self.options[index]
   }
 }
 
@@ -115,22 +152,30 @@ impl model::HostsEntry {
     &self.ip_address
   }
 
-  pub(crate) fn hostnames(&self) -> Vec<String> {
-    self.hostnames.clone()
+  pub(crate) fn hostnames_len(&self) -> usize {
+    self.hostnames.len()
   }
 
-  pub(crate) fn comment(&self) -> Option<String> {
-    self.comment.clone()
+  pub(crate) fn hostnames_at(&self, index: usize) -> &str {
+    &self.hostnames[index]
+  }
+
+  pub(crate) fn comment(&self) -> Option<&str> {
+    self.comment.as_deref()
   }
 }
 
 impl model::Hosts {
-  pub(crate) fn entries(&self) -> Vec<model::HostsEntry> {
-    self.entries.clone()
+  pub(crate) fn entries_len(&self) -> usize {
+    self.entries.len()
   }
 
-  pub(crate) fn comment(&self) -> Option<String> {
-    self.comment.clone()
+  pub(crate) fn entries_at(&self, index: usize) -> &model::HostsEntry {
+    &self.entries[index]
+  }
+
+  pub(crate) fn comment(&self) -> Option<&str> {
+    self.comment.as_deref()
   }
 }
 
@@ -157,8 +202,12 @@ impl model::User {
     self.umask
   }
 
-  pub(crate) fn additional_gids(&self) -> Vec<u32> {
-    self.additional_gids.clone()
+  pub(crate) fn additional_gids_len(&self) -> usize {
+    self.additional_gids.len()
+  }
+
+  pub(crate) fn additional_gids_at(&self, index: usize) -> u32 {
+    self.additional_gids[index]
   }
 
   pub(crate) fn username(&self) -> &str {
@@ -171,17 +220,25 @@ impl model::LinuxProcessConfiguration {
     self.arguments.is_some()
   }
 
-  /// Empty when [`Self::has_arguments`] is false.
-  pub(crate) fn arguments(&self) -> Vec<String> {
-    self.arguments.clone().unwrap_or_default()
+  /// Zero when [`Self::has_arguments`] is false.
+  pub(crate) fn arguments_len(&self) -> usize {
+    self.arguments.as_deref().unwrap_or_default().len()
   }
 
-  pub(crate) fn environment_variables(&self) -> Vec<String> {
-    self.environment_variables.clone()
+  pub(crate) fn arguments_at(&self, index: usize) -> &str {
+    &self.arguments.as_deref().unwrap_or_default()[index]
   }
 
-  pub(crate) fn working_directory(&self) -> Option<String> {
-    self.working_directory.clone()
+  pub(crate) fn environment_variables_len(&self) -> usize {
+    self.environment_variables.len()
+  }
+
+  pub(crate) fn environment_variables_at(&self, index: usize) -> &str {
+    &self.environment_variables[index]
+  }
+
+  pub(crate) fn working_directory(&self) -> Option<&str> {
+    self.working_directory.as_deref()
   }
 
   pub(crate) fn has_user(&self) -> bool {
@@ -210,36 +267,60 @@ impl model::LinuxContainerConfiguration {
     self.memory_in_bytes
   }
 
-  pub(crate) fn hostname(&self) -> Option<String> {
-    self.hostname.clone()
+  pub(crate) fn hostname(&self) -> Option<&str> {
+    self.hostname.as_deref()
   }
 
-  pub(crate) fn sysctl_keys(&self) -> Vec<String> {
-    self.sysctl.keys().cloned().collect()
+  pub(crate) fn sysctl_len(&self) -> usize {
+    self.sysctl.len()
   }
 
-  pub(crate) fn sysctl(&self, key: &str) -> Option<String> {
-    self.sysctl.get(key).cloned()
+  pub(crate) fn sysctl_key_at(&self, index: usize) -> &str {
+    entry_at(&self.sysctl, index).0
   }
 
-  pub(crate) fn interfaces(&self) -> Vec<model::NatInterface> {
-    self.interfaces.clone()
+  pub(crate) fn sysctl_value_at(&self, index: usize) -> &str {
+    entry_at(&self.sysctl, index).1
   }
 
-  pub(crate) fn sockets(&self) -> Vec<model::UnixSocketConfiguration> {
-    self.sockets.clone()
+  pub(crate) fn interfaces_len(&self) -> usize {
+    self.interfaces.len()
   }
 
-  pub(crate) fn mounts(&self) -> Vec<model::Mount> {
-    self.mounts.clone()
+  pub(crate) fn interfaces_at(&self, index: usize) -> &model::NatInterface {
+    &self.interfaces[index]
   }
 
-  pub(crate) fn masked_paths(&self) -> Vec<String> {
-    self.masked_paths.clone()
+  pub(crate) fn sockets_len(&self) -> usize {
+    self.sockets.len()
   }
 
-  pub(crate) fn readonly_paths(&self) -> Vec<String> {
-    self.readonly_paths.clone()
+  pub(crate) fn sockets_at(&self, index: usize) -> &model::UnixSocketConfiguration {
+    &self.sockets[index]
+  }
+
+  pub(crate) fn mounts_len(&self) -> usize {
+    self.mounts.len()
+  }
+
+  pub(crate) fn mounts_at(&self, index: usize) -> &model::Mount {
+    &self.mounts[index]
+  }
+
+  pub(crate) fn masked_paths_len(&self) -> usize {
+    self.masked_paths.len()
+  }
+
+  pub(crate) fn masked_paths_at(&self, index: usize) -> &str {
+    &self.masked_paths[index]
+  }
+
+  pub(crate) fn readonly_paths_len(&self) -> usize {
+    self.readonly_paths.len()
+  }
+
+  pub(crate) fn readonly_paths_at(&self, index: usize) -> &str {
+    &self.readonly_paths[index]
   }
 
   pub(crate) fn has_dns(&self) -> bool {
@@ -282,8 +363,8 @@ impl model::LinuxContainerConfiguration {
       .expect("Swift asks for a boot log only after has_boot_log")
   }
 
-  pub(crate) fn oci_runtime_path(&self) -> Option<String> {
-    self.oci_runtime_path.clone()
+  pub(crate) fn oci_runtime_path(&self) -> Option<&str> {
+    self.oci_runtime_path.as_deref()
   }
 
   pub(crate) fn seccomp_mode(&self) -> SeccompMode {
@@ -295,9 +376,9 @@ impl model::LinuxContainerConfiguration {
   }
 
   /// The custom profile's JSON, when [`Self::seccomp_mode`] is `Profile`.
-  pub(crate) fn seccomp_profile(&self) -> Option<String> {
+  pub(crate) fn seccomp_profile(&self) -> Option<&str> {
     match &self.seccomp_profile {
-      model::SeccompProfile::Profile(profile) => Some(profile.clone()),
+      model::SeccompProfile::Profile(profile) => Some(profile),
       _ => None,
     }
   }
@@ -342,8 +423,8 @@ impl model::BuildStep {
     &self.script
   }
 
-  pub(crate) fn user(&self) -> Option<String> {
-    self.user.clone()
+  pub(crate) fn user(&self) -> Option<&str> {
+    self.user.as_deref()
   }
 
   /// Unsalted; the builder mixes in the base's digest and the rootfs ceiling.
@@ -381,28 +462,44 @@ impl model::BuildPlan {
     self.vm.memory_in_bytes
   }
 
-  pub(crate) fn mounts(&self) -> Vec<model::Mount> {
-    self.mounts.clone()
+  pub(crate) fn mounts_len(&self) -> usize {
+    self.mounts.len()
   }
 
-  pub(crate) fn steps(&self) -> Vec<model::BuildStep> {
-    self.steps.clone()
+  pub(crate) fn mounts_at(&self, index: usize) -> &model::Mount {
+    &self.mounts[index]
   }
 
-  pub(crate) fn environment(&self) -> Vec<String> {
-    self.environment.clone()
+  pub(crate) fn steps_len(&self) -> usize {
+    self.steps.len()
   }
 
-  pub(crate) fn label_keys(&self) -> Vec<String> {
-    self.labels.keys().cloned().collect()
+  pub(crate) fn steps_at(&self, index: usize) -> &model::BuildStep {
+    &self.steps[index]
   }
 
-  pub(crate) fn label(&self, key: &str) -> Option<String> {
-    self.labels.get(key).cloned()
+  pub(crate) fn environment_len(&self) -> usize {
+    self.environment.len()
   }
 
-  pub(crate) fn user(&self) -> Option<String> {
-    self.user.clone()
+  pub(crate) fn environment_at(&self, index: usize) -> &str {
+    &self.environment[index]
+  }
+
+  pub(crate) fn labels_len(&self) -> usize {
+    self.labels.len()
+  }
+
+  pub(crate) fn label_key_at(&self, index: usize) -> &str {
+    entry_at(&self.labels, index).0
+  }
+
+  pub(crate) fn label_value_at(&self, index: usize) -> &str {
+    entry_at(&self.labels, index).1
+  }
+
+  pub(crate) fn user(&self) -> Option<&str> {
+    self.user.as_deref()
   }
 
   pub(crate) fn working_directory(&self) -> Option<String> {
@@ -433,12 +530,20 @@ impl model::BuildPlan {
     self.cache.keep_for.as_secs()
   }
 
-  pub(crate) fn shell(&self) -> Vec<String> {
-    self.shell.0.clone()
+  pub(crate) fn shell_len(&self) -> usize {
+    self.shell.0.len()
   }
 
-  pub(crate) fn keepalive(&self) -> Vec<String> {
-    self.keepalive.clone()
+  pub(crate) fn shell_at(&self, index: usize) -> &str {
+    &self.shell.0[index]
+  }
+
+  pub(crate) fn keepalive_len(&self) -> usize {
+    self.keepalive.len()
+  }
+
+  pub(crate) fn keepalive_at(&self, index: usize) -> &str {
+    &self.keepalive[index]
   }
 
   pub(crate) fn reclaim(&self) -> bool {
@@ -458,21 +563,45 @@ mod tests {
     assert!(!configuration.has_hosts());
     assert!(!configuration.has_boot_log());
     assert!(!configuration.process().has_arguments());
-    assert!(configuration.process().arguments().is_empty());
+    assert_eq!(configuration.process().arguments_len(), 0);
     assert!(!configuration.process().has_user());
     assert_eq!(configuration.seccomp_profile(), None);
   }
 
   #[test]
-  fn reads_a_map_as_its_keys_and_a_lookup() {
+  fn reads_a_list_as_its_length_and_each_element() {
+    let process = model::LinuxProcessConfiguration::new(&["/bin/echo", "hello"]);
+
+    assert_eq!(process.arguments_len(), 2);
+    assert_eq!(process.arguments_at(1), "hello");
+
+    let mount = model::Mount {
+      runtime_options: model::RuntimeOptions::Virtiofs(vec!["cache=auto".into()]),
+      ..model::Mount::share("/Users/user/workspace", "/workspace", &["ro"])
+    };
+
+    assert_eq!(mount.options_len(), 1);
+    assert_eq!(mount.options_at(0), "ro");
+    assert_eq!(mount.runtime_options_len(), 1);
+    assert_eq!(mount.runtime_options_at(0), "cache=auto");
+  }
+
+  #[test]
+  fn reads_a_map_as_its_length_and_each_entry() {
     let configuration = model::LinuxContainerConfiguration {
-      sysctl: [("net.core.somaxconn".to_string(), "4096".to_string())].into(),
+      sysctl: [
+        ("vm.swappiness".to_string(), "10".to_string()),
+        ("net.core.somaxconn".to_string(), "4096".to_string()),
+      ]
+      .into(),
       ..Default::default()
     };
 
-    assert_eq!(configuration.sysctl_keys(), ["net.core.somaxconn"]);
-    assert_eq!(configuration.sysctl("net.core.somaxconn").as_deref(), Some("4096"));
-    assert_eq!(configuration.sysctl("vm.swappiness"), None);
+    assert_eq!(configuration.sysctl_len(), 2);
+    assert_eq!(configuration.sysctl_key_at(0), "net.core.somaxconn");
+    assert_eq!(configuration.sysctl_value_at(0), "4096");
+    assert_eq!(configuration.sysctl_key_at(1), "vm.swappiness");
+    assert_eq!(configuration.sysctl_value_at(1), "10");
   }
 
   #[test]
@@ -489,9 +618,10 @@ mod tests {
 
     assert_eq!(plan.cache_keep_for_seconds(), 14 * 24 * 60 * 60);
     assert_eq!(plan.working_directory().as_deref(), Some("/workspace"));
-    assert_eq!(plan.label_keys(), ["com.example.built-by"]);
-    assert_eq!(plan.label("com.example.built-by").as_deref(), Some("example"));
-    assert_eq!(plan.interface().ipv4_gateway().as_deref(), Some("192.168.64.1"));
+    assert_eq!(plan.labels_len(), 1);
+    assert_eq!(plan.label_key_at(0), "com.example.built-by");
+    assert_eq!(plan.label_value_at(0), "example");
+    assert_eq!(plan.interface().ipv4_gateway(), Some("192.168.64.1"));
   }
 
   #[test]
@@ -502,7 +632,7 @@ mod tests {
     };
 
     assert!(matches!(configuration.seccomp_mode(), super::SeccompMode::Profile));
-    assert_eq!(configuration.seccomp_profile().as_deref(), Some("{}"));
+    assert_eq!(configuration.seccomp_profile(), Some("{}"));
 
     let mount = model::Mount::block("ext4", "/images/data.ext4", "/data", &[]);
     assert!(matches!(mount.runtime_kind(), super::RuntimeKind::Virtioblk));

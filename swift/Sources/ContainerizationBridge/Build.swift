@@ -114,14 +114,10 @@ struct BuildPlan: Sendable {
         memoryInBytes = plan.memory_in_bytes()
         vm = VMResources(cpus: Int(plan.vm_cpus()), memoryInBytes: plan.vm_memory_in_bytes())
         rootfsSizeInBytes = plan.rootfs_size_in_bytes()
-        mounts = plan.mounts().map { Containerization.Mount($0) }
-        steps = plan.steps().map { BuildStep($0) }
-        environment = strings(plan.environment())
-        labels = Dictionary(
-            uniqueKeysWithValues: strings(plan.label_keys()).compactMap { key in
-                plan.label(key).map { (key, $0.toString()) }
-            }
-        )
+        mounts = list(plan.mounts_len()) { Containerization.Mount(plan.mounts_at($0)) }
+        steps = list(plan.steps_len()) { BuildStep(plan.steps_at($0)) }
+        environment = strings(plan.environment_len(), plan.environment_at)
+        labels = dictionary(plan.labels_len(), plan.label_key_at, plan.label_value_at)
         user = plan.user()?.toString()
         workingDirectory = plan.working_directory()?.toString()
         interface = try NATInterface(plan.interface())
@@ -131,8 +127,8 @@ struct BuildPlan: Sendable {
             keep: Int(plan.cache_keep()),
             keepForSeconds: Double(plan.cache_keep_for_seconds())
         )
-        shell = strings(plan.shell())
-        keepalive = strings(plan.keepalive())
+        shell = strings(plan.shell_len(), plan.shell_at)
+        keepalive = strings(plan.keepalive_len(), plan.keepalive_at)
         reclaim = plan.reclaim()
     }
 }

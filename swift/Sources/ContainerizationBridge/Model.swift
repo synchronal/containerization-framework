@@ -13,14 +13,24 @@ import Foundation
 // For `FilePermissions` (relayed socket mode).
 import SystemPackage
 
-/// A `Vec<String>`'s elements.
-func strings(_ vec: RustVec<RustString>) -> [String] {
-    vec.map { $0.as_str().toString() }
+/// A list Rust lends by index: `x_len`, `x_at`.
+func list<Element>(_ count: UInt, _ element: (UInt) throws -> Element) rethrows -> [Element] {
+    try (0..<count).map(element)
+}
+
+/// A list of strings Rust lends by index.
+func strings(_ count: UInt, _ element: (UInt) -> RustStr) -> [String] {
+    list(count) { element($0).toString() }
+}
+
+/// A map Rust lends by index: `x_len`, `x_key_at`, `x_value_at`.
+func dictionary(_ count: UInt, _ key: (UInt) -> RustStr, _ value: (UInt) -> RustStr) -> [String: String] {
+    Dictionary(uniqueKeysWithValues: list(count) { (key($0).toString(), value($0).toString()) })
 }
 
 extension Containerization.Mount {
     init(_ mount: RustMountRef) {
-        let options = strings(mount.runtime_options())
+        let options = strings(mount.runtime_options_len(), mount.runtime_options_at)
         let runtimeOptions: RuntimeOptions =
             switch mount.runtime_kind() {
             case .Virtioblk: .virtioblk(options)
@@ -32,7 +42,7 @@ extension Containerization.Mount {
             type: mount.mount_type().toString(),
             source: mount.source().toString(),
             destination: mount.destination().toString(),
-            options: strings(mount.options()),
+            options: strings(mount.options_len(), mount.options_at),
             runtimeOptions: runtimeOptions
         )
     }
@@ -79,10 +89,10 @@ extension NATInterface {
 extension DNS {
     init(_ dns: RustDnsRef) throws {
         self.init(
-            nameservers: strings(dns.nameservers()),
+            nameservers: strings(dns.nameservers_len(), dns.nameservers_at),
             domain: dns.domain()?.toString(),
-            searchDomains: strings(dns.search_domains()),
-            options: strings(dns.options())
+            searchDomains: strings(dns.search_domains_len(), dns.search_domains_at),
+            options: strings(dns.options_len(), dns.options_at)
         )
         // The library doesn't check; a hostname would silently break DNS.
         try validate()
@@ -92,10 +102,10 @@ extension DNS {
 extension Hosts {
     init(_ hosts: RustHostsRef) {
         self.init(
-            entries: hosts.entries().map { entry in
+            entries: list(hosts.entries_len(), hosts.entries_at).map { entry in
                 Hosts.Entry(
                     ipAddress: entry.ip_address().toString(),
-                    hostnames: strings(entry.hostnames()),
+                    hostnames: strings(entry.hostnames_len(), entry.hostnames_at),
                     comment: entry.comment()?.toString()
                 )
             },
@@ -110,7 +120,7 @@ extension User {
             uid: user.uid(),
             gid: user.gid(),
             umask: user.umask(),
-            additionalGids: Array(user.additional_gids()),
+            additionalGids: list(user.additional_gids_len(), user.additional_gids_at),
             username: user.username().toString()
         )
     }
@@ -124,8 +134,8 @@ struct ProcessSettings: Sendable {
     var user: User?
 
     init(_ process: RustLinuxProcessConfigurationRef) {
-        arguments = process.has_arguments() ? strings(process.arguments()) : nil
-        environmentVariables = strings(process.environment_variables())
+        arguments = process.has_arguments() ? strings(process.arguments_len(), process.arguments_at) : nil
+        environmentVariables = strings(process.environment_variables_len(), process.environment_variables_at)
         workingDirectory = process.working_directory()?.toString()
         user = process.has_user() ? User(process.user()) : nil
     }
@@ -173,16 +183,14 @@ struct ContainerSettings: Sendable {
         cpus = Int(configuration.cpus())
         memoryInBytes = configuration.memory_in_bytes()
         hostname = configuration.hostname()?.toString()
-        sysctl = Dictionary(
-            uniqueKeysWithValues: strings(configuration.sysctl_keys()).compactMap { key in
-                configuration.sysctl(key).map { (key, $0.toString()) }
-            }
-        )
-        interfaces = try configuration.interfaces().map { try NATInterface($0) }
-        sockets = try configuration.sockets().map { try UnixSocketConfiguration($0) }
-        mounts = configuration.mounts().map { Containerization.Mount($0) }
-        maskedPaths = strings(configuration.masked_paths())
-        readonlyPaths = strings(configuration.readonly_paths())
+        sysctl = dictionary(configuration.sysctl_len(), configuration.sysctl_key_at, configuration.sysctl_value_at)
+        interfaces = try list(configuration.interfaces_len()) { try NATInterface(configuration.interfaces_at($0)) }
+        sockets = try list(configuration.sockets_len()) {
+            try UnixSocketConfiguration(configuration.sockets_at($0))
+        }
+        mounts = list(configuration.mounts_len()) { Containerization.Mount(configuration.mounts_at($0)) }
+        maskedPaths = strings(configuration.masked_paths_len(), configuration.masked_paths_at)
+        readonlyPaths = strings(configuration.readonly_paths_len(), configuration.readonly_paths_at)
         dns = configuration.has_dns() ? try DNS(configuration.dns()) : nil
         hosts = configuration.has_hosts() ? Hosts(configuration.hosts()) : nil
         virtualization = configuration.virtualization()
