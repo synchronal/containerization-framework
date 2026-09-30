@@ -1,92 +1,65 @@
-//! Stand-ins for every platform but macOS: the same surface as the real types,
-//! failing on first use of anything that needs a VM, so a cross-platform
-//! workspace still compiles.
+//! Stand-ins for the bridge on every platform but macOS: the same functions,
+//! each failing, so [`crate::Session`] and [`crate::Builder`] are written once
+//! and a cross-platform workspace still compiles.
 //!
-//! Every method the macOS types have belongs here too, or a caller builds on
-//! macOS and stops building elsewhere.
+//! Signatures match `bridge::ffi`'s, with the model types in place of their
+//! `Rust`-prefixed aliases. [`crate::checked`] words the failure.
 
-use crate::error::Error;
+use crate::FAILED;
 use crate::model;
-use crate::stdio::Stdio;
-use crate::store::{Store, StoreError};
-use std::os::fd::RawFd;
 
-fn unsupported() -> Error {
-  Error::unavailable("use Containerization.framework", "it is macOS only")
+pub(crate) fn czbridge_boot(
+  _spec: model::BootSpec,
+  _store_root: &str,
+  _kernel_path: &str,
+  _initfs_reference: &str,
+  _initfs_path: &str,
+) -> i32 {
+  FAILED
 }
 
-pub struct Session {
-  store: Store,
+pub(crate) fn czbridge_exec(
+  _name: &str,
+  _id: &str,
+  _configuration: model::LinuxProcessConfiguration,
+  _terminal: i32,
+  _stdin: i32,
+  _stdout: i32,
+  _stderr: i32,
+) -> i32 {
+  FAILED
 }
 
-impl Session {
-  pub fn new(store: Store) -> Self {
-    Self { store }
-  }
-
-  pub fn store(&self) -> &Store {
-    &self.store
-  }
-
-  pub fn boot(&self, _spec: &model::BootSpec) -> Result<(), Error> {
-    Err(unsupported())
-  }
-
-  pub fn exec(
-    &self,
-    _name: &str,
-    _id: &str,
-    _configuration: &model::LinuxProcessConfiguration,
-    _stdio: Stdio,
-  ) -> Result<i32, Error> {
-    Err(unsupported())
-  }
-
-  pub fn resize(&self, _id: &str, _terminal: RawFd) -> Result<(), Error> {
-    Err(unsupported())
-  }
-
-  /// Nothing can be running, since nothing can boot.
-  pub fn is_running(&self, _name: &str) -> bool {
-    false
-  }
-
-  pub fn is_unpacked(&self, _image: &str) -> Result<bool, Error> {
-    Err(unsupported())
-  }
-
-  /// The store is plain files, so this answers here as it does on macOS.
-  pub fn images(&self) -> Result<Vec<String>, StoreError> {
-    self.store.images()
-  }
-
-  pub fn version() -> String {
-    format!(
-      "Containerization {}, kernel {}",
-      crate::INITFS_VERSION,
-      crate::KERNEL_VERSION
-    )
-  }
+pub(crate) fn czbridge_build(
+  _plan: model::BuildPlan,
+  _store_root: &str,
+  _kernel_path: &str,
+  _initfs_reference: &str,
+  _initfs_path: &str,
+) -> i32 {
+  FAILED
 }
 
-pub struct Builder {
-  store: Store,
+pub(crate) fn czbridge_provision(
+  _store_root: &str,
+  _kernel_path: &str,
+  _kernel_url: &str,
+  _kernel_in_archive: &str,
+  _initfs_reference: &str,
+  _initfs_path: &str,
+) -> i32 {
+  FAILED
 }
 
-impl Builder {
-  pub fn new(store: Store) -> Self {
-    Self { store }
-  }
+pub(crate) fn czbridge_resize(_id: &str, _terminal: i32) -> i32 {
+  FAILED
+}
 
-  pub fn store(&self) -> &Store {
-    &self.store
-  }
+/// Nothing can be running, since nothing can boot.
+pub(crate) fn czbridge_is_running(_name: &str) -> bool {
+  false
+}
 
-  pub fn build(&self, _plan: &model::BuildPlan) -> Result<(), Error> {
-    Err(unsupported())
-  }
-
-  pub fn provision(&self) -> Result<(), Error> {
-    Err(unsupported())
-  }
+pub(crate) fn czbridge_is_unpacked(_store_root: &str, _image_reference: &str) -> i32 {
+  FAILED
 }

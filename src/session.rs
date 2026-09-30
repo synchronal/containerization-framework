@@ -45,9 +45,7 @@ impl Session {
       &self.store.initfs().display().to_string(),
     );
 
-    checked(code)
-      .map(|_| ())
-      .map_err(|error| Error::failed(format!("boot {}", spec.id), error))
+    checked(code, format!("boot {}", spec.id)).map(|_| ())
   }
 
   /// Runs a process in container `name` until it exits, returning its exit
@@ -74,7 +72,7 @@ impl Session {
       stdio.stderr,
     );
 
-    checked(code).map_err(|error| Error::failed("exec", error))
+    checked(code, "exec")
   }
 
   /// Tells the guest that the terminal `id`'s process reads changed size.
@@ -83,9 +81,7 @@ impl Session {
   /// exits. `terminal` is re-read rather than passed as a size, so a stale one
   /// cannot race a second resize.
   pub fn resize(&self, id: &str, terminal: RawFd) -> Result<(), Error> {
-    checked(ffi::czbridge_resize(id, terminal))
-      .map(|_| ())
-      .map_err(|error| Error::failed(format!("resize {id}"), error))
+    checked(ffi::czbridge_resize(id, terminal), format!("resize {id}")).map(|_| ())
   }
 
   /// Whether *this process* owns a running container by that name.
@@ -101,7 +97,7 @@ impl Session {
   pub fn is_unpacked(&self, image: &str) -> Result<bool, Error> {
     let code = ffi::czbridge_is_unpacked(&self.store.root().display().to_string(), image);
 
-    Ok(checked(code).map_err(|error| Error::failed("find the image", error))? == 1)
+    Ok(checked(code, "find the image")? == 1)
   }
 
   /// Every image the store holds, as `name:tag`. Read from the store's index;

@@ -10,9 +10,10 @@
 #![allow(dead_code)]
 
 use containerization_framework as cfw;
-use std::fs::File;
 use std::io::Read;
-use std::os::fd::{FromRawFd, RawFd};
+use std::os::fd::AsRawFd;
+use std::os::fd::IntoRawFd;
+use std::os::fd::RawFd;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -357,44 +358,32 @@ fn is_unpacked(session: &cfw::Session) -> bool {
 /// `exec` returns, so that blocks forever. It has returned by then, so a
 /// non-blocking drain gets everything the guest wrote.
 ///
-/// The write end is never closed here either: a second close would take
-/// whatever descriptor number was reused since.
+/// The write end is released, not closed: `exec` closes what it is handed.
 struct Pipe {
-  read: RawFd,
+  read: std::io::PipeReader,
   write: RawFd,
 }
 
 impl Pipe {
   fn new() -> Self {
-    let mut ends = [0; 2];
-
-    // SAFETY: `pipe` writes two descriptors into the array it is given.
-    let made = unsafe { libc::pipe(ends.as_mut_ptr()) };
-    assert_eq!(
-      made,
-      0,
-      "a pipe should be creatable: {}",
-      std::io::Error::last_os_error()
-    );
+    let (read, write) = std::io::pipe().expect("a pipe should be creatable");
 
     Self {
-      read: ends[0],
-      write: ends[1],
+      read,
+      write: write.into_raw_fd(),
     }
   }
 
   /// Everything already in the pipe, stopping where a read would block.
-  fn drain(self) -> String {
+  fn drain(mut self) -> String {
     // SAFETY: the read end is ours; `F_SETFL` only changes how it reads.
-    unsafe { libc::fcntl(self.read, libc::F_SETFL, libc::O_NONBLOCK) };
+    unsafe { libc::fcntl(self.read.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) };
 
-    // SAFETY: the read end is ours, and this is the one owner of it.
-    let mut reader = unsafe { File::from_raw_fd(self.read) };
     let mut written = Vec::new();
     let mut chunk = [0u8; 8192];
 
     loop {
-      match reader.read(&mut chunk) {
+      match self.read.read(&mut chunk) {
         Ok(0) => break,
         Ok(read) => written.extend_from_slice(&chunk[..read]),
         Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,

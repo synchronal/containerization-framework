@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Off macOS, errors name what was attempted (`cannot boot session-one:
+  Containerization.framework is macOS only`) rather than a generic action
+
 ## v0.2.0
 
 - Update Containerization to 0.47.0

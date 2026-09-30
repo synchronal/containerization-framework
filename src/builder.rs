@@ -38,9 +38,7 @@ impl Builder {
       &self.store.initfs().display().to_string(),
     );
 
-    checked(code)
-      .map(|_| ())
-      .map_err(|error| Error::failed(format!("build {}", plan.tag), error))
+    checked(code, format!("build {}", plan.tag)).map(|_| ())
   }
 
   /// Fetches the kernel to [`Store::kernel`] and unpacks the init image to
@@ -55,8 +53,6 @@ impl Builder {
       &self.store.initfs().display().to_string(),
     );
 
-    checked(code)
-      .map(|_| ())
-      .map_err(|error| Error::failed("provision the image store", error))
+    checked(code, "provision the image store").map(|_| ())
   }
 }

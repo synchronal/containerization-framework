@@ -14,7 +14,8 @@
 //! to `codesign --entitlements`.
 //!
 //! Elsewhere this crate compiles, and every call that needs a VM fails on
-//! first use, so a cross-platform workspace still builds.
+//! first use with [`Error::Unavailable`], so a cross-platform workspace still
+//! builds.
 //!
 //! # Shape
 //!
@@ -37,43 +38,49 @@ pub mod model;
 pub mod stdio;
 mod store;
 
+mod builder;
+mod session;
+
 #[cfg(target_os = "macos")]
 mod bridge;
-#[cfg(target_os = "macos")]
-mod builder;
-#[cfg(target_os = "macos")]
-mod session;
 
 #[cfg(not(target_os = "macos"))]
 mod unsupported;
 
+pub use crate::builder::Builder;
 pub use crate::error::Error;
 pub use crate::model::{BootSpec, BuildPlan, BuildStep, CachePolicy, Shell};
+pub use crate::session::Session;
 pub use crate::stdio::{Stdio, UNATTACHED, is_tty, lend};
 pub use crate::store::{
   INITFS_REFERENCE, INITFS_VERSION, KERNEL_IN_ARCHIVE, KERNEL_URL, KERNEL_VERSION, Store, StoreError,
 };
 
-#[cfg(target_os = "macos")]
-pub use crate::builder::Builder;
-#[cfg(target_os = "macos")]
-pub use crate::session::Session;
-
-#[cfg(not(target_os = "macos"))]
-pub use crate::unsupported::{Builder, Session};
-
 /// The bridge's failure code; can't collide with a guest exit code (0...255).
-#[cfg(target_os = "macos")]
 const FAILED: i32 = -1;
 
 #[cfg(target_os = "macos")]
 use crate::bridge::ffi;
 
-/// Turns the bridge's `-1` into the message Swift left behind.
+#[cfg(not(target_os = "macos"))]
+use crate::unsupported as ffi;
+
+/// Turns the bridge's `-1` into a failure of `action`, with the message Swift
+/// left behind.
 #[cfg(target_os = "macos")]
-fn checked(code: i32) -> Result<i32, String> {
+fn checked(code: i32, action: impl Into<String>) -> Result<i32, Error> {
   if code == FAILED {
-    return Err(ffi::czbridge_last_error());
+    return Err(Error::failed(action, ffi::czbridge_last_error()));
+  }
+
+  Ok(code)
+}
+
+/// Elsewhere the bridge only ever fails, and nothing was attempted.
+#[cfg(not(target_os = "macos"))]
+fn checked(code: i32, action: impl Into<String>) -> Result<i32, Error> {
+  if code == FAILED {
+    return Err(Error::unavailable(action, "Containerization.framework is macOS only"));
   }
 
   Ok(code)
