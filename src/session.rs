@@ -10,9 +10,11 @@
 
 use crate::error::Error;
 use crate::model;
+use crate::pins;
+use crate::platform::checked;
+use crate::platform::ffi;
 use crate::stdio::Stdio;
 use crate::store::{Store, StoreError};
-use crate::{checked, ffi};
 use std::os::fd::RawFd;
 
 pub struct Session {
@@ -111,8 +113,8 @@ impl Session {
   pub fn version() -> String {
     format!(
       "Containerization {}, kernel {}",
-      crate::INITFS_VERSION,
-      crate::KERNEL_VERSION
+      pins::INITFS_VERSION,
+      pins::KERNEL_VERSION
     )
   }
 }

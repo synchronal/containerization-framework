@@ -10,19 +10,19 @@ mod support;
 
 #[test]
 fn builds_an_image_into_the_store() {
-  let store = support::image();
+  let store = support::store::image();
 
   assert!(
-    store.holds(support::TEST_IMAGE),
+    store.holds(support::store::TEST_IMAGE),
     "the index should name {}, and holds {:?}",
-    support::TEST_IMAGE,
+    support::store::TEST_IMAGE,
     store.images().expect("a readable index")
   );
   assert!(
     store
       .images()
       .expect("a readable index")
-      .contains(&support::BASE_IMAGE.to_string()),
+      .contains(&support::store::BASE_IMAGE.to_string()),
     "the base a build pulled should be in the store beside what it built"
   );
 }

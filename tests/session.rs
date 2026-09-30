@@ -12,7 +12,7 @@
 
 mod support;
 
-use support::Container;
+use support::container::Container;
 
 #[test]
 fn boots_and_runs_processes() {
@@ -42,9 +42,9 @@ fn boots_and_runs_processes() {
   );
   assert_eq!(
     container
-      .capture("marker", &["/bin/cat", support::MARKER_PATH])
+      .capture("marker", &["/bin/cat", support::store::MARKER_PATH])
       .trim(),
-    support::MARKER,
+    support::store::MARKER,
     "the step the image was built with should be in a container booted from it"
   );
 

@@ -11,8 +11,10 @@
 
 use crate::error::Error;
 use crate::model;
-use crate::store::{KERNEL_IN_ARCHIVE, KERNEL_URL, Store};
-use crate::{checked, ffi};
+use crate::pins;
+use crate::platform::checked;
+use crate::platform::ffi;
+use crate::store::Store;
 
 pub struct Builder {
   store: Store,
@@ -47,8 +49,8 @@ impl Builder {
     let code = ffi::czbridge_provision(
       &self.store.root().display().to_string(),
       &self.store.kernel().display().to_string(),
-      KERNEL_URL,
-      KERNEL_IN_ARCHIVE,
+      pins::KERNEL_URL,
+      pins::KERNEL_IN_ARCHIVE,
       self.store.initfs_reference(),
       &self.store.initfs().display().to_string(),
     );

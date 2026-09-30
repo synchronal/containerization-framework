@@ -3,9 +3,9 @@
 //! and a cross-platform workspace still compiles.
 //!
 //! Signatures match `bridge::ffi`'s, with the model types in place of their
-//! `Rust`-prefixed aliases. [`crate::checked`] words the failure.
+//! `Rust`-prefixed aliases. [`super::checked`] words the failure.
 
-use crate::FAILED;
+use super::FAILED;
 use crate::model;
 
 pub(crate) fn czbridge_boot(

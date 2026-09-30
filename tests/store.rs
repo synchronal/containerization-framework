@@ -11,7 +11,7 @@ use containerization_framework as cfw;
 
 #[test]
 fn provisions_a_bootable_store() {
-  let store = support::provisioned();
+  let store = support::store::provisioned();
 
   assert_eq!(store.ready(), Ok(()));
   assert!(store.kernel().is_file(), "the kernel should be in the store");
@@ -25,7 +25,7 @@ fn provisions_a_bootable_store() {
 
 #[test]
 fn provisions_idempotently() {
-  let store = support::provisioned();
+  let store = support::store::provisioned();
 
   cfw::Builder::new(store.clone())
     .provision()

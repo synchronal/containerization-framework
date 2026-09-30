@@ -1,27 +1,8 @@
-//! Crate-private getters Swift reads the model through.
-//!
-//! Each lends what the model holds, so Swift's copy is the only one. Shapes
-//! swift-bridge can't return become sets: optional nested value → `has_x` +
-//! `x`; list → `x_len` + `x_at`; map → length + key and value at an index;
-//! enum → mode + payload. Swift asks for an index only below the length.
+//! Getters for a container to boot, and a process to run in one.
 
-use super::ffi::{RuntimeKind, SeccompMode, SocketDirection};
+use super::entry_at;
+use crate::bridge::ffi;
 use crate::model;
-use std::collections::BTreeMap;
-use std::path::Path;
-
-fn path(path: &Path) -> String {
-  path.display().to_string()
-}
-
-/// The `index`th entry of a sorted map.
-fn entry_at(map: &BTreeMap<String, String>, index: usize) -> (&str, &str) {
-  map
-    .iter()
-    .nth(index)
-    .map(|(key, value)| (key.as_str(), value.as_str()))
-    .expect("Swift asks for an entry only below the length")
-}
 
 impl model::Mount {
   pub(crate) fn mount_type(&self) -> &str {
@@ -44,11 +25,11 @@ impl model::Mount {
     &self.options[index]
   }
 
-  pub(crate) fn runtime_kind(&self) -> RuntimeKind {
+  pub(crate) fn runtime_kind(&self) -> ffi::RuntimeKind {
     match self.runtime_options {
-      model::RuntimeOptions::Virtioblk(_) => RuntimeKind::Virtioblk,
-      model::RuntimeOptions::Virtiofs(_) => RuntimeKind::Virtiofs,
-      model::RuntimeOptions::Any(_) => RuntimeKind::Generic,
+      model::RuntimeOptions::Virtioblk(_) => ffi::RuntimeKind::Virtioblk,
+      model::RuntimeOptions::Virtiofs(_) => ffi::RuntimeKind::Virtiofs,
+      model::RuntimeOptions::Any(_) => ffi::RuntimeKind::Generic,
     }
   }
 
@@ -72,21 +53,21 @@ impl model::Mount {
 
 impl model::UnixSocketConfiguration {
   pub(crate) fn source(&self) -> String {
-    path(&self.source)
+    super::path(&self.source)
   }
 
   pub(crate) fn destination(&self) -> String {
-    path(&self.destination)
+    super::path(&self.destination)
   }
 
   pub(crate) fn permissions(&self) -> Option<u32> {
     self.permissions
   }
 
-  pub(crate) fn direction(&self) -> SocketDirection {
+  pub(crate) fn direction(&self) -> ffi::SocketDirection {
     match self.direction {
-      model::Direction::Into => SocketDirection::Into,
-      model::Direction::OutOf => SocketDirection::OutOf,
+      model::Direction::Into => ffi::SocketDirection::Into,
+      model::Direction::OutOf => ffi::SocketDirection::OutOf,
     }
   }
 }
@@ -181,7 +162,7 @@ impl model::Hosts {
 
 impl model::BootLog {
   pub(crate) fn path(&self) -> String {
-    path(&self.path)
+    super::path(&self.path)
   }
 
   pub(crate) fn append(&self) -> bool {
@@ -367,11 +348,11 @@ impl model::LinuxContainerConfiguration {
     self.oci_runtime_path.as_deref()
   }
 
-  pub(crate) fn seccomp_mode(&self) -> SeccompMode {
+  pub(crate) fn seccomp_mode(&self) -> ffi::SeccompMode {
     match self.seccomp_profile {
-      model::SeccompProfile::Unconfined => SeccompMode::Unconfined,
-      model::SeccompProfile::Default => SeccompMode::Default,
-      model::SeccompProfile::Profile(_) => SeccompMode::Profile,
+      model::SeccompProfile::Unconfined => ffi::SeccompMode::Unconfined,
+      model::SeccompProfile::Default => ffi::SeccompMode::Default,
+      model::SeccompProfile::Profile(_) => ffi::SeccompMode::Profile,
     }
   }
 
@@ -414,145 +395,9 @@ impl model::BootSpec {
   }
 }
 
-impl model::BuildStep {
-  pub(crate) fn name(&self) -> &str {
-    &self.name
-  }
-
-  pub(crate) fn script(&self) -> &str {
-    &self.script
-  }
-
-  pub(crate) fn user(&self) -> Option<&str> {
-    self.user.as_deref()
-  }
-
-  /// Unsalted; the builder mixes in the base's digest and the rootfs ceiling.
-  pub(crate) fn cache_key(&self) -> &str {
-    &self.cache_key
-  }
-}
-
-impl model::BuildPlan {
-  pub(crate) fn name(&self) -> &str {
-    &self.name
-  }
-
-  pub(crate) fn base(&self) -> &str {
-    &self.base
-  }
-
-  pub(crate) fn tag(&self) -> &str {
-    &self.tag
-  }
-
-  pub(crate) fn cpus(&self) -> u32 {
-    self.cpus
-  }
-
-  pub(crate) fn memory_in_bytes(&self) -> u64 {
-    self.memory_in_bytes
-  }
-
-  pub(crate) fn vm_cpus(&self) -> u32 {
-    self.vm.cpus
-  }
-
-  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
-    self.vm.memory_in_bytes
-  }
-
-  pub(crate) fn mounts_len(&self) -> usize {
-    self.mounts.len()
-  }
-
-  pub(crate) fn mounts_at(&self, index: usize) -> &model::Mount {
-    &self.mounts[index]
-  }
-
-  pub(crate) fn steps_len(&self) -> usize {
-    self.steps.len()
-  }
-
-  pub(crate) fn steps_at(&self, index: usize) -> &model::BuildStep {
-    &self.steps[index]
-  }
-
-  pub(crate) fn environment_len(&self) -> usize {
-    self.environment.len()
-  }
-
-  pub(crate) fn environment_at(&self, index: usize) -> &str {
-    &self.environment[index]
-  }
-
-  pub(crate) fn labels_len(&self) -> usize {
-    self.labels.len()
-  }
-
-  pub(crate) fn label_key_at(&self, index: usize) -> &str {
-    entry_at(&self.labels, index).0
-  }
-
-  pub(crate) fn label_value_at(&self, index: usize) -> &str {
-    entry_at(&self.labels, index).1
-  }
-
-  pub(crate) fn user(&self) -> Option<&str> {
-    self.user.as_deref()
-  }
-
-  pub(crate) fn working_directory(&self) -> Option<String> {
-    self.workdir.as_deref().map(path)
-  }
-
-  pub(crate) fn interface(&self) -> &model::NatInterface {
-    &self.interface
-  }
-
-  pub(crate) fn base_key(&self) -> &str {
-    &self.base_key
-  }
-
-  pub(crate) fn rootfs_size_in_bytes(&self) -> u64 {
-    self.rootfs_size_in_bytes
-  }
-
-  pub(crate) fn cache_restore(&self) -> bool {
-    self.cache.restore
-  }
-
-  pub(crate) fn cache_keep(&self) -> u64 {
-    self.cache.keep as u64
-  }
-
-  pub(crate) fn cache_keep_for_seconds(&self) -> u64 {
-    self.cache.keep_for.as_secs()
-  }
-
-  pub(crate) fn shell_len(&self) -> usize {
-    self.shell.0.len()
-  }
-
-  pub(crate) fn shell_at(&self, index: usize) -> &str {
-    &self.shell.0[index]
-  }
-
-  pub(crate) fn keepalive_len(&self) -> usize {
-    self.keepalive.len()
-  }
-
-  pub(crate) fn keepalive_at(&self, index: usize) -> &str {
-    &self.keepalive[index]
-  }
-
-  pub(crate) fn reclaim(&self) -> bool {
-    self.reclaim
-  }
-}
-
 #[cfg(test)]
 mod tests {
+  use crate::bridge::ffi;
   use crate::model;
 
   #[test]
@@ -605,37 +450,17 @@ mod tests {
   }
 
   #[test]
-  fn reads_a_plan_in_the_units_swift_takes() {
-    let mut plan = model::BuildPlan::new(
-      "builder",
-      "docker.io/library/debian:stable-slim",
-      "example/base:latest",
-      model::NatInterface::new("192.168.64.7/24", "192.168.64.1"),
-      "basekey",
-    );
-    plan.workdir = Some("/workspace".into());
-    plan.labels = [("com.example.built-by".to_string(), "example".to_string())].into();
-
-    assert_eq!(plan.cache_keep_for_seconds(), 14 * 24 * 60 * 60);
-    assert_eq!(plan.working_directory().as_deref(), Some("/workspace"));
-    assert_eq!(plan.labels_len(), 1);
-    assert_eq!(plan.label_key_at(0), "com.example.built-by");
-    assert_eq!(plan.label_value_at(0), "example");
-    assert_eq!(plan.interface().ipv4_gateway(), Some("192.168.64.1"));
-  }
-
-  #[test]
   fn reads_an_enum_as_its_mode_and_what_it_carries() {
     let configuration = model::LinuxContainerConfiguration {
       seccomp_profile: model::SeccompProfile::Profile("{}".into()),
       ..Default::default()
     };
 
-    assert!(matches!(configuration.seccomp_mode(), super::SeccompMode::Profile));
+    assert!(matches!(configuration.seccomp_mode(), ffi::SeccompMode::Profile));
     assert_eq!(configuration.seccomp_profile(), Some("{}"));
 
     let mount = model::Mount::block("ext4", "/images/data.ext4", "/data", &[]);
-    assert!(matches!(mount.runtime_kind(), super::RuntimeKind::Virtioblk));
+    assert!(matches!(mount.runtime_kind(), ffi::RuntimeKind::Virtioblk));
     assert_eq!(mount.mount_type(), "ext4");
   }
 }

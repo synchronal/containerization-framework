@@ -6,7 +6,7 @@
 mod support;
 
 use containerization_framework as cfw;
-use support::Container;
+use support::container::Container;
 
 #[test]
 fn boots_the_kernel_and_init_image_at_the_stores_paths() {
@@ -32,8 +32,8 @@ fn boots_the_init_image_where_the_caller_puts_it() {
   let unpacked = tempfile::tempdir().expect("a temporary directory");
   let initfs = unpacked.path().join("vminit-pinned.ext4");
 
-  let store = support::image();
-  let digest = support::digest(&store, cfw::INITFS_REFERENCE);
+  let store = support::store::image();
+  let digest = support::store::digest(&store, cfw::INITFS_REFERENCE);
   let (repository, _) = cfw::INITFS_REFERENCE
     .rsplit_once(':')
     .expect("the pinned init image is tagged");

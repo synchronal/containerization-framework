@@ -11,7 +11,7 @@
 mod support;
 
 use containerization_framework as cfw;
-use support::Container;
+use support::container::Container;
 
 /// One of Containerization's standard masked paths that this kernel has: a
 /// path it lacks, like `/proc/kcore`, is never mounted over either way.
@@ -41,7 +41,7 @@ fn names_resolves_and_tunes_the_container() {
     configuration.hostname = Some("configured-host".into());
     configuration.sysctl = [("net.core.somaxconn".to_string(), "4096".to_string())].into();
     configuration.dns = Some(cfw::model::Dns {
-      nameservers: vec![support::GATEWAY.into(), "1.1.1.1".into()],
+      nameservers: vec![support::network::GATEWAY.into(), "1.1.1.1".into()],
       domain: Some("example.test".into()),
       search_domains: vec!["a.test".into(), "b.test".into()],
       options: vec!["ndots:2".into()],
@@ -49,7 +49,7 @@ fn names_resolves_and_tunes_the_container() {
     configuration.hosts = Some(cfw::model::Hosts {
       entries: vec![
         cfw::model::HostsEntry::new("127.0.0.1", &["localhost"]),
-        cfw::model::HostsEntry::new(support::GATEWAY, &["host.internal", "host"]),
+        cfw::model::HostsEntry::new(support::network::GATEWAY, &["host.internal", "host"]),
       ],
       comment: Some("written by the suite".into()),
     });
@@ -66,14 +66,14 @@ fn names_resolves_and_tunes_the_container() {
     container.sh("resolv", "cat /etc/resolv.conf"),
     format!(
       "nameserver {}\nnameserver 1.1.1.1\ndomain example.test\nsearch a.test b.test\noptions ndots:2\n",
-      support::GATEWAY
+      support::network::GATEWAY
     )
   );
   assert_eq!(
     container.sh("hosts", "cat /etc/hosts"),
     format!(
       "# written by the suite\n127.0.0.1 localhost\n{} host.internal host\n",
-      support::GATEWAY
+      support::network::GATEWAY
     ),
     "the image's /etc/hosts should be replaced whole"
   );
@@ -134,7 +134,9 @@ fn guards_paths_beyond_the_standard_ones() {
   let container = Container::boot_with("cfw-test-config-guarded", |spec| {
     let configuration = &mut spec.configuration;
 
-    configuration.masked_paths.push(support::MARKER_PATH.into());
+    configuration
+      .masked_paths
+      .push(support::store::MARKER_PATH.into());
     configuration.readonly_paths.push("/etc".into());
   });
 
@@ -143,7 +145,7 @@ fn guards_paths_beyond_the_standard_ones() {
     "adding a masked path should keep the standard ones"
   );
   assert_eq!(
-    container.sh("masked", &format!("cat {}", support::MARKER_PATH)),
+    container.sh("masked", &format!("cat {}", support::store::MARKER_PATH)),
     "",
     "a masked file should read as empty"
   );

@@ -10,7 +10,7 @@
 //! a copy per fingerprint costs ~2 GiB and a full rebuild of Containerization.
 //!
 //! macOS only. On other platforms the session and builder are stand-ins
-//! (`unsupported.rs`) that compile, but return errors on every invocation.
+//! (`src/platform/unsupported.rs`) that compile, but return errors on every invocation.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
