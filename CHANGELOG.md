@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.2
+
 - Update Containerization to 0.48.0
 
 ## v0.2.1
