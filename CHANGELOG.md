@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.1
+
 - Off macOS, errors name what was attempted (`cannot boot session-one:
   Containerization.framework is macOS only`) rather than a generic action
 - Lend FFI accessors instead of returning owned clones.
