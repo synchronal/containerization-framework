@@ -1,13 +1,13 @@
 //! The suite's image store, the kernel and init image its VMs boot, and the
 //! image its containers run.
 //!
-//! A kernel download and a pull are slow, so the store is filled once and kept
-//! between runs rather than thrown away per test.
+//! A pull is slow, so the store is filled once and kept between runs rather
+//! than thrown away per test. The kernel is downloaded into it before the
+//! tests run, by `bin/dev/prepare-integration`.
 
 use super::lock::Lock;
 use containerization_framework as cfw;
 use std::path::PathBuf;
-use std::process::Command;
 
 /// Kept apart from any store a developer's own tools use: these tests write
 /// containers into it.
@@ -22,12 +22,6 @@ pub const IMAGE: &str = "docker.io/library/alpine:3";
 /// runtime.
 pub const INITFS_REFERENCE: &str = "ghcr.io/apple/containerization/vminit:0.48.0";
 
-/// The kernel Containerization's Makefile pins: Kata Containers' static build,
-/// since no one publishes a kernel as an image.
-const KERNEL_VERSION: &str = "3.17.0";
-const KERNEL_IN_ARCHIVE: &str = "opt/kata/share/kata-containers/vmlinux.container";
-
-const KERNEL_LOCK: &str = ".kernel.lock";
 const IMAGE_LOCK: &str = ".image.lock";
 const INITFS_LOCK: &str = ".initfs.lock";
 
@@ -71,19 +65,14 @@ pub fn unpack(at: &std::path::Path) -> cfw::containerization::Mount {
     .unwrap_or_else(|error| panic!("{IMAGE} should unpack to {}: {error}", at.display()))
 }
 
-/// The kernel, downloaded on a first run.
+/// The kernel `bin/dev/prepare-integration` downloaded, which nextest runs
+/// before these tests.
 pub fn kernel() -> cfw::containerization::Kernel {
-  let path = root()
-    .join("kernels")
-    .join(format!("vmlinux-{KERNEL_VERSION}"));
-
-  if !path.is_file() {
-    let _lock = Lock::take(root().join(KERNEL_LOCK));
-
-    if !path.is_file() {
-      download_kernel(&path);
-    }
-  }
+  let path = PathBuf::from(
+    std::env::var("CFW_TEST_KERNEL")
+      .expect("CFW_TEST_KERNEL names the kernel; run the suite with bin/dev/test-integration"),
+  );
+  assert!(path.is_file(), "the kernel at {} should be a file", path.display());
 
   cfw::containerization::Kernel::new(path, cfw::containerization::SystemPlatform::LINUX_ARM)
 }
@@ -96,28 +85,4 @@ pub fn manager(store: &cfw::containerization::ImageStore) -> cfw::containerizati
 
   cfw::containerization::ContainerManager::with_initfs_reference(&kernel, INITFS_REFERENCE, store, false, false)
     .unwrap_or_else(|error| panic!("a manager booting {INITFS_REFERENCE} should be made: {error}"))
-}
-
-/// Fetches Kata's release and extracts the kernel to `path`, by way of a
-/// partial file so an interrupted download is never found.
-fn download_kernel(path: &std::path::Path) {
-  let directory = path.parent().expect("the kernel has a directory");
-  std::fs::create_dir_all(directory).expect("the kernel directory should be creatable");
-
-  let url = format!(
-    "https://github.com/kata-containers/kata-containers/releases/download/{KERNEL_VERSION}/kata-static-{KERNEL_VERSION}-arm64.tar.xz"
-  );
-  let staging = tempfile::tempdir_in(directory).expect("a staging directory");
-  let script = format!(
-    "curl --fail --location --silent --show-error {url} | tar -xJf - -C {} {KERNEL_IN_ARCHIVE}",
-    staging.path().display()
-  );
-  let status = Command::new("/bin/sh")
-    .args(["-c", &script])
-    .status()
-    .expect("curl and tar should run");
-
-  assert!(status.success(), "the kernel should download from {url}");
-
-  std::fs::rename(staging.path().join(KERNEL_IN_ARCHIVE), path).expect("the kernel should move into place");
 }

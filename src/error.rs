@@ -1,12 +1,18 @@
 //! What this crate could not do: the attempt, and what it said.
 
+use crate::containerization_error;
 use std::fmt;
 
 #[derive(Debug)]
 pub enum Error {
   /// Attempted and failed. The message is whatever Containerization said,
-  /// which is the only account of a failure inside the VM.
-  Failed { action: String, message: String },
+  /// which is the only account of a failure inside the VM. The code is the
+  /// thrown `ContainerizationError`'s, if it was one.
+  Failed {
+    action: String,
+    message: String,
+    code: Option<containerization_error::Code>,
+  },
   /// Couldn't be attempted: a prerequisite is missing or unreadable. The fix
   /// is to provision it, not to debug a failure.
   Unavailable { action: String, message: String },
@@ -17,6 +23,20 @@ impl Error {
     Self::Failed {
       action: action.into(),
       message: message.to_string(),
+      code: None,
+    }
+  }
+
+  /// A thrown `ContainerizationError`, with its code.
+  pub(crate) fn failed_with_code(
+    action: impl Into<String>,
+    message: impl fmt::Display,
+    code: Option<containerization_error::Code>,
+  ) -> Self {
+    Self::Failed {
+      action: action.into(),
+      message: message.to_string(),
+      code,
     }
   }
 
@@ -33,12 +53,18 @@ impl Error {
       Self::Failed { action, .. } | Self::Unavailable { action, .. } => action,
     }
   }
+
+  /// `ContainerizationError.isCode(_:)`: whether this is a thrown
+  /// `ContainerizationError` with `code`.
+  pub fn is_code(&self, code: containerization_error::Code) -> bool {
+    matches!(self, Self::Failed { code: Some(thrown), .. } if *thrown == code)
+  }
 }
 
 impl fmt::Display for Error {
   fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Failed { action, message } => write!(formatter, "could not {action}: {message}"),
+      Self::Failed { action, message, .. } => write!(formatter, "could not {action}: {message}"),
       Self::Unavailable { action, message } => write!(formatter, "cannot {action}: {message}"),
     }
   }
@@ -65,5 +91,15 @@ mod tests {
   #[test]
   fn names_the_action_without_its_message() {
     assert_eq!(Error::failed("boot session-one", "nope").action(), "boot session-one");
+  }
+
+  #[test]
+  fn has_only_the_code_it_was_thrown_with() {
+    let not_found = containerization_error::Code::NotFound;
+    let error = Error::failed_with_code("get alpine", "not found", Some(not_found));
+    assert!(error.is_code(not_found));
+    assert!(!error.is_code(containerization_error::Code::Exists));
+    assert!(!Error::failed("get alpine", "not found").is_code(not_found));
+    assert!(!Error::unavailable("get alpine", "not on macOS").is_code(not_found));
   }
 }

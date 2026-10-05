@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// Long enough for a kernel download and a build, short enough that a lock left
+/// Long enough for an image pull and a build, short enough that a lock left
 /// by a killed test does not stop the next run.
 const LOCK_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 const LOCK_POLL: Duration = Duration::from_millis(250);

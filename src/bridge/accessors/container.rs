@@ -863,7 +863,7 @@ mod tests {
 
     let mount = containerization::Mount {
       runtime_options: mount::RuntimeOptions::Virtiofs(vec!["cache=auto".into()]),
-      ..containerization::Mount::share("/Users/user/workspace", "/workspace", &["ro"])
+      ..containerization::Mount::share("/Users/user/workspace", "/workspace", &["ro"], &[])
     };
 
     assert_eq!(mount.options_len(), 1);
@@ -900,7 +900,7 @@ mod tests {
     assert!(matches!(configuration.seccomp_mode(), ffi::SeccompMode::Profile));
     assert_eq!(configuration.seccomp_profile(), Some("{}"));
 
-    let mount = containerization::Mount::block("ext4", "/images/data.ext4", "/data", &[]);
+    let mount = containerization::Mount::block("ext4", "/images/data.ext4", "/data", &[], &[]);
     assert!(matches!(mount.runtime_kind(), ffi::RuntimeKind::Virtioblk));
     assert_eq!(mount.mount_type(), "ext4");
   }

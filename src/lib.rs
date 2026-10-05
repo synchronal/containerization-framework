@@ -64,6 +64,7 @@
 //! [Containerization]: https://github.com/apple/containerization
 
 pub mod containerization;
+pub mod containerization_error;
 pub mod containerization_ext4;
 pub mod containerization_extras;
 pub mod containerization_oci;

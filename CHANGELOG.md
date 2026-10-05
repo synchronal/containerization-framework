@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- `Error::Failed` now carries the code of a thrown `ContainerizationError`, as
+  a `containerization_error::Code`. Check it with `Error::is_code`, which
+  mirrors `ContainerizationError.isCode(_:)`. Other errors have no code.
+- A custom seccomp profile is decoded with `LinuxSeccomp.decode(from:)` again.
+  A profile in Docker's format now fails the container with
+  `Code::InvalidArgument`. Before, its conditional rules silently became
+  unconditional allows.
+
+### Breaking
+
+- `Mount::share`, `Mount::block` and `Mount::any` take a `runtime_options`
+  argument after `options`, matching Swift. Pass `&[]` for Swift's default.
+- `NatInterface::new` takes the gateway as an `Option<String>`, because Swift's
+  `ipv4Gateway` is optional.
+- `Error::Failed` has a new `code` field, so a pattern that names its fields
+  needs `..`.
+
 ## v0.3.0
 
 - The Rust API now mirrors Containerization's Swift API. Modules are named

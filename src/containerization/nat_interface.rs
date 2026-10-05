@@ -14,10 +14,10 @@ pub struct NatInterface {
 impl NatInterface {
   /// `NATInterface(ipv4Address:ipv4Gateway:)`, its other arguments at their
   /// defaults.
-  pub fn new(ipv4_address: impl Into<String>, ipv4_gateway: impl Into<String>) -> Self {
+  pub fn new(ipv4_address: impl Into<String>, ipv4_gateway: Option<String>) -> Self {
     Self {
       ipv4_address: ipv4_address.into(),
-      ipv4_gateway: Some(ipv4_gateway.into()),
+      ipv4_gateway,
       ipv6_address: None,
       ipv6_gateway: None,
       mac_address: None,

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# Downloads the kernel the integration suites boot, once, into the suite's store.
+# Nextest runs this as a setup script (`.config/nextest.toml`), and hands the
+# kernel's path to the tests in CFW_TEST_KERNEL.
+#
+# The kernel is the one Containerization's Makefile pins: Kata Containers'
+# static build, since no one publishes a kernel as an image. In the archive,
+# `vmlinux.container` is a symlink to the versioned kernel, so it is resolved
+# before it moves out of the staging directory.
+
+set -euo pipefail
+
+kernel_version="3.17.0"
+kernel_in_archive="opt/kata/share/kata-containers/vmlinux.container"
+url="https://github.com/kata-containers/kata-containers/releases/download/${kernel_version}/kata-static-${kernel_version}-arm64.tar.xz"
+
+kernels="${HOME:?}/.cache/containerization-framework-tests/kernels"
+kernel="${kernels}/vmlinux-${kernel_version}"
+
+# A kernel cached before this script resolved the symlink is a dangling link.
+if [ -L "$kernel" ] && [ ! -e "$kernel" ]; then
+  rm "$kernel"
+fi
+
+if [ ! -f "$kernel" ]; then
+  echo "bin/dev/prepare-integration: downloading the kernel from ${url}" >&2
+  mkdir -p "$kernels"
+  staging="$(mktemp -d "${kernels}/staging.XXXXXX")"
+  trap 'rm -rf "$staging"' EXIT
+
+  # macOS's own bsdtar, whose libarchive reads xz itself: a `tar` earlier in
+  # PATH, like GNU tar, would need an `xz` binary.
+  curl --fail --location --silent --show-error "$url" |
+    /usr/bin/tar -xJf - -C "$staging" "opt/kata/share/kata-containers/vmlinux*"
+
+  mv "$(realpath "${staging}/${kernel_in_archive}")" "$kernel"
+fi
+
+if [ -n "${NEXTEST_ENV:-}" ]; then
+  echo "CFW_TEST_KERNEL=${kernel}" >>"$NEXTEST_ENV"
+fi

@@ -13,6 +13,8 @@ pub(crate) use self::unsupported as ffi;
 
 use crate::containerization;
 use crate::containerization::linux_container;
+#[cfg(target_os = "macos")]
+use crate::containerization_error;
 use crate::containerization_extras::ProgressHandler;
 use crate::error::Error;
 use std::sync::Mutex;
@@ -38,19 +40,22 @@ impl Configure {
 /// `action`.
 pub(crate) fn outcome(outcome: ffi::CzOutcome, action: impl Into<String>) -> Result<ffi::CzOutcome, Error> {
   match outcome.error() {
-    Some(message) => Err(error(action, message)),
+    Some(message) => Err(error(&outcome, action, message)),
     None => Ok(outcome),
   }
 }
 
 #[cfg(target_os = "macos")]
-fn error(action: impl Into<String>, message: String) -> Error {
-  Error::failed(action, message)
+fn error(outcome: &ffi::CzOutcome, action: impl Into<String>, message: String) -> Error {
+  let code = outcome
+    .error_code()
+    .and_then(|code| containerization_error::Code::from_description(&code));
+  Error::failed_with_code(action, message, code)
 }
 
 /// Elsewhere the bridge only ever fails, and nothing was attempted.
 #[cfg(not(target_os = "macos"))]
-fn error(action: impl Into<String>, message: String) -> Error {
+fn error(_outcome: &ffi::CzOutcome, action: impl Into<String>, message: String) -> Error {
   Error::unavailable(action, message)
 }
 

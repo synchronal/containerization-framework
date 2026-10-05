@@ -523,6 +523,8 @@ pub(crate) mod ffi {
     // first, then takes the one value the call makes, once.
     type CzOutcome;
     fn error(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "errorCode")]
+    fn error_code(self: &CzOutcome) -> Option<String>;
     #[swift_bridge(swift_name = "localContentStore")]
     fn local_content_store(self: &CzOutcome) -> CzLocalContentStore;
     fn content(self: &CzOutcome) -> CzContent;

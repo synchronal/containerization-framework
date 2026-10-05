@@ -12,27 +12,37 @@
 //===----------------------------------------------------------------------===//
 
 import Containerization
+import ContainerizationError
 import ContainerizationOCI
 import Foundation
 
 /// Unchecked: Rust reads an outcome once, on the thread it was returned to.
 final class CzOutcome: @unchecked Sendable {
   private let failure: String?
+  private let failureCode: String?
   private let value: Any?
 
-  /// Runs `body`, keeping what it returns or the message of what it throws.
+  /// Runs `body`, keeping what it returns or the message of what it throws,
+  /// and the code of a thrown `ContainerizationError`.
   init(_ body: () throws -> Any) {
     do {
       value = try body()
       failure = nil
+      failureCode = nil
     } catch {
       value = nil
       failure = "\(error)"
+      failureCode = (error as? ContainerizationError)?.code.description
     }
   }
 
   func error() -> String? {
     failure
+  }
+
+  /// A thrown `ContainerizationError`'s `code.description`.
+  func errorCode() -> String? {
+    failureCode
   }
 
   private func taken<T>() -> T {

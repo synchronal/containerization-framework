@@ -23,13 +23,18 @@ pub struct Mount {
 
 impl Mount {
   /// `Mount.share(source:destination:options:runtimeOptions:)`.
-  pub fn share(source: impl Into<String>, destination: impl Into<String>, options: &[&str]) -> Self {
+  pub fn share(
+    source: impl Into<String>,
+    destination: impl Into<String>,
+    options: &[&str],
+    runtime_options: &[&str],
+  ) -> Self {
     Self {
       r#type: "virtiofs".to_string(),
       source: source.into(),
       destination: destination.into(),
       options: strings(options),
-      runtime_options: RuntimeOptions::Virtiofs(Vec::new()),
+      runtime_options: RuntimeOptions::Virtiofs(strings(runtime_options)),
     }
   }
 
@@ -39,13 +44,14 @@ impl Mount {
     source: impl Into<String>,
     destination: impl Into<String>,
     options: &[&str],
+    runtime_options: &[&str],
   ) -> Self {
     Self {
       r#type: format.into(),
       source: source.into(),
       destination: destination.into(),
       options: strings(options),
-      runtime_options: RuntimeOptions::Virtioblk(Vec::new()),
+      runtime_options: RuntimeOptions::Virtioblk(strings(runtime_options)),
     }
   }
 
@@ -55,13 +61,14 @@ impl Mount {
     source: impl Into<String>,
     destination: impl Into<String>,
     options: &[&str],
+    runtime_options: &[&str],
   ) -> Self {
     Self {
       r#type: r#type.into(),
       source: source.into(),
       destination: destination.into(),
       options: strings(options),
-      runtime_options: RuntimeOptions::Any(Vec::new()),
+      runtime_options: RuntimeOptions::Any(strings(runtime_options)),
     }
   }
 }
@@ -72,17 +79,17 @@ mod tests {
 
   #[test]
   fn builds_mounts_of_each_kind() {
-    let share = Mount::share("/Users/user/workspace", "/workspace", &["ro"]);
+    let share = Mount::share("/Users/user/workspace", "/workspace", &["ro"], &[]);
     assert_eq!(share.r#type, "virtiofs");
     assert_eq!(share.options, ["ro"]);
     assert_eq!(share.runtime_options, RuntimeOptions::Virtiofs(vec![]));
 
     assert_eq!(
-      Mount::block("ext4", "/images/data.ext4", "/data", &[]).runtime_options,
-      RuntimeOptions::Virtioblk(vec![])
+      Mount::block("ext4", "/images/data.ext4", "/data", &[], &["vda"]).runtime_options,
+      RuntimeOptions::Virtioblk(vec!["vda".into()])
     );
     assert_eq!(
-      Mount::any("tmpfs", "tmpfs", "/scratch", &[]).runtime_options,
+      Mount::any("tmpfs", "tmpfs", "/scratch", &[], &[]).runtime_options,
       RuntimeOptions::Any(vec![])
     );
   }

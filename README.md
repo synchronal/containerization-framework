@@ -27,7 +27,7 @@ let image = store.get("docker.io/library/alpine:3", true)?;
 let options = cz::container_manager::CreateOptions { networking: false, ..Default::default() };
 let container = manager.create("example", &image, options, |config| {
     config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
-    config.interfaces = vec![cz::NatInterface::new("192.168.64.7/24", "192.168.64.1")];
+    config.interfaces = vec![cz::NatInterface::new("192.168.64.7/24", Some("192.168.64.1".into()))];
     config.dns = Some(cz::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
 })?;
 container.create()?;
@@ -155,9 +155,11 @@ with `containerization.entitlements` first — the entitlement is checked agains
 calling process.
 
 Those tests share an image store at `~/.cache/containerization-framework-tests`,
-kept between runs. The first run fills it — a kernel download, the init image, and
-`alpine:3` — so it needs the network; later runs reuse it. This directory can be
-deleted.
+kept between runs. Before the tests that boot a VM, nextest runs
+`bin/dev/prepare-integration` as a setup script, which downloads the kernel into
+the store. The tests then pull the init image and `alpine:3` themselves. A first
+run therefore needs the network, and later runs reuse the store. This directory
+can be deleted.
 
 ## License
 

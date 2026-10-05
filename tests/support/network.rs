@@ -35,5 +35,5 @@ pub fn interface(name: &str) -> cfw::containerization::NatInterface {
     .rsplit_once('.')
     .expect("the gateway is a dotted quad");
 
-  cfw::containerization::NatInterface::new(format!("{subnet}.{host}/{PREFIX}"), GATEWAY)
+  cfw::containerization::NatInterface::new(format!("{subnet}.{host}/{PREFIX}"), Some(GATEWAY.into()))
 }

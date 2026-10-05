@@ -89,12 +89,13 @@ fn mounts_what_it_is_given() {
   let container = Container::boot_with("cfw-test-config-mounts", move |configuration| {
     let mounts = &mut configuration.mounts;
 
-    mounts.push(cfw::containerization::Mount::share(&source, "/shared", &["ro"]));
+    mounts.push(cfw::containerization::Mount::share(&source, "/shared", &["ro"], &[]));
     mounts.push(cfw::containerization::Mount::any(
       "tmpfs",
       "tmpfs",
       "/scratch",
       &["size=1m"],
+      &[],
     ));
   });
 
@@ -306,6 +307,29 @@ fn refuses_a_seccomp_profile_that_is_not_one() {
       .contains("create cfw-test-config-seccomp-profile"),
     "{error}"
   );
+}
+
+/// A plain decoder would accept this, dropping `includes` to allow `mount`
+/// unconditionally. The container would then fail only for lacking `runc`.
+#[test]
+fn refuses_a_docker_format_seccomp_profile() {
+  let profile = r#"{
+    "defaultAction": "SCMP_ACT_ERRNO",
+    "syscalls": [{"names": ["mount"], "action": "SCMP_ACT_ALLOW", "includes": {"caps": ["CAP_SYS_ADMIN"]}}]
+  }"#;
+  let refused = Container::try_boot_with("cfw-test-config-seccomp-docker", |configuration| {
+    configuration.oci_runtime_path = Some("/sbin/runc".into());
+    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Profile(profile.into());
+  });
+
+  let error = refused
+    .err()
+    .expect("a Docker-format profile should fail the container");
+  assert!(
+    error.is_code(cfw::containerization_error::Code::InvalidArgument),
+    "{error}"
+  );
+  assert!(error.to_string().contains("Docker's format"), "{error}");
 }
 
 /// The stock init image carries no `runc`. That one runs when present is

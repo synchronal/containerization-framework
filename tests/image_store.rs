@@ -191,6 +191,7 @@ fn says_which_image_it_could_not_get() {
       .contains("containerization-framework/never-pulled:latest"),
     "{error}"
   );
+  assert!(error.is_code(cfw::containerization_error::Code::NotFound), "{error}");
 }
 
 #[test]

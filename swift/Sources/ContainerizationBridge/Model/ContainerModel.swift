@@ -213,10 +213,7 @@ extension LinuxContainer.Configuration {
       case .Default: .default
       case .Profile:
         .profile(
-          try JSONDecoder().decode(
-            LinuxSeccomp.self,
-            from: Data((configuration.seccompProfile()?.toString() ?? "").utf8)
-          )
+          try LinuxSeccomp.decode(from: Data((configuration.seccompProfile()?.toString() ?? "").utf8))
         )
       }
     useInit = configuration.useInit()

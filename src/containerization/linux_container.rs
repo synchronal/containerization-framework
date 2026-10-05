@@ -146,22 +146,24 @@ impl LinuxContainer {
     let defaults = ["nosuid", "noexec", "nodev"];
 
     vec![
-      Mount::any("proc", "proc", "/proc", &[]),
-      Mount::any("sysfs", "sysfs", "/sys", &defaults),
-      Mount::any("devtmpfs", "none", "/dev", &["nosuid", "mode=755"]),
-      Mount::any("mqueue", "mqueue", "/dev/mqueue", &defaults),
+      Mount::any("proc", "proc", "/proc", &[], &[]),
+      Mount::any("sysfs", "sysfs", "/sys", &defaults, &[]),
+      Mount::any("devtmpfs", "none", "/dev", &["nosuid", "mode=755"], &[]),
+      Mount::any("mqueue", "mqueue", "/dev/mqueue", &defaults, &[]),
       Mount::any(
         "tmpfs",
         "tmpfs",
         "/dev/shm",
         &["nosuid", "noexec", "nodev", "mode=1777", "size=65536k"],
+        &[],
       ),
-      Mount::any("cgroup2", "none", "/sys/fs/cgroup", &defaults),
+      Mount::any("cgroup2", "none", "/sys/fs/cgroup", &defaults, &[]),
       Mount::any(
         "devpts",
         "devpts",
         "/dev/pts",
         &["nosuid", "noexec", "newinstance", "gid=5", "mode=0620", "ptmxmode=0666"],
+        &[],
       ),
     ]
   }

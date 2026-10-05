@@ -1,10 +1,21 @@
+experimental = ["setup-scripts"]
+
+# Downloads the kernel the VM suites boot, and tells them where it is.
+[scripts.setup.prepare-integration]
+command = { command-line = "bin/dev/prepare-integration", relative-to = "workspace-root" }
+slow-timeout = { period = "120s", terminate-after = 5 }
+
+[[profile.default.scripts]]
+filter = 'binary(linux_container) | binary(configuration)'
+setup = 'prepare-integration'
+
 # A VM per test: a dozen at once leaves the host swapping, and a starved guest
 # looks like a hang.
 [test-groups]
 containers = { max-threads = 4 }
 
-# Each container unpacks its image, and a cold store first downloads a kernel
-# and pulls the image and the init image.
+# Each container unpacks its image, and a cold store first pulls the image and
+# the init image.
 [[profile.default.overrides]]
 filter = 'binary(linux_container) | binary(configuration)'
 test-group = 'containers'
