@@ -96,12 +96,15 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 
 ## Shape
 
-- `containerization`: `ImageStore`, `Image`, `InitImage`, `Kernel`,
-  `ContainerManager`, `LinuxContainer`, `LinuxProcess`, and the configuration
-  types they take (`linux_container::Configuration`,
-  `LinuxProcessConfiguration`, `Mount`, `Dns`, `Hosts`, ...). Their defaults
-  match Containerization's.
-- `containerization_oci`: `LocalContentStore`, `Content`, `User`.
+- `containerization`: `ImageStore`, `Image`, `image::Description`,
+  `InitImage`, `Ext4Unpacker`, `Kernel`, `ContainerManager`,
+  `LinuxContainer`, `LinuxProcess`, and the configuration types they take
+  (`linux_container::Configuration`, `LinuxProcessConfiguration`, `Mount`,
+  `Dns`, `Hosts`, ...). Their defaults match Containerization's.
+- `containerization_oci`: `LocalContentStore`, `Content`, `ContentWriter`,
+  `Descriptor`, `Platform`, `User`.
+- `containerization_ext4`: `ext4::Ext4Reader`, `ext4::JournalConfig`.
+- `containerization_extras`: `ProgressEvent`, `ProgressHandler`.
 - `containerization_os`: `terminal::Size`.
 
 A few things work differently because Rust can't express them the way Swift
@@ -110,12 +113,17 @@ does:
 - Rust has no default arguments, so `ContainerManager.create`'s optional
   arguments are fields of `container_manager::CreateOptions`. Its `Default`
   uses the same values as Swift.
+- Rust has no overloading either. Where Swift overloads a name, the second
+  Rust method adds a suffix naming the argument that tells them apart:
+  `ContainerManager.create(_:image:rootfs:...)` is `create_with_rootfs`, and
+  `ImageStore(path:contentStore:)` is `ImageStore::with_content_store`.
 - Where Swift takes a `ReaderStream` or `Writer` for a process's `stdin`,
   `stdout` and `stderr`, Rust takes a file descriptor. Swift uses a duplicate
   of it, so you keep yours open and close it yourself.
 - `ContainerManager.create` takes a Rust closure. It receives the
   configuration the manager has prepared and runs on a Swift thread, so it
-  must be `Send + 'static`.
+  must be `Send + 'static`. So must `LocalContentStore.ingest`'s body and a
+  `ProgressHandler`, and a `ProgressHandler` must also be `Sync`.
 - `Content.decode()` is generic over Swift's `Decodable`, which Rust can't
   call. Read `Content::data` and decode the bytes yourself.
 
@@ -124,8 +132,8 @@ does:
 The framework is larger than these bindings. Not exposed: `LinuxPod`, a
 `Network` for `ContainerManager`, `VZVirtualMachineManager` and
 `LinuxContainer`'s own initializers, container statistics, filesystem
-operations, host↔guest file copy, vsock, content ingest, registry
-authentication, progress, push, and OCI layout save and load.
+operations, file copy between host and guest, vsock, registry authentication,
+push, and OCI layout save.
 
 An OCI runtime (and so seccomp) is configurable, but requires an init image with
 `runc`, which Apple does not publish.

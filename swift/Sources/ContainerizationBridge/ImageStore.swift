@@ -11,6 +11,17 @@ func openImageStore(path: RustStr) -> CzOutcome {
   return CzOutcome { CzImageStore(try ImageStore(path: path)) }
 }
 
+// Made from the content store it takes, which swift-bridge can't pass as an
+// argument.
+extension CzLocalContentStore {
+  func imageStore(path: RustStr) -> CzOutcome {
+    let path = URL(filePath: path.toString())
+    let store = store
+
+    return CzOutcome { CzImageStore(try ImageStore(path: path, contentStore: store)) }
+  }
+}
+
 final class CzImageStore: Sendable {
   let store: ImageStore
 
@@ -77,6 +88,21 @@ final class CzImageStore: Sendable {
     let store = store
 
     return CzOutcome { try blocking { try await store.calculateOrphanedBlobsSize() } }
+  }
+
+  func create(description: RustImageDescription) -> CzOutcome {
+    let description = Image.Description(description)
+    let store = store
+
+    return CzOutcome { CzImage(try blocking { try await store.create(description: description) }) }
+  }
+
+  func load(from: RustStr, progress: RustProgressHandler) -> CzOutcome {
+    let directory = URL(filePath: from.toString())
+    let progress = progressHandler(progress)
+    let store = store
+
+    return CzOutcome { CzImages(try blocking { try await store.load(from: directory, progress: progress) }) }
   }
 }
 

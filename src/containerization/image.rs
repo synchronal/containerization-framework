@@ -1,7 +1,37 @@
+//! `Image`, and its nested `Image.Description`.
+
 use crate::containerization_oci::Content;
+use crate::containerization_oci::Descriptor;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+
+/// `Image.Description`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Description {
+  pub reference: String,
+  pub descriptor: Descriptor,
+}
+
+impl Description {
+  /// `Image.Description(reference:descriptor:)`.
+  pub fn new(reference: impl Into<String>, descriptor: Descriptor) -> Self {
+    Self {
+      reference: reference.into(),
+      descriptor,
+    }
+  }
+
+  /// `Image.Description.digest`: the descriptor's.
+  pub fn digest(&self) -> &str {
+    &self.descriptor.digest
+  }
+
+  /// `Image.Description.mediaType`: the descriptor's.
+  pub fn media_type(&self) -> &str {
+    &self.descriptor.media_type
+  }
+}
 
 /// `Image`. Made by [`super::ImageStore`].
 pub struct Image {

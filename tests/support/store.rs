@@ -61,6 +61,16 @@ pub fn image(store: &cfw::containerization::ImageStore) -> cfw::containerization
     .unwrap_or_else(|error| panic!("{IMAGE} should pull: {error}"))
 }
 
+/// [`IMAGE`], unpacked by Rust into an ext4 file at `at`.
+pub fn unpack(at: &std::path::Path) -> cfw::containerization::Mount {
+  let store = image_store();
+  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+
+  cfw::containerization::Ext4Unpacker::new(super::TEST_ROOTFS_SIZE_IN_BYTES, None)
+    .unpack(&image(&store), &platform, at, None)
+    .unwrap_or_else(|error| panic!("{IMAGE} should unpack to {}: {error}", at.display()))
+}
+
 /// The kernel, downloaded on a first run.
 pub fn kernel() -> cfw::containerization::Kernel {
   let path = root()

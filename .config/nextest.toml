@@ -12,5 +12,5 @@ slow-timeout = { period = "300s", terminate-after = 4 }
 
 # A cold store pulls an image and the init image.
 [[profile.default.overrides]]
-filter = 'binary(content) | binary(image_store)'
+filter = 'binary(content) | binary(image_store) | binary(ext4)'
 slow-timeout = { period = "300s", terminate-after = 4 }

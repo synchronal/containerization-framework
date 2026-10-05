@@ -259,14 +259,6 @@ extension Kernel {
 
 // MARK: Swift to Rust
 
-private func rust(_ string: String) -> RustString {
-  string.intoRustString()
-}
-
-private func rust(_ string: String?) -> RustString? {
-  string.map(rust)
-}
-
 /// A mount's `RuntimeOptions`, as the bridge's kind and the options it carries.
 func runtimeKind(_ options: Containerization.Mount.RuntimeOptions) -> (RuntimeKind, [String]) {
   switch options {

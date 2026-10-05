@@ -5,9 +5,13 @@
 //! Nothing can make a Swift object here: every constructor's outcome is a
 //! failure, and every handle is uninhabited, so its methods never run.
 
+use super::Configure;
+use super::Progress;
 use crate::containerization;
 use crate::containerization::container_manager;
+use crate::containerization::image;
 use crate::containerization::linux_container;
+use crate::containerization_oci;
 use std::convert::Infallible;
 
 const MACOS_ONLY: &str = "Containerization.framework is macOS only";
@@ -41,6 +45,11 @@ taken!(
   container_manager -> CzContainerManager,
   linux_container -> CzLinuxContainer,
   linux_process -> CzLinuxProcess,
+  content_writer -> CzContentWriter,
+  written_size -> i64,
+  written_digest -> String,
+  ext4_reader -> CzExt4Reader,
+  platform -> containerization_oci::Platform,
   mount -> containerization::Mount,
   exit_code -> i32,
   exited_at -> f64,
@@ -67,6 +76,8 @@ handles!(
   CzContainerManager,
   CzLinuxContainer,
   CzLinuxProcess,
+  CzContentWriter,
+  CzExt4Reader,
 );
 
 pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
@@ -75,6 +86,34 @@ pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
 
 pub(crate) fn cz_image_store_new(_path: &str) -> CzOutcome {
   CzOutcome
+}
+
+pub(crate) fn cz_content_writer_new(_base: &str) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_current() -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_ext4_reader_new(_block_device: &str) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_ext4_unpack(
+  _unpacker: containerization::Ext4Unpacker,
+  image: CzImage,
+  _platform: containerization_oci::Platform,
+  _at: &str,
+  _progress: Progress,
+) -> CzOutcome {
+  match image.0 {}
+}
+
+impl CzExt4Reader {
+  pub(crate) fn export(&self, _archive: &str) -> CzOutcome {
+    match self.0 {}
+  }
 }
 
 impl CzLocalContentStore {
@@ -91,6 +130,20 @@ impl CzLocalContentStore {
   }
 
   pub(crate) fn total_allocated_size(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn image_store(&self, _path: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn ingest(&self, _body: Box<dyn FnOnce(String) -> bool>) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzContentWriter {
+  pub(crate) fn create(&self, _from: &str) -> CzOutcome {
     match self.0 {}
   }
 }
@@ -155,6 +208,14 @@ impl CzImageStore {
   }
 
   pub(crate) fn calculate_orphaned_blobs_size(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(&self, _description: image::Description) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn load(&self, _from: &str, _progress: Progress) -> CzOutcome {
     match self.0 {}
   }
 
@@ -232,7 +293,19 @@ impl CzContainerManager {
     _image: CzImage,
     _options: container_manager::CreateOptions,
     _seed: linux_container::Configuration,
-    _configuration: Box<dyn FnOnce(linux_container::Configuration) -> linux_container::Configuration>,
+    _configuration: Configure,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_with_rootfs(
+    &self,
+    _id: &str,
+    _image: CzImage,
+    _rootfs: containerization::Mount,
+    _options: container_manager::RootfsCreateOptions,
+    _seed: linux_container::Configuration,
+    _configuration: Configure,
   ) -> CzOutcome {
     match self.0 {}
   }

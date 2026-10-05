@@ -48,24 +48,55 @@ impl Container {
     // Left by a run that died before dropping its container.
     let _ = manager.delete(name);
 
-    let interface = network::interface(name);
     let options = cfw::containerization::container_manager::CreateOptions {
       rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
       networking: false,
       vm: super::vm(),
       ..Default::default()
     };
+    let container = manager.create(name, &image, options, suite_configuration(name, configure))?;
 
-    let container = manager.create(name, &image, options, move |configuration| {
-      configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
-      configuration.cpus = super::TEST_CPUS;
-      configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;
-      configuration.interfaces = vec![interface];
-      configuration.dns = Some(network::gateway_dns());
+    Self::start(manager, container)
+  }
 
-      configure(configuration);
-    })?;
+  /// Creates and starts [`store::IMAGE`] from `rootfs`, a block the test
+  /// unpacked, rather than one the manager unpacks.
+  ///
+  /// Its boot log goes beside the rootfs: the manager seeds one in a container
+  /// directory that only the image `create` makes.
+  pub fn boot_from_rootfs(name: &str, rootfs: cfw::containerization::Mount) -> Self {
+    let boot_log = std::path::Path::new(&rootfs.source).with_extension("log");
+    let image_store = store::image_store();
+    let image = store::image(&image_store);
+    let mut manager = store::manager(&image_store);
 
+    // Left by a run that died before dropping its container.
+    let _ = manager.delete(name);
+
+    let options = cfw::containerization::container_manager::RootfsCreateOptions {
+      networking: false,
+      vm: super::vm(),
+      ..Default::default()
+    };
+
+    manager
+      .create_with_rootfs(
+        name,
+        &image,
+        rootfs,
+        options,
+        suite_configuration(name, move |configuration| {
+          configuration.boot_log = Some(cfw::containerization::BootLog::file(boot_log));
+        }),
+      )
+      .and_then(|container| Self::start(manager, container))
+      .unwrap_or_else(|error| panic!("{name} should boot: {error}"))
+  }
+
+  fn start(
+    manager: cfw::containerization::ContainerManager,
+    container: cfw::containerization::LinuxContainer,
+  ) -> Result<Self, cfw::Error> {
     let booted = Self { manager, container };
 
     booted.container.create()?;
@@ -141,6 +172,24 @@ impl Container {
   /// What a `/bin/sh` script wrote to stdout, which it must exit 0 from.
   pub fn sh(&self, id: &str, script: &str) -> String {
     self.capture(id, &["/bin/sh", "-c", script])
+  }
+}
+
+/// The suite's changes to a seeded configuration, then `configure`'s.
+fn suite_configuration(
+  name: &str,
+  configure: impl FnOnce(&mut cfw::containerization::linux_container::Configuration) + Send + 'static,
+) -> impl FnOnce(&mut cfw::containerization::linux_container::Configuration) + Send + 'static {
+  let interface = network::interface(name);
+
+  move |configuration| {
+    configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
+    configuration.cpus = super::TEST_CPUS;
+    configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;
+    configuration.interfaces = vec![interface];
+    configuration.dns = Some(network::gateway_dns());
+
+    configure(configuration);
   }
 }
 

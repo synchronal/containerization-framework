@@ -13,6 +13,7 @@
 //! swift-bridge's glue.)
 
 mod container;
+mod images;
 
 use std::collections::BTreeMap;
 use std::path::Path;

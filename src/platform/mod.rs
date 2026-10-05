@@ -12,9 +12,27 @@ pub(crate) use crate::bridge::ffi;
 pub(crate) use self::unsupported as ffi;
 
 use crate::containerization;
+use crate::containerization::linux_container;
+use crate::containerization_extras::ProgressHandler;
 use crate::error::Error;
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
+
+/// A `ProgressHandler?`, as it crosses to Swift.
+pub(crate) struct Progress(pub(crate) Option<ProgressHandler>);
+
+type ConfigureContainer = Box<dyn FnOnce(&mut linux_container::Configuration) + Send>;
+
+/// A `(inout LinuxContainer.Configuration) -> Void` closure, as it crosses to
+/// Swift. Swift calls it once, with the configuration it seeded.
+pub(crate) struct Configure(pub(crate) Mutex<Option<ConfigureContainer>>);
+
+impl Configure {
+  pub(crate) fn new(configure: impl FnOnce(&mut linux_container::Configuration) + Send + 'static) -> Self {
+    Self(Mutex::new(Some(Box::new(configure))))
+  }
+}
 
 /// What a throwing Swift call returned, or what it threw as a failure of
 /// `action`.

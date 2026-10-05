@@ -1,4 +1,5 @@
-//! `ContainerManager`, and [`CreateOptions`] for its `create`.
+//! `ContainerManager`, and the options for its `create`s: [`CreateOptions`]
+//! and [`RootfsCreateOptions`].
 
 use super::GIB;
 use super::Image;
@@ -29,6 +30,25 @@ impl Default for CreateOptions {
       rootfs_size_in_bytes: 8 * GIB,
       writable_layer_size_in_bytes: None,
       read_only: false,
+      networking: true,
+      vm: VmResources::default(),
+    }
+  }
+}
+
+/// `ContainerManager.create(_:image:rootfs:...)`'s defaulted arguments, between
+/// the rootfs and the configuration. [`Default`] is Swift's defaults.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RootfsCreateOptions {
+  pub writable_layer: Option<Mount>,
+  pub networking: bool,
+  pub vm: VmResources,
+}
+
+impl Default for RootfsCreateOptions {
+  fn default() -> Self {
+    Self {
+      writable_layer: None,
       networking: true,
       vm: VmResources::default(),
     }
@@ -105,10 +125,35 @@ impl ContainerManager {
       image.handle.duplicate(),
       options,
       linux_container::Configuration::default(),
-      Box::new(move |mut seeded: linux_container::Configuration| {
-        configuration(&mut seeded);
-        seeded
-      }),
+      platform::Configure::new(configuration),
+    );
+
+    platform::outcome(outcome, format!("create {id}")).map(|outcome| LinuxContainer {
+      handle: outcome.linux_container(),
+    })
+  }
+
+  /// `ContainerManager.create(_:image:rootfs:writableLayer:networking:vm:configuration:)`.
+  ///
+  /// `configuration` runs on another thread, as Swift's closure does, against
+  /// the configuration the manager seeded. Swift seeds a boot log in the
+  /// manager's directory for `id`, but only the image `create` makes that
+  /// directory, so set `boot_log` to somewhere that exists.
+  pub fn create_with_rootfs(
+    &mut self,
+    id: &str,
+    image: &Image,
+    rootfs: Mount,
+    options: RootfsCreateOptions,
+    configuration: impl FnOnce(&mut linux_container::Configuration) + Send + 'static,
+  ) -> Result<LinuxContainer, Error> {
+    let outcome = self.handle.create_with_rootfs(
+      id,
+      image.handle.duplicate(),
+      rootfs,
+      options,
+      linux_container::Configuration::default(),
+      platform::Configure::new(configuration),
     );
 
     platform::outcome(outcome, format!("create {id}")).map(|outcome| LinuxContainer {

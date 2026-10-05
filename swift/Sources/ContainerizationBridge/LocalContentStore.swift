@@ -44,6 +44,28 @@ final class CzLocalContentStore: Sendable {
 
     return CzOutcome { try blocking { try await store.totalAllocatedSize() } }
   }
+
+  /// `body` is Rust's: it gets the ingest directory, and returns whether it
+  /// succeeded. Rust keeps its own error, and returns that in place of the one
+  /// thrown here.
+  func ingest(body: (RustString) -> Bool) -> CzOutcome {
+    let store = store
+
+    return CzOutcome {
+      // Doesn't escape: `blocking` returns only once `ingest` is done.
+      try withoutActuallyEscaping(body) { body in
+        nonisolated(unsafe) let body = body
+
+        return try blocking {
+          try await store.ingest { directory in
+            guard body(directory.path(percentEncoded: false).intoRustString()) else {
+              throw BridgeError.bodyFailed
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 /// A `Content?`: Rust asks `isSome` before anything else.

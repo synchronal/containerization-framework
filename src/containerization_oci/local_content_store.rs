@@ -3,10 +3,13 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::PoisonError;
 
 /// `LocalContentStore`.
 pub struct LocalContentStore {
-  handle: ffi::CzLocalContentStore,
+  pub(crate) handle: ffi::CzLocalContentStore,
 }
 
 // Swift's `LocalContentStore` is an actor.
@@ -47,6 +50,31 @@ impl LocalContentStore {
     let outcome = platform::outcome(self.handle.delete_keeping(keeping), "delete content")?;
 
     Ok((outcome.strings(), outcome.number()))
+  }
+
+  /// `LocalContentStore.ingest(_:)`: the digests ingested.
+  ///
+  /// `body` runs on another thread, as Swift's closure does, with the ingest
+  /// directory. If it returns an error, nothing it wrote reaches the store, and
+  /// `ingest` returns that error.
+  pub fn ingest(&self, body: impl FnOnce(&Path) -> Result<(), Error> + Send + 'static) -> Result<Vec<String>, Error> {
+    let failure = Arc::new(Mutex::new(None));
+    let slot = Arc::clone(&failure);
+    let outcome = self.handle.ingest(Box::new(move |directory: String| {
+      body(Path::new(&directory))
+        .map_err(|error| *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(error))
+        .is_ok()
+    }));
+
+    platform::outcome(outcome, "ingest content")
+      .map(|outcome| outcome.strings())
+      .map_err(|error| {
+        failure
+          .lock()
+          .unwrap_or_else(PoisonError::into_inner)
+          .take()
+          .unwrap_or(error)
+      })
   }
 
   /// `LocalContentStore.totalAllocatedSize()`.

@@ -17,6 +17,18 @@
 - `ContainerManager::create` takes Swift's optional arguments in a
   `container_manager::CreateOptions` struct, whose defaults match Swift's. Its
   closure receives the configuration the manager prepared and can change it.
+- Unpack an image once with `Ext4Unpacker::unpack`, then boot containers from
+  copies of it with `ContainerManager::create_with_rootfs`. `boot_log` must
+  point at an existing directory, because Swift doesn't create it.
+- Turn an ext4 filesystem back into a tar archive with `Ext4Reader::export`.
+- Write your own blobs into a store with `LocalContentStore::ingest` and
+  `ContentWriter`. If your closure fails, nothing is added.
+- Add images without pulling them: `ImageStore::create` tags blobs already in
+  the store, and `ImageStore::load` imports an OCI layout directory.
+  `ImageStore::with_content_store` lets an image store share a content store.
+- Unpacking and loading accept a `ProgressHandler` to report progress.
+- New supporting types: `Platform`, `Descriptor`, `image::Description` and
+  `JournalConfig`.
 
 ### Breaking
 

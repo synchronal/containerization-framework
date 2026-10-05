@@ -9,11 +9,15 @@ enum BridgeError: Error, CustomStringConvertible {
   /// A value the bridge could not parse: a malformed wire string, or a
   /// setting that never made sense.
   case malformed(String, String)
+  /// A Rust closure returned an error, which Rust keeps.
+  case bodyFailed
 
   var description: String {
     switch self {
     case .noOutcome:
       return "the bridged task signalled completion without an outcome"
+    case .bodyFailed:
+      return "the Rust closure failed"
     case .malformed(let what, let value):
       return "malformed \(what): \(value.debugDescription)"
     }

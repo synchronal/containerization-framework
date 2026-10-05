@@ -1,5 +1,8 @@
 use super::Image;
 use super::InitImage;
+use super::image;
+use crate::containerization_extras::ProgressHandler;
+use crate::containerization_oci::LocalContentStore;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -20,6 +23,20 @@ impl ImageStore {
   pub fn new(path: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(
       ffi::cz_image_store_new(&path.display().to_string()),
+      format!("open the image store at {}", path.display()),
+    )?;
+
+    Ok(Self {
+      handle: outcome.image_store(),
+    })
+  }
+
+  /// `ImageStore(path:contentStore:)`.
+  pub fn with_content_store(path: &Path, content_store: &LocalContentStore) -> Result<Self, Error> {
+    let outcome = platform::outcome(
+      content_store
+        .handle
+        .image_store(&path.display().to_string()),
       format!("open the image store at {}", path.display()),
     )?;
 
@@ -85,6 +102,36 @@ impl ImageStore {
     .map(|outcome| InitImage {
       handle: outcome.init_image(),
     })
+  }
+
+  /// `ImageStore.create(description:)`.
+  pub fn create(&self, description: &image::Description) -> Result<Image, Error> {
+    platform::outcome(
+      self.handle.create(description.clone()),
+      format!("create {}", description.reference),
+    )
+    .map(|outcome| Image {
+      handle: outcome.image(),
+    })
+  }
+
+  /// `ImageStore.load(from:progress:)`.
+  pub fn load(&self, directory: &Path, progress: Option<ProgressHandler>) -> Result<Vec<Image>, Error> {
+    let images = platform::outcome(
+      self
+        .handle
+        .load(&directory.display().to_string(), platform::Progress(progress)),
+      format!("load images from {}", directory.display()),
+    )?
+    .images();
+
+    Ok(
+      (0..images.len())
+        .map(|index| Image {
+          handle: images.at(index),
+        })
+        .collect(),
+    )
   }
 
   /// `ImageStore.cleanUpOrphanedBlobs()`: the digests deleted, and the bytes

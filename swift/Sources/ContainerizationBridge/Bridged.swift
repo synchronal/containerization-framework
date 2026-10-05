@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 import Containerization
+import ContainerizationOCI
 import Foundation
 
 /// Unchecked: Rust reads an outcome once, on the thread it was returned to.
@@ -50,6 +51,16 @@ final class CzOutcome: @unchecked Sendable {
   func containerManager() -> CzContainerManager { taken() }
   func linuxContainer() -> CzLinuxContainer { taken() }
   func linuxProcess() -> CzLinuxProcess { taken() }
+  func contentWriter() -> CzContentWriter { taken() }
+  func ext4Reader() -> CzExt4Reader { taken() }
+
+  func writtenSize() -> Int64 {
+    (taken() as Written).size
+  }
+
+  func writtenDigest() -> String {
+    (taken() as Written).digest
+  }
 
   // A `Mount`, field by field: Rust builds its own.
 
@@ -75,6 +86,32 @@ final class CzOutcome: @unchecked Sendable {
 
   func mountRuntimeOptions() -> RustVec<RustString> {
     rustStrings(runtimeKind((taken() as Containerization.Mount).runtimeOptions).1)
+  }
+
+  // A `Platform`, field by field: Rust builds its own.
+
+  func platformArchitecture() -> String {
+    (taken() as Platform).architecture
+  }
+
+  func platformOs() -> String {
+    (taken() as Platform).os
+  }
+
+  func platformOsVersion() -> String? {
+    (taken() as Platform).osVersion
+  }
+
+  func platformHasOsFeatures() -> Bool {
+    (taken() as Platform).osFeatures != nil
+  }
+
+  func platformOsFeatures() -> RustVec<RustString> {
+    rustStrings((taken() as Platform).osFeatures ?? [])
+  }
+
+  func platformVariant() -> String? {
+    (taken() as Platform).variant
   }
 
   func exitCode() -> Int32 {
@@ -116,6 +153,14 @@ final class CzOutcome: @unchecked Sendable {
     }
     return vec
   }
+}
+
+func rust(_ string: String) -> RustString {
+  string.intoRustString()
+}
+
+func rust(_ string: String?) -> RustString? {
+  string.map(rust)
 }
 
 /// Strings as Rust's `Vec<String>`.

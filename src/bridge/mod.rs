@@ -20,6 +20,7 @@ mod accessors;
 
 use crate::containerization::BootLog as RustBootLog;
 use crate::containerization::Dns as RustDns;
+use crate::containerization::Ext4Unpacker as RustExt4Unpacker;
 use crate::containerization::Hosts as RustHosts;
 use crate::containerization::Kernel as RustKernel;
 use crate::containerization::LinuxCapabilities as RustLinuxCapabilities;
@@ -29,9 +30,15 @@ use crate::containerization::NatInterface as RustNatInterface;
 use crate::containerization::SystemPlatform as RustSystemPlatform;
 use crate::containerization::UnixSocketConfiguration as RustUnixSocketConfiguration;
 use crate::containerization::container_manager::CreateOptions as RustCreateOptions;
+use crate::containerization::container_manager::RootfsCreateOptions as RustRootfsCreateOptions;
 use crate::containerization::hosts::Entry as RustHostsEntry;
+use crate::containerization::image::Description as RustImageDescription;
 use crate::containerization::linux_container::Configuration as RustLinuxContainerConfiguration;
+use crate::containerization_oci::Descriptor as RustDescriptor;
+use crate::containerization_oci::Platform as RustPlatform;
 use crate::containerization_oci::User as RustUser;
+use crate::platform::Configure as RustConfigure;
+use crate::platform::Progress as RustProgressHandler;
 
 #[swift_bridge::bridge]
 pub(crate) mod ffi {
@@ -103,7 +110,98 @@ pub(crate) mod ffi {
     Amd64,
   }
 
+  // `ProgressEvent`, less its value: `addItems` is `Items`, and so on.
+  enum ProgressKind {
+    Items,
+    TotalItems,
+    Size,
+    TotalSize,
+  }
+
+  // `EXT4.JournalConfig.JournalMode`.
+  enum JournalModeKind {
+    Writeback,
+    Ordered,
+    Journal,
+  }
+
   extern "Rust" {
+    // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
+    // with the configuration it seeded.
+    type RustConfigure;
+    fn call(self: &RustConfigure, configuration: &mut RustLinuxContainerConfiguration);
+
+    // A `ProgressHandler?`. Swift asks `is_some` before calling it.
+    type RustProgressHandler;
+    #[swift_bridge(swift_name = "isSome")]
+    fn is_some(self: &RustProgressHandler) -> bool;
+    fn call(self: &RustProgressHandler, kinds: Vec<ProgressKind>, values: Vec<i64>);
+
+    type RustPlatform;
+    fn architecture(self: &RustPlatform) -> &str;
+    fn os(self: &RustPlatform) -> &str;
+    #[swift_bridge(swift_name = "osVersion")]
+    fn os_version(self: &RustPlatform) -> Option<&str>;
+    #[swift_bridge(swift_name = "hasOsFeatures")]
+    fn has_os_features(self: &RustPlatform) -> bool;
+    #[swift_bridge(swift_name = "osFeaturesLen")]
+    fn os_features_len(self: &RustPlatform) -> usize;
+    #[swift_bridge(swift_name = "osFeaturesAt")]
+    fn os_features_at(self: &RustPlatform, index: usize) -> &str;
+    fn variant(self: &RustPlatform) -> Option<&str>;
+
+    type RustDescriptor;
+    #[swift_bridge(swift_name = "mediaType")]
+    fn media_type(self: &RustDescriptor) -> &str;
+    fn digest(self: &RustDescriptor) -> &str;
+    fn size(self: &RustDescriptor) -> i64;
+    #[swift_bridge(swift_name = "hasUrls")]
+    fn has_urls(self: &RustDescriptor) -> bool;
+    #[swift_bridge(swift_name = "urlsLen")]
+    fn urls_len(self: &RustDescriptor) -> usize;
+    #[swift_bridge(swift_name = "urlsAt")]
+    fn urls_at(self: &RustDescriptor, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasAnnotations")]
+    fn has_annotations(self: &RustDescriptor) -> bool;
+    #[swift_bridge(swift_name = "annotationsLen")]
+    fn annotations_len(self: &RustDescriptor) -> usize;
+    #[swift_bridge(swift_name = "annotationKeyAt")]
+    fn annotation_key_at(self: &RustDescriptor, index: usize) -> &str;
+    #[swift_bridge(swift_name = "annotationValueAt")]
+    fn annotation_value_at(self: &RustDescriptor, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasPlatform")]
+    fn has_platform(self: &RustDescriptor) -> bool;
+    fn platform(self: &RustDescriptor) -> &RustPlatform;
+    #[swift_bridge(swift_name = "artifactType")]
+    fn artifact_type(self: &RustDescriptor) -> Option<&str>;
+
+    type RustImageDescription;
+    fn reference(self: &RustImageDescription) -> &str;
+    fn descriptor(self: &RustImageDescription) -> &RustDescriptor;
+
+    type RustExt4Unpacker;
+    #[swift_bridge(swift_name = "capacityInBytes")]
+    fn capacity_in_bytes(self: &RustExt4Unpacker) -> u64;
+    #[swift_bridge(swift_name = "hasJournal")]
+    fn has_journal(self: &RustExt4Unpacker) -> bool;
+    #[swift_bridge(swift_name = "journalSize")]
+    fn journal_size(self: &RustExt4Unpacker) -> Option<u64>;
+    #[swift_bridge(swift_name = "hasJournalMode")]
+    fn has_journal_mode(self: &RustExt4Unpacker) -> bool;
+    #[swift_bridge(swift_name = "journalMode")]
+    fn journal_mode(self: &RustExt4Unpacker) -> JournalModeKind;
+
+    type RustRootfsCreateOptions;
+    #[swift_bridge(swift_name = "hasWritableLayer")]
+    fn has_writable_layer(self: &RustRootfsCreateOptions) -> bool;
+    #[swift_bridge(swift_name = "writableLayer")]
+    fn writable_layer(self: &RustRootfsCreateOptions) -> &RustMount;
+    fn networking(self: &RustRootfsCreateOptions) -> bool;
+    #[swift_bridge(swift_name = "vmCpus")]
+    fn vm_cpus(self: &RustRootfsCreateOptions) -> u32;
+    #[swift_bridge(swift_name = "vmMemoryInBytes")]
+    fn vm_memory_in_bytes(self: &RustRootfsCreateOptions) -> u64;
+
     type RustMount;
     #[swift_bridge(swift_name = "mountType")]
     fn mount_type(self: &RustMount) -> &str;
@@ -440,6 +538,46 @@ pub(crate) mod ffi {
     fn linux_container(self: &CzOutcome) -> CzLinuxContainer;
     #[swift_bridge(swift_name = "linuxProcess")]
     fn linux_process(self: &CzOutcome) -> CzLinuxProcess;
+    #[swift_bridge(swift_name = "contentWriter")]
+    fn content_writer(self: &CzOutcome) -> CzContentWriter;
+    #[swift_bridge(swift_name = "writtenSize")]
+    fn written_size(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "writtenDigest")]
+    fn written_digest(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ext4Reader")]
+    fn ext4_reader(self: &CzOutcome) -> CzExt4Reader;
+
+    #[swift_bridge(swift_name = "platformArchitecture")]
+    fn platform_architecture(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "platformOs")]
+    fn platform_os(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "platformOsVersion")]
+    fn platform_os_version(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "platformHasOsFeatures")]
+    fn platform_has_os_features(self: &CzOutcome) -> bool;
+    #[swift_bridge(swift_name = "platformOsFeatures")]
+    fn platform_os_features(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "platformVariant")]
+    fn platform_variant(self: &CzOutcome) -> Option<String>;
+
+    #[swift_bridge(swift_name = "currentPlatform")]
+    fn cz_platform_current() -> CzOutcome;
+
+    type CzExt4Reader;
+    #[swift_bridge(swift_name = "openExt4Reader")]
+    fn cz_ext4_reader_new(#[swift_bridge(label = "blockDevice")] block_device: &str) -> CzOutcome;
+    fn export(self: &CzExt4Reader, archive: &str) -> CzOutcome;
+
+    // `EXT4Unpacker.unpack(_:for:at:progress:)`, with the image as a
+    // `duplicate()`.
+    #[swift_bridge(swift_name = "unpackExt4")]
+    fn cz_ext4_unpack(
+      unpacker: RustExt4Unpacker,
+      image: CzImage,
+      platform: RustPlatform,
+      at: &str,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
     #[swift_bridge(swift_name = "mountType")]
     fn mount_type(self: &CzOutcome) -> String;
     #[swift_bridge(swift_name = "mountSource")]
@@ -473,6 +611,16 @@ pub(crate) mod ffi {
     fn delete_keeping(self: &CzLocalContentStore, keeping: Vec<String>) -> CzOutcome;
     #[swift_bridge(swift_name = "totalAllocatedSize")]
     fn total_allocated_size(self: &CzLocalContentStore) -> CzOutcome;
+    // `ImageStore(path:contentStore:)`, on the store it takes.
+    #[swift_bridge(swift_name = "imageStore")]
+    fn image_store(self: &CzLocalContentStore, path: &str) -> CzOutcome;
+    // `body` gets the ingest directory, and returns whether it succeeded.
+    fn ingest(self: &CzLocalContentStore, body: Box<dyn FnOnce(String) -> bool>) -> CzOutcome;
+
+    type CzContentWriter;
+    #[swift_bridge(swift_name = "openContentWriter")]
+    fn cz_content_writer_new(base: &str) -> CzOutcome;
+    fn create(self: &CzContentWriter, from: &str) -> CzOutcome;
 
     // A `Content?`: Rust asks `is_some` before anything else.
     type CzContent;
@@ -504,6 +652,8 @@ pub(crate) mod ffi {
     fn clean_up_orphaned_blobs(self: &CzImageStore) -> CzOutcome;
     #[swift_bridge(swift_name = "calculateOrphanedBlobsSize")]
     fn calculate_orphaned_blobs_size(self: &CzImageStore) -> CzOutcome;
+    fn create(self: &CzImageStore, description: RustImageDescription) -> CzOutcome;
+    fn load(self: &CzImageStore, from: &str, progress: RustProgressHandler) -> CzOutcome;
     // `ContainerManager`'s inits, on the store they take: swift-bridge can't
     // pass a `&` Swift type as an argument.
     #[swift_bridge(swift_name = "containerManager")]
@@ -553,7 +703,17 @@ pub(crate) mod ffi {
       image: CzImage,
       options: RustCreateOptions,
       seed: RustLinuxContainerConfiguration,
-      configuration: Box<dyn FnOnce(RustLinuxContainerConfiguration) -> RustLinuxContainerConfiguration>,
+      configuration: RustConfigure,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "createWithRootfs")]
+    fn create_with_rootfs(
+      self: &CzContainerManager,
+      id: &str,
+      image: CzImage,
+      rootfs: RustMount,
+      options: RustRootfsCreateOptions,
+      seed: RustLinuxContainerConfiguration,
+      configuration: RustConfigure,
     ) -> CzOutcome;
     fn delete(self: &CzContainerManager, id: &str) -> CzOutcome;
 

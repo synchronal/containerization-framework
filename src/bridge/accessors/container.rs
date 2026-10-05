@@ -10,7 +10,9 @@ use crate::containerization::mount;
 use crate::containerization::system_platform;
 use crate::containerization::unix_socket_configuration;
 use crate::containerization_oci;
+use crate::platform::Configure;
 use std::path::PathBuf;
+use std::sync::PoisonError;
 
 fn runtime_options_of(kind: ffi::RuntimeKind, options: Vec<String>) -> mount::RuntimeOptions {
   match kind {
@@ -30,6 +32,17 @@ impl ffi::CzOutcome {
       destination: self.mount_destination(),
       options: self.mount_options(),
       runtime_options: runtime_options_of(self.mount_runtime_kind(), self.mount_runtime_options()),
+    }
+  }
+}
+
+impl Configure {
+  /// Runs the closure on the configuration Swift seeded, the first time only.
+  pub(crate) fn call(&self, configuration: &mut linux_container::Configuration) {
+    let configure = self.0.lock().unwrap_or_else(PoisonError::into_inner).take();
+
+    if let Some(configure) = configure {
+      configure(configuration);
     }
   }
 }

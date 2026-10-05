@@ -61,6 +61,89 @@ fn finds_no_blob_the_store_never_held() {
   assert!(content_store().get(ABSENT).expect("a lookup").is_none());
 }
 
+/// A file outside any ingest directory, and a store of its own.
+fn blob_and_store(contents: &str) -> (tempfile::TempDir, cfw::containerization_oci::LocalContentStore) {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  std::fs::write(directory.path().join("blob"), contents).expect("the blob should write");
+  let store = cfw::containerization_oci::LocalContentStore::new(&directory.path().join("content"))
+    .expect("a new content store should open");
+
+  (directory, store)
+}
+
+#[test]
+fn ingests_what_a_content_writer_wrote() {
+  let (directory, store) = blob_and_store("ingested");
+  let blob = directory.path().join("blob");
+  let (written, writer_saw) = std::sync::mpsc::channel();
+
+  let ingested = store
+    .ingest(move |ingest_directory| {
+      let created = cfw::containerization_oci::ContentWriter::new(ingest_directory)?.create(&blob)?;
+      written.send(created).expect("the test is listening");
+      Ok(())
+    })
+    .expect("the ingest should complete");
+  let (size, digest) = writer_saw.recv().expect("the body ran");
+
+  assert_eq!(size, "ingested".len() as i64);
+  assert!(digest.starts_with("sha256:"), "{digest}");
+  assert_eq!(ingested, [digest.trim_start_matches("sha256:")]);
+
+  let content = store
+    .get(&digest)
+    .expect("a lookup")
+    .expect("the ingested blob should be in the store");
+  assert_eq!(content.data().expect("the blob's bytes"), b"ingested");
+}
+
+#[test]
+fn returns_the_error_its_body_returned_and_ingests_nothing() {
+  let (directory, store) = blob_and_store("abandoned");
+  let blob = directory.path().join("blob");
+  let (written, writer_saw) = std::sync::mpsc::channel();
+
+  let error = store
+    .ingest(move |ingest_directory| {
+      let (_, digest) = cfw::containerization_oci::ContentWriter::new(ingest_directory)?.create(&blob)?;
+      written.send(digest).expect("the test is listening");
+      Err(cfw::Error::failed("finish the body", "it gave up"))
+    })
+    .err()
+    .expect("a failed body");
+  let digest = writer_saw.recv().expect("the body ran");
+
+  assert_eq!(error.action(), "finish the body");
+  assert!(store.get(&digest).expect("a lookup").is_none());
+}
+
+#[test]
+fn runs_a_body_that_calls_back_into_swift() {
+  let (_directory, store) = blob_and_store("unused");
+  let (found, body_saw) = std::sync::mpsc::channel();
+
+  store
+    .ingest(move |_| {
+      let store = support::store::image_store();
+      found
+        .send(support::store::image(&store).reference())
+        .expect("the test is listening");
+      Ok(())
+    })
+    .expect("the ingest should complete");
+
+  assert_eq!(body_saw.recv().expect("the body ran"), support::store::IMAGE);
+}
+
+#[test]
+fn says_which_directory_a_content_writer_could_not_write_into() {
+  let error = cfw::containerization_oci::ContentWriter::new("/nowhere/at/all".as_ref())
+    .err()
+    .expect("a directory that doesn't exist");
+
+  assert!(error.to_string().contains("/nowhere/at/all"), "{error}");
+}
+
 #[test]
 fn says_which_blob_it_could_not_get() {
   let error = content_store()

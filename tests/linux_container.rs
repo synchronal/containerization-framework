@@ -6,12 +6,12 @@
 //! code comes back as its own, and that the descriptors a caller attaches are
 //! the ones the guest writes to.
 //!
-//! One container serves all of it. Nextest runs each test in a process of its
-//! own and a container dies with the process that created it, so every test is
-//! a VM.
+//! Nextest runs each test in a process of its own and a container dies with
+//! the process that created it, so every container is a VM.
 
 mod support;
 
+use containerization_framework as cfw;
 use support::container::Container;
 
 #[test]
@@ -46,5 +46,32 @@ fn creates_and_runs_processes() {
   assert!(
     container.directory().join("bootlog.log").is_file(),
     "the manager should seed a boot log in the container's directory"
+  );
+}
+
+#[test]
+fn boots_from_copies_of_one_unpacked_rootfs() {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  let unpacked = support::store::unpack(&directory.path().join("rootfs.ext4"));
+  let copy = |name: &str| {
+    let path = directory.path().join(name);
+    std::fs::copy(&unpacked.source, &path).expect("the rootfs should copy");
+
+    cfw::containerization::Mount {
+      source: path.display().to_string(),
+      ..unpacked.clone()
+    }
+  };
+
+  let first = Container::boot_from_rootfs("cfw-test-rootfs-first", copy("first.ext4"));
+  let second = Container::boot_from_rootfs("cfw-test-rootfs-second", copy("second.ext4"));
+
+  first.sh("write", "echo first > /marker");
+
+  assert_eq!(first.sh("read", "cat /marker").trim(), "first");
+  assert_eq!(
+    second.exec("look", &["/bin/sh", "-c", "test -e /marker"]),
+    1,
+    "a copy doesn't see what another copy's container wrote"
   );
 }
