@@ -47,8 +47,28 @@
 - Added the conversions `Process::from_image_config`, `LinuxRLimit::to_oci`,
   `LinuxCapabilities::to_oci` and `SystemPlatform::oci_platform`, and Swift's
   `description` for `Process` and `Hook`, which hides the values in `env`.
+- `ImageStore` has `default_store`, `push`, `push_all` and `save`. `pull` and
+  the `push`es take Swift's defaulted arguments as
+  `image_store::PullOptions`, `PushOptions` and `PushAllOptions`.
+- Added `containerization_oci::Authentication`, which holds Swift's value and
+  so can't show its credentials. Make one with `Authentication::basic`, or
+  look one up with the new `KeychainHelper`, whose `list` returns
+  `containerization_os::RegistryInfo`s.
+- Added `RegistryClient` and `RetryOptions`. `RegistryClient::with_host`
+  takes Swift's defaulted arguments as `registry_client::HostOptions`.
+  Neither init takes Swift's TLS configuration or logger.
+- Added `Image::new`, `InitImage::new`, `InitImage::create` and
+  `KernelImage`.
+- `LocalContentStore` has `new_ingest_session`, `complete_ingest_session` and
+  `cancel_ingest_session`. `Content::open` reads a file without a store, and
+  `ContentWriter` has `write` and `copy`.
 
 ### Breaking
+
+- `ImageStore::pull` takes a `PullOptions`. Pass `Default::default()` for
+  Swift's defaults.
+- `ImageStore::get_init_image` takes an `auth` and a `progress` argument.
+  Pass `None` for Swift's defaults.
 
 - `Mount::share`, `Mount::block` and `Mount::any` take a `runtime_options`
   argument after `options`, matching Swift. Pass `&[]` for Swift's default.

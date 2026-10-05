@@ -18,6 +18,11 @@ final class CzLocalContentStore: Sendable {
     self.store = store
   }
 
+  /// Another handle on the same store, to pass where Rust would lend one.
+  func duplicate() -> CzLocalContentStore {
+    CzLocalContentStore(store)
+  }
+
   func get(digest: RustStr) -> CzOutcome {
     let digest = digest.toString()
     let store = store
@@ -37,6 +42,26 @@ final class CzLocalContentStore: Sendable {
     let store = store
 
     return CzOutcome { try blocking { try await store.delete(keeping: keeping) } }
+  }
+
+  func newIngestSession() -> CzOutcome {
+    let store = store
+
+    return CzOutcome { try blocking { try await store.newIngestSession() } }
+  }
+
+  func completeIngestSession(id: RustStr) -> CzOutcome {
+    let id = id.toString()
+    let store = store
+
+    return CzOutcome { try blocking { try await store.completeIngestSession(id) } }
+  }
+
+  func cancelIngestSession(id: RustStr) -> CzOutcome {
+    let id = id.toString()
+    let store = store
+
+    return CzOutcome { try blocking { try await store.cancelIngestSession(id) } }
   }
 
   func totalAllocatedSize() -> CzOutcome {
@@ -66,6 +91,28 @@ final class CzLocalContentStore: Sendable {
       }
     }
   }
+}
+
+extension CzOutcome {
+  // What `newIngestSession` returned.
+
+  func ingestSessionId() -> String {
+    (taken() as (id: String, ingestDir: URL)).id
+  }
+
+  func ingestSessionDirectory() -> String {
+    (taken() as (id: String, ingestDir: URL)).ingestDir.path(percentEncoded: false)
+  }
+}
+
+func openLocalContent(path: RustStr) -> CzOutcome {
+  let path = URL(filePath: path.toString())
+
+  return CzOutcome { CzContent(try LocalContent(path: path)) }
+}
+
+func localContentMaxDecodedSize() -> Int {
+  LocalContent.maxDecodedSize
 }
 
 /// A `Content?`: Rust asks `isSome` before anything else.

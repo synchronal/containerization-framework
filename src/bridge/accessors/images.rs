@@ -7,6 +7,8 @@ use crate::bridge::ffi;
 use crate::containerization;
 use crate::containerization::container_manager;
 use crate::containerization::image;
+use crate::containerization::kernel;
+use crate::containerization::system_platform;
 use crate::containerization_ext4::ext4::journal_config::JournalMode;
 use crate::containerization_extras::ProgressEvent;
 use crate::containerization_oci;
@@ -182,6 +184,27 @@ impl ffi::CzOutcome {
         .optional(|history| history.list(Self::history)),
     }
   }
+
+  /// The `Kernel` an outcome holds.
+  pub(crate) fn kernel(&self) -> containerization::Kernel {
+    containerization::Kernel {
+      path: self.kernel_path().into(),
+      platform: containerization::SystemPlatform {
+        os: match self.kernel_platform_os() {
+          ffi::PlatformOs::Linux => system_platform::Os::Linux,
+          ffi::PlatformOs::Darwin => system_platform::Os::Darwin,
+        },
+        architecture: match self.kernel_platform_architecture() {
+          ffi::PlatformArchitecture::Arm64 => system_platform::Architecture::Arm64,
+          ffi::PlatformArchitecture::Amd64 => system_platform::Architecture::Amd64,
+        },
+      },
+      command_line: kernel::CommandLine {
+        kernel_args: self.kernel_kernel_args(),
+        init_args: self.kernel_init_args(),
+      },
+    }
+  }
 }
 
 impl containerization_oci::Descriptor {
@@ -337,6 +360,22 @@ mod tests {
     assert_eq!(
       ffi::cz_parsed_digest_algorithm(),
       containerization_oci::ParsedDigest::ALGORITHM
+    );
+  }
+
+  #[test]
+  fn copies_swifts_max_decoded_size() {
+    assert_eq!(
+      ffi::cz_local_content_max_decoded_size(),
+      containerization_oci::Content::MAX_DECODED_SIZE
+    );
+  }
+
+  #[test]
+  fn copies_swifts_kernel_media_type() {
+    assert_eq!(
+      ffi::cz_kernel_image_media_type(),
+      crate::containerization::KernelImage::MEDIA_TYPE
     );
   }
 

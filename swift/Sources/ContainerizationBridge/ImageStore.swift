@@ -1,5 +1,5 @@
 //===----------------------------------------------------------------------===//
-// `ImageStore`, `Image` and `InitImage`, from Containerization.
+// `ImageStore`, `Image`, `InitImage` and `KernelImage`, from Containerization.
 //===----------------------------------------------------------------------===//
 
 import Containerization
@@ -13,7 +13,11 @@ func openImageStore(path: RustStr) -> CzOutcome {
   return CzOutcome { CzImageStore(try ImageStore(path: path)) }
 }
 
-// Made from the content store it takes, which swift-bridge can't pass as an
+func defaultImageStore() -> CzOutcome {
+  CzOutcome { CzImageStore(ImageStore.default) }
+}
+
+// Made from the content store they take, which swift-bridge can't pass as an
 // argument.
 extension CzLocalContentStore {
   func imageStore(path: RustStr) -> CzOutcome {
@@ -21,6 +25,10 @@ extension CzLocalContentStore {
     let store = store
 
     return CzOutcome { CzImageStore(try ImageStore(path: path, contentStore: store)) }
+  }
+
+  func image(description: RustImageDescription) -> CzImage {
+    CzImage(Image(description: Image.Description(description), contentStore: store))
   }
 }
 
@@ -63,18 +71,105 @@ final class CzImageStore: Sendable {
     return CzOutcome { CzImage(try blocking { try await store.tag(existing: existing, new: new) }) }
   }
 
-  func pull(reference: RustStr) -> CzOutcome {
+  func pull(
+    reference: RustStr,
+    hasPlatform: Bool,
+    platform: RustPlatform,
+    insecure: Bool,
+    auth: CzAuthentication,
+    progress: RustProgressHandler,
+    maxConcurrentDownloads: UInt
+  ) -> CzOutcome {
     let reference = reference.toString()
+    let platform = hasPlatform ? Platform(platform) : nil
+    let auth = auth.authentication
+    let progress = progressHandler(progress)
     let store = store
 
-    return CzOutcome { CzImage(try blocking { try await store.pull(reference: reference) }) }
+    return CzOutcome {
+      CzImage(
+        try blocking {
+          try await store.pull(
+            reference: reference,
+            platform: platform,
+            insecure: insecure,
+            auth: auth,
+            progress: progress,
+            maxConcurrentDownloads: Int(maxConcurrentDownloads)
+          )
+        })
+    }
   }
 
-  func getInitImage(reference: RustStr) -> CzOutcome {
+  func push(
+    reference: RustStr,
+    hasPlatform: Bool,
+    platform: RustPlatform,
+    insecure: Bool,
+    auth: CzAuthentication,
+    progress: RustProgressHandler
+  ) -> CzOutcome {
     let reference = reference.toString()
+    let platform = hasPlatform ? Platform(platform) : nil
+    let auth = auth.authentication
+    let progress = progressHandler(progress)
     let store = store
 
-    return CzOutcome { CzInitImage(try blocking { try await store.getInitImage(reference: reference) }) }
+    return CzOutcome {
+      try blocking {
+        try await store.push(
+          reference: reference, platform: platform, insecure: insecure, auth: auth, progress: progress)
+      }
+    }
+  }
+
+  func pushAll(
+    references: RustVec<RustString>,
+    hasPlatform: Bool,
+    platform: RustPlatform,
+    insecure: Bool,
+    auth: CzAuthentication,
+    maxConcurrentUploads: UInt,
+    progress: RustProgressHandler
+  ) -> CzOutcome {
+    let references = strings(references)
+    let platform = hasPlatform ? Platform(platform) : nil
+    let auth = auth.authentication
+    let progress = progressHandler(progress)
+    let store = store
+
+    return CzOutcome {
+      try blocking {
+        try await store.push(
+          references: references,
+          platform: platform,
+          insecure: insecure,
+          auth: auth,
+          maxConcurrentUploads: Int(maxConcurrentUploads),
+          progress: progress
+        )
+      }
+    }
+  }
+
+  func getInitImage(reference: RustStr, auth: CzAuthentication, progress: RustProgressHandler) -> CzOutcome {
+    let reference = reference.toString()
+    let auth = auth.authentication
+    let progress = progressHandler(progress)
+    let store = store
+
+    return CzOutcome {
+      CzInitImage(try blocking { try await store.getInitImage(reference: reference, auth: auth, progress: progress) })
+    }
+  }
+
+  func save(references: RustVec<RustString>, out: RustStr, hasPlatform: Bool, platform: RustPlatform) -> CzOutcome {
+    let references = strings(references)
+    let out = URL(filePath: out.toString())
+    let platform = hasPlatform ? Platform(platform) : nil
+    let store = store
+
+    return CzOutcome { try blocking { try await store.save(references: references, out: out, platform: platform) } }
   }
 
   func cleanUpOrphanedBlobs() -> CzOutcome {
@@ -105,6 +200,64 @@ final class CzImageStore: Sendable {
     let store = store
 
     return CzOutcome { CzImages(try blocking { try await store.load(from: directory, progress: progress) }) }
+  }
+
+  func createInitImage(
+    reference: RustStr,
+    rootfs: RustStr,
+    platform: RustPlatform,
+    labelKeys: RustVec<RustString>,
+    labelValues: RustVec<RustString>,
+    contentStore: CzLocalContentStore
+  ) -> CzOutcome {
+    let reference = reference.toString()
+    let rootfs = URL(filePath: rootfs.toString())
+    let platform = Platform(platform)
+    let labels = dictionary(labelKeys, labelValues)
+    let contentStore = contentStore.store
+    let store = store
+
+    return CzOutcome {
+      CzInitImage(
+        try blocking {
+          try await InitImage.create(
+            reference: reference,
+            rootfs: rootfs,
+            platform: platform,
+            labels: labels,
+            imageStore: store,
+            contentStore: contentStore
+          )
+        })
+    }
+  }
+
+  func createKernelImage(
+    reference: RustStr,
+    binaries: RustVec<RustKernel>,
+    labelKeys: RustVec<RustString>,
+    labelValues: RustVec<RustString>,
+    contentStore: CzLocalContentStore
+  ) -> CzOutcome {
+    let reference = reference.toString()
+    let labels = dictionary(labelKeys, labelValues)
+    let contentStore = contentStore.store
+    let store = store
+
+    return CzOutcome {
+      let binaries = try binaries.map { try Kernel($0) }
+
+      return CzKernelImage(
+        try blocking {
+          try await KernelImage.create(
+            reference: reference,
+            binaries: binaries,
+            labels: labels,
+            imageStore: store,
+            contentStore: contentStore
+          )
+        })
+    }
   }
 }
 
@@ -192,6 +345,72 @@ final class CzImage: Sendable {
     let image = image
 
     return CzOutcome { CzContent(try blocking { try await image.getContent(digest: digest) }) }
+  }
+
+  func initImage() -> CzInitImage {
+    CzInitImage(InitImage(image: image))
+  }
+
+  func kernelImage() -> CzKernelImage {
+    CzKernelImage(KernelImage(image: image))
+  }
+}
+
+final class CzKernelImage: Sendable {
+  let image: KernelImage
+
+  init(_ image: KernelImage) {
+    self.image = image
+  }
+
+  func name() -> String {
+    image.name
+  }
+
+  func kernel(platform: RustSystemPlatform) -> CzOutcome {
+    let image = image
+
+    return CzOutcome {
+      let platform = try SystemPlatform(platform)
+
+      return try blocking { try await image.kernel(for: platform) }
+    }
+  }
+}
+
+func kernelImageMediaType() -> String {
+  KernelImage.mediaType
+}
+
+extension CzOutcome {
+  func kernelImage() -> CzKernelImage { taken() }
+
+  // A `Kernel`, field by field: Rust builds its own.
+
+  func kernelPath() -> String {
+    (taken() as Kernel).path.path(percentEncoded: false)
+  }
+
+  func kernelPlatformOs() -> PlatformOs {
+    switch (taken() as Kernel).platform.os {
+    case .linux: .Linux
+    case .darwin: .Darwin
+    }
+  }
+
+  func kernelPlatformArchitecture() -> PlatformArchitecture {
+    switch (taken() as Kernel).platform.architecture {
+    case .arm64: .Arm64
+    case .amd64: .Amd64
+    }
+  }
+
+  func kernelKernelArgs() -> RustVec<RustString> {
+    rustStrings((taken() as Kernel).commandLine.kernelArgs)
+  }
+
+  func kernelInitArgs() -> RustVec<RustString> {
+    rustStrings((taken() as Kernel).commandLine.initArgs)
   }
 }
 

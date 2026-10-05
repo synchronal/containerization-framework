@@ -19,7 +19,17 @@ final class CzContentWriter: @unchecked Sendable {
     self.writer = writer
   }
 
-  /// The size and the digest, as its `digestString`.
+  // Each outcome holds the size and the digest, as its `digestString`.
+
+  func write(data: RustVec<UInt8>) -> CzOutcome {
+    let data = Data(data)
+
+    return CzOutcome {
+      let (size, digest) = try writer.write(data)
+      return Written(size: size, digest: digest.digestString)
+    }
+  }
+
   func create(from: RustStr) -> CzOutcome {
     let url = URL(filePath: from.toString())
 
@@ -27,6 +37,16 @@ final class CzContentWriter: @unchecked Sendable {
       let (size, digest) = try writer.create(from: url)
       return Written(size: size, digest: digest.digestString)
     }
+  }
+}
+
+func copyContent(from: RustStr, destination: RustStr) -> CzOutcome {
+  let url = URL(filePath: from.toString())
+  let destination = URL(filePath: destination.toString())
+
+  return CzOutcome {
+    let (size, digest) = try ContentWriter.copy(from: url, destination: destination)
+    return Written(size: size, digest: digest.digestString)
   }
 }
 

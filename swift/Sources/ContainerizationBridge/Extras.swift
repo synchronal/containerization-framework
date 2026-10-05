@@ -33,7 +33,7 @@ func proxyFromEnvironment(
 ) -> CzOutcome {
   let scheme = scheme?.toString()
   let host = host.toString()
-  let env = hasEnv ? Dictionary(zip(strings(envKeys), strings(envValues)), uniquingKeysWith: { _, last in last }) : nil
+  let env = hasEnv ? dictionary(envKeys, envValues) : nil
 
   return CzOutcome {
     let proxy =

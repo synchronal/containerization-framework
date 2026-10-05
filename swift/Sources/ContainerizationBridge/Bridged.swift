@@ -299,3 +299,8 @@ func rustStrings(_ values: some Sequence<String>) -> RustVec<RustString> {
 func strings(_ vec: RustVec<RustString>) -> [String] {
   vec.map { $0.as_str().toString() }
 }
+
+/// A Rust map, crossing as its keys and its values in the same order.
+func dictionary(_ keys: RustVec<RustString>, _ values: RustVec<RustString>) -> [String: String] {
+  Dictionary(zip(strings(keys), strings(values)), uniquingKeysWith: { _, last in last })
+}

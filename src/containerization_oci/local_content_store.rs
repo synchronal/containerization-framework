@@ -3,6 +3,7 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
@@ -75,6 +76,35 @@ impl LocalContentStore {
           .take()
           .unwrap_or(error)
       })
+  }
+
+  /// `LocalContentStore.newIngestSession()`: the session's id, and the
+  /// directory to write its content into.
+  pub fn new_ingest_session(&self) -> Result<(String, PathBuf), Error> {
+    platform::outcome(self.handle.new_ingest_session(), "start an ingest session").map(|outcome| {
+      (
+        outcome.ingest_session_id(),
+        PathBuf::from(outcome.ingest_session_directory()),
+      )
+    })
+  }
+
+  /// `LocalContentStore.completeIngestSession(_:)`: the digests ingested.
+  pub fn complete_ingest_session(&self, id: &str) -> Result<Vec<String>, Error> {
+    platform::outcome(
+      self.handle.complete_ingest_session(id),
+      format!("complete ingest session {id}"),
+    )
+    .map(|outcome| outcome.strings())
+  }
+
+  /// `LocalContentStore.cancelIngestSession(_:)`.
+  pub fn cancel_ingest_session(&self, id: &str) -> Result<(), Error> {
+    platform::outcome(
+      self.handle.cancel_ingest_session(id),
+      format!("cancel ingest session {id}"),
+    )
+    .map(drop)
   }
 
   /// `LocalContentStore.totalAllocatedSize()`.

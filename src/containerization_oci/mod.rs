@@ -44,24 +44,28 @@ macro_rules! raw_values {
 }
 
 mod annotation_keys;
+pub(crate) mod authentication;
 mod bundle;
 mod content;
 mod content_writer;
 mod descriptor;
 mod image_config;
 mod index;
+mod keychain_helper;
 mod local_content_store;
 mod manifest;
 mod media_types;
 mod parsed_digest;
-mod platform;
+pub(crate) mod platform;
 pub mod reference;
+pub mod registry_client;
 mod spec;
 mod state;
 mod user;
 mod version;
 
 pub use self::annotation_keys::AnnotationKeys;
+pub use self::authentication::Authentication;
 pub use self::bundle::Bundle;
 pub use self::content::Content;
 pub use self::content_writer::ContentWriter;
@@ -71,12 +75,15 @@ pub use self::image_config::Image;
 pub use self::image_config::ImageConfig;
 pub use self::image_config::Rootfs;
 pub use self::index::Index;
+pub use self::keychain_helper::KeychainHelper;
 pub use self::local_content_store::LocalContentStore;
 pub use self::manifest::Manifest;
 pub use self::media_types::MediaTypes;
 pub use self::parsed_digest::ParsedDigest;
 pub use self::platform::Platform;
 pub use self::reference::Reference;
+pub use self::registry_client::RegistryClient;
+pub use self::registry_client::RetryOptions;
 pub use self::spec::Arch;
 pub use self::spec::Box;
 pub use self::spec::Hook;

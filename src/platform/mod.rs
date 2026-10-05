@@ -2,7 +2,9 @@
 //! reads. Every wrapper calls through here, so each is written once for every
 //! platform.
 
+// The bridge's functions take Swift's arguments, however many there are.
 #[cfg(not(target_os = "macos"))]
+#[allow(clippy::too_many_arguments)]
 pub(crate) mod unsupported;
 
 #[cfg(target_os = "macos")]

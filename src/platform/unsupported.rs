@@ -15,6 +15,7 @@ use crate::containerization_extras;
 use crate::containerization_extras::IPv6Address;
 use crate::containerization_extras::IpAddress;
 use crate::containerization_oci;
+use crate::containerization_os;
 use std::convert::Infallible;
 
 const MACOS_ONLY: &str = "Containerization.framework is macOS only";
@@ -61,6 +62,13 @@ taken!(
   written_digest -> String,
   ext4_reader -> CzExt4Reader,
   reference -> CzReference,
+  authentication -> CzAuthentication,
+  registry_infos -> Vec<containerization_os::RegistryInfo>,
+  kernel_image -> CzKernelImage,
+  kernel -> containerization::Kernel,
+  ingest_session_id -> String,
+  ingest_session_directory -> String,
+  registry_client -> CzRegistryClient,
   parsed_digest_encoded -> String,
   boolean -> bool,
   is_some -> bool,
@@ -114,6 +122,9 @@ handles!(
   CzContentWriter,
   CzExt4Reader,
   CzReference,
+  CzAuthentication,
+  CzKernelImage,
+  CzRegistryClient,
 );
 
 pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
@@ -182,6 +193,27 @@ macro_rules! failing {
 }
 
 failing!(
+  cz_registry_client_new(&str, bool, CzAuthentication),
+  cz_registry_client_with_host(
+    &str,
+    Option<String>,
+    Option<u16>,
+    CzAuthentication,
+    Option<String>,
+    bool,
+    isize,
+    u64,
+    usize,
+  ),
+  cz_content_writer_copy(&str, &str),
+  cz_local_content_open(&str),
+  cz_image_store_default(),
+  cz_basic_authentication(&str, &str),
+  cz_no_authentication(),
+  cz_keychain_helper_lookup(&str, Option<String>, &str),
+  cz_keychain_helper_list(&str, Option<String>),
+  cz_keychain_helper_delete(&str, Option<String>, &str),
+  cz_keychain_helper_save(&str, Option<String>, &str, &str, &str),
   cz_reference_new(&str, Option<String>, Option<String>, Option<String>),
   cz_reference_parse(&str),
   cz_reference_with_name(&str),
@@ -338,6 +370,48 @@ impl CzReference {
   }
 }
 
+impl CzRegistryClient {
+  pub(crate) fn ping(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resolve(&self, _name: &str, _tag: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn fetch_data(&self, _name: &str, _descriptor: containerization_oci::Descriptor) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn fetch_blob(
+    &self,
+    _name: &str,
+    _descriptor: containerization_oci::Descriptor,
+    _into: &str,
+    _progress: Progress,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn catalog(&self, _prefix: Option<String>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn referrers(&self, _name: &str, _digest: &str, _artifact_type: Option<String>) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzAuthentication {
+  pub(crate) fn duplicate(&self) -> CzAuthentication {
+    match self.0 {}
+  }
+
+  pub(crate) fn token(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
 impl CzExt4Reader {
   pub(crate) fn export(&self, _archive: &str) -> CzOutcome {
     match self.0 {}
@@ -346,6 +420,26 @@ impl CzExt4Reader {
 
 impl CzLocalContentStore {
   pub(crate) fn get(&self, _digest: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn duplicate(&self) -> CzLocalContentStore {
+    match self.0 {}
+  }
+
+  pub(crate) fn new_ingest_session(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn complete_ingest_session(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn cancel_ingest_session(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn image(&self, _description: image::Description) -> CzImage {
     match self.0 {}
   }
 
@@ -371,6 +465,10 @@ impl CzLocalContentStore {
 }
 
 impl CzContentWriter {
+  pub(crate) fn write(&self, _data: Vec<u8>) -> CzOutcome {
+    match self.0 {}
+  }
+
   pub(crate) fn create(&self, _from: &str) -> CzOutcome {
     match self.0 {}
   }
@@ -407,6 +505,29 @@ impl CzImageStore {
     match self.0 {}
   }
 
+  pub(crate) fn create_init_image(
+    &self,
+    _reference: &str,
+    _rootfs: &str,
+    _platform: containerization_oci::Platform,
+    _label_keys: Vec<String>,
+    _label_values: Vec<String>,
+    _content_store: CzLocalContentStore,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_kernel_image(
+    &self,
+    _reference: &str,
+    _binaries: Vec<containerization::Kernel>,
+    _label_keys: Vec<String>,
+    _label_values: Vec<String>,
+    _content_store: CzLocalContentStore,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
   pub(crate) fn get(&self, _reference: &str, _pull: bool) -> CzOutcome {
     match self.0 {}
   }
@@ -423,11 +544,55 @@ impl CzImageStore {
     match self.0 {}
   }
 
-  pub(crate) fn pull(&self, _reference: &str) -> CzOutcome {
+  pub(crate) fn pull(
+    &self,
+    _reference: &str,
+    _has_platform: bool,
+    _platform: containerization_oci::Platform,
+    _insecure: bool,
+    _auth: CzAuthentication,
+    _progress: Progress,
+    _max_concurrent_downloads: usize,
+  ) -> CzOutcome {
     match self.0 {}
   }
 
-  pub(crate) fn get_init_image(&self, _reference: &str) -> CzOutcome {
+  pub(crate) fn push(
+    &self,
+    _reference: &str,
+    _has_platform: bool,
+    _platform: containerization_oci::Platform,
+    _insecure: bool,
+    _auth: CzAuthentication,
+    _progress: Progress,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn push_all(
+    &self,
+    _references: Vec<String>,
+    _has_platform: bool,
+    _platform: containerization_oci::Platform,
+    _insecure: bool,
+    _auth: CzAuthentication,
+    _max_concurrent_uploads: usize,
+    _progress: Progress,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn get_init_image(&self, _reference: &str, _auth: CzAuthentication, _progress: Progress) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn save(
+    &self,
+    _references: Vec<String>,
+    _out: &str,
+    _has_platform: bool,
+    _platform: containerization_oci::Platform,
+  ) -> CzOutcome {
     match self.0 {}
   }
 
@@ -483,6 +648,14 @@ impl CzImage {
     match self.0 {}
   }
 
+  pub(crate) fn init_image(&self) -> CzInitImage {
+    match self.0 {}
+  }
+
+  pub(crate) fn kernel_image(&self) -> CzKernelImage {
+    match self.0 {}
+  }
+
   pub(crate) fn reference(&self) -> String {
     match self.0 {}
   }
@@ -520,6 +693,16 @@ impl CzImage {
   }
 
   pub(crate) fn get_content(&self, _digest: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzKernelImage {
+  pub(crate) fn name(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn kernel(&self, _platform: containerization::SystemPlatform) -> CzOutcome {
     match self.0 {}
   }
 }

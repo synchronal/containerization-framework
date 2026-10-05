@@ -1820,16 +1820,40 @@ pub(crate) mod ffi {
     fn delete_keeping(self: &CzLocalContentStore, keeping: Vec<String>) -> CzOutcome;
     #[swift_bridge(swift_name = "totalAllocatedSize")]
     fn total_allocated_size(self: &CzLocalContentStore) -> CzOutcome;
-    // `ImageStore(path:contentStore:)`, on the store it takes.
+    fn duplicate(self: &CzLocalContentStore) -> CzLocalContentStore;
+    // `ImageStore(path:contentStore:)` and `Image(description:contentStore:)`,
+    // on the store they take.
     #[swift_bridge(swift_name = "imageStore")]
     fn image_store(self: &CzLocalContentStore, path: &str) -> CzOutcome;
+    fn image(self: &CzLocalContentStore, description: RustImageDescription) -> CzImage;
     // `body` gets the ingest directory, and returns whether it succeeded.
     fn ingest(self: &CzLocalContentStore, body: Box<dyn FnOnce(String) -> bool>) -> CzOutcome;
+    #[swift_bridge(swift_name = "newIngestSession")]
+    fn new_ingest_session(self: &CzLocalContentStore) -> CzOutcome;
+    #[swift_bridge(swift_name = "completeIngestSession")]
+    fn complete_ingest_session(self: &CzLocalContentStore, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "cancelIngestSession")]
+    fn cancel_ingest_session(self: &CzLocalContentStore, id: &str) -> CzOutcome;
+    // What `newIngestSession` returned.
+    #[swift_bridge(swift_name = "ingestSessionId")]
+    fn ingest_session_id(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ingestSessionDirectory")]
+    fn ingest_session_directory(self: &CzOutcome) -> String;
 
     type CzContentWriter;
     #[swift_bridge(swift_name = "openContentWriter")]
     fn cz_content_writer_new(base: &str) -> CzOutcome;
+    fn write(self: &CzContentWriter, data: Vec<u8>) -> CzOutcome;
     fn create(self: &CzContentWriter, from: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "copyContent")]
+    fn cz_content_writer_copy(from: &str, destination: &str) -> CzOutcome;
+
+    // `LocalContent(path:)`, held as a `Content`.
+    #[swift_bridge(swift_name = "openLocalContent")]
+    fn cz_local_content_open(path: &str) -> CzOutcome;
+    // For a test that compares Rust's copy with it.
+    #[swift_bridge(swift_name = "localContentMaxDecodedSize")]
+    fn cz_local_content_max_decoded_size() -> isize;
 
     // A `Content?`: Rust asks `is_some` before anything else.
     type CzContent;
@@ -1842,9 +1866,97 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "dataRange")]
     fn data_range(self: &CzContent, offset: u64, length: usize) -> CzOutcome;
 
+    // An `Authentication?`.
+    type CzAuthentication;
+    #[swift_bridge(swift_name = "basicAuthentication")]
+    fn cz_basic_authentication(username: &str, password: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "noAuthentication")]
+    fn cz_no_authentication() -> CzOutcome;
+    fn authentication(self: &CzOutcome) -> CzAuthentication;
+    fn duplicate(self: &CzAuthentication) -> CzAuthentication;
+    fn token(self: &CzAuthentication) -> CzOutcome;
+
+    // `KeychainHelper`, as its security domain and access group. `list`'s
+    // outcome holds a `[RegistryInfo]`, its dates as seconds since 1970.
+    #[swift_bridge(swift_name = "keychainHelperLookup")]
+    fn cz_keychain_helper_lookup(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainHelperList")]
+    fn cz_keychain_helper_list(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainHelperDelete")]
+    fn cz_keychain_helper_delete(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainHelperSave")]
+    fn cz_keychain_helper_save(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+      username: &str,
+      password: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "registryInfoHostname")]
+    fn registry_info_hostname(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "registryInfoUsername")]
+    fn registry_info_username(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "registryInfoModifiedDate")]
+    fn registry_info_modified_date(self: &CzOutcome) -> f64;
+    #[swift_bridge(swift_name = "registryInfoCreatedDate")]
+    fn registry_info_created_date(self: &CzOutcome) -> f64;
+
+    // `RegistryClient`'s inits. `retry_options` stands for `nil` when
+    // `has_retry_options` is false.
+    type CzRegistryClient;
+    #[swift_bridge(swift_name = "newRegistryClient")]
+    fn cz_registry_client_new(reference: &str, insecure: bool, auth: CzAuthentication) -> CzOutcome;
+    #[swift_bridge(swift_name = "registryClientWithHost")]
+    fn cz_registry_client_with_host(
+      host: &str,
+      scheme: Option<String>,
+      port: Option<u16>,
+      authentication: CzAuthentication,
+      #[swift_bridge(label = "clientID")] client_id: Option<String>,
+      #[swift_bridge(label = "hasRetryOptions")] has_retry_options: bool,
+      #[swift_bridge(label = "maxRetries")] max_retries: isize,
+      #[swift_bridge(label = "retryInterval")] retry_interval: u64,
+      #[swift_bridge(label = "bufferSize")] buffer_size: usize,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "registryClient")]
+    fn registry_client(self: &CzOutcome) -> CzRegistryClient;
+    fn ping(self: &CzRegistryClient) -> CzOutcome;
+    fn resolve(self: &CzRegistryClient, name: &str, tag: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "fetchData")]
+    fn fetch_data(self: &CzRegistryClient, name: &str, descriptor: RustDescriptor) -> CzOutcome;
+    // The outcome holds the size and the digest, as `ContentWriter`'s do.
+    #[swift_bridge(swift_name = "fetchBlob")]
+    fn fetch_blob(
+      self: &CzRegistryClient,
+      name: &str,
+      descriptor: RustDescriptor,
+      into: &str,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
+    fn catalog(self: &CzRegistryClient, prefix: Option<String>) -> CzOutcome;
+    fn referrers(
+      self: &CzRegistryClient,
+      name: &str,
+      digest: &str,
+      #[swift_bridge(label = "artifactType")] artifact_type: Option<String>,
+    ) -> CzOutcome;
+
     type CzImageStore;
     #[swift_bridge(swift_name = "openImageStore")]
     fn cz_image_store_new(path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "defaultImageStore")]
+    fn cz_image_store_default() -> CzOutcome;
     fn path(self: &CzImageStore) -> String;
     fn get(self: &CzImageStore, reference: &str, pull: bool) -> CzOutcome;
     fn list(self: &CzImageStore) -> CzOutcome;
@@ -1854,15 +1966,79 @@ pub(crate) mod ffi {
       #[swift_bridge(label = "performCleanup")] perform_cleanup: bool,
     ) -> CzOutcome;
     fn tag(self: &CzImageStore, existing: &str, new: &str) -> CzOutcome;
-    fn pull(self: &CzImageStore, reference: &str) -> CzOutcome;
+    // In these, `platform` stands for `nil` when `has_platform` is false.
+    fn pull(
+      self: &CzImageStore,
+      reference: &str,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+      insecure: bool,
+      auth: CzAuthentication,
+      progress: RustProgressHandler,
+      #[swift_bridge(label = "maxConcurrentDownloads")] max_concurrent_downloads: usize,
+    ) -> CzOutcome;
+    fn push(
+      self: &CzImageStore,
+      reference: &str,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+      insecure: bool,
+      auth: CzAuthentication,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "pushAll")]
+    fn push_all(
+      self: &CzImageStore,
+      references: Vec<String>,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+      insecure: bool,
+      auth: CzAuthentication,
+      #[swift_bridge(label = "maxConcurrentUploads")] max_concurrent_uploads: usize,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
     #[swift_bridge(swift_name = "getInitImage")]
-    fn get_init_image(self: &CzImageStore, reference: &str) -> CzOutcome;
+    fn get_init_image(
+      self: &CzImageStore,
+      reference: &str,
+      auth: CzAuthentication,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
+    fn save(
+      self: &CzImageStore,
+      references: Vec<String>,
+      out: &str,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+    ) -> CzOutcome;
     #[swift_bridge(swift_name = "cleanUpOrphanedBlobs")]
     fn clean_up_orphaned_blobs(self: &CzImageStore) -> CzOutcome;
     #[swift_bridge(swift_name = "calculateOrphanedBlobsSize")]
     fn calculate_orphaned_blobs_size(self: &CzImageStore) -> CzOutcome;
     fn create(self: &CzImageStore, description: RustImageDescription) -> CzOutcome;
     fn load(self: &CzImageStore, from: &str, progress: RustProgressHandler) -> CzOutcome;
+    // `InitImage.create` and `KernelImage.create`, on the image store they
+    // take, with the content store as a `duplicate()` and `labels` as its keys
+    // and values.
+    #[swift_bridge(swift_name = "createInitImage")]
+    fn create_init_image(
+      self: &CzImageStore,
+      reference: &str,
+      rootfs: &str,
+      platform: RustPlatform,
+      #[swift_bridge(label = "labelKeys")] label_keys: Vec<String>,
+      #[swift_bridge(label = "labelValues")] label_values: Vec<String>,
+      #[swift_bridge(label = "contentStore")] content_store: CzLocalContentStore,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "createKernelImage")]
+    fn create_kernel_image(
+      self: &CzImageStore,
+      reference: &str,
+      binaries: Vec<RustKernel>,
+      #[swift_bridge(label = "labelKeys")] label_keys: Vec<String>,
+      #[swift_bridge(label = "labelValues")] label_values: Vec<String>,
+      #[swift_bridge(label = "contentStore")] content_store: CzLocalContentStore,
+    ) -> CzOutcome;
     // `ContainerManager`'s inits, on the store they take: swift-bridge can't
     // pass a `&` Swift type as an argument.
     #[swift_bridge(swift_name = "containerManager")]
@@ -1902,6 +2078,31 @@ pub(crate) mod ffi {
     fn referenced_digests(self: &CzImage) -> CzOutcome;
     #[swift_bridge(swift_name = "getContent")]
     fn get_content(self: &CzImage, digest: &str) -> CzOutcome;
+    // `InitImage(image:)` and `KernelImage(image:)`.
+    #[swift_bridge(swift_name = "initImage")]
+    fn init_image(self: &CzImage) -> CzInitImage;
+    #[swift_bridge(swift_name = "kernelImage")]
+    fn kernel_image(self: &CzImage) -> CzKernelImage;
+
+    type CzKernelImage;
+    #[swift_bridge(swift_name = "kernelImage")]
+    fn kernel_image(self: &CzOutcome) -> CzKernelImage;
+    fn name(self: &CzKernelImage) -> String;
+    fn kernel(self: &CzKernelImage, platform: RustSystemPlatform) -> CzOutcome;
+    // For a test that compares Rust's copy with it.
+    #[swift_bridge(swift_name = "kernelImageMediaType")]
+    fn cz_kernel_image_media_type() -> String;
+    // A `Kernel`, field by field: Rust builds its own.
+    #[swift_bridge(swift_name = "kernelPath")]
+    fn kernel_path(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "kernelPlatformOs")]
+    fn kernel_platform_os(self: &CzOutcome) -> PlatformOs;
+    #[swift_bridge(swift_name = "kernelPlatformArchitecture")]
+    fn kernel_platform_architecture(self: &CzOutcome) -> PlatformArchitecture;
+    #[swift_bridge(swift_name = "kernelKernelArgs")]
+    fn kernel_kernel_args(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "kernelInitArgs")]
+    fn kernel_init_args(self: &CzOutcome) -> Vec<String>;
 
     type CzInitImage;
     fn name(self: &CzInitImage) -> String;

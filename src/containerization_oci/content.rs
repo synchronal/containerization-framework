@@ -1,9 +1,11 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::path::Path;
 use std::path::PathBuf;
 
-/// `Content`. Swift's generic `decode()` doesn't cross the bridge; decode
+/// `Content`, which in Swift is a protocol that `LocalContent` conforms to.
+/// Swift's generic `decode()` doesn't cross the bridge; decode
 /// [`Content::data`] instead.
 pub struct Content {
   pub(crate) handle: ffi::CzContent,
@@ -14,6 +16,21 @@ unsafe impl Send for Content {}
 unsafe impl Sync for Content {}
 
 impl Content {
+  /// `LocalContent.maxDecodedSize`: the largest content [`Content::data`]
+  /// reads whole.
+  pub const MAX_DECODED_SIZE: isize = 4 * 1024 * 1024;
+
+  /// `LocalContent(path:)`, which reads the file at `path` without a store.
+  pub fn open(path: &Path) -> Result<Self, Error> {
+    platform::outcome(
+      ffi::cz_local_content_open(&path.display().to_string()),
+      format!("open {} as content", path.display()),
+    )
+    .map(|outcome| Self {
+      handle: outcome.content(),
+    })
+  }
+
   /// `Content.path`.
   pub fn path(&self) -> PathBuf {
     PathBuf::from(self.handle.path())

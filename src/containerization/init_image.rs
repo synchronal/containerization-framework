@@ -1,11 +1,16 @@
+use super::Image;
+use super::ImageStore;
 use super::Mount;
 use super::SystemPlatform;
+use crate::containerization_oci::LocalContentStore;
+use crate::containerization_oci::Platform;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::collections::BTreeMap;
 use std::path::Path;
 
-/// `InitImage`. Made by [`super::ImageStore::get_init_image`].
+/// `InitImage`.
 pub struct InitImage {
   pub(crate) handle: ffi::CzInitImage,
 }
@@ -15,6 +20,39 @@ unsafe impl Send for InitImage {}
 unsafe impl Sync for InitImage {}
 
 impl InitImage {
+  /// `InitImage(image:)`.
+  pub fn new(image: &Image) -> Self {
+    Self {
+      handle: image.handle.init_image(),
+    }
+  }
+
+  /// `InitImage.create(reference:rootfs:platform:labels:imageStore:contentStore:)`.
+  /// `rootfs` is a `.tar.gz` file.
+  pub fn create(
+    reference: &str,
+    rootfs: &Path,
+    platform: &Platform,
+    labels: &BTreeMap<String, String>,
+    image_store: &ImageStore,
+    content_store: &LocalContentStore,
+  ) -> Result<Self, Error> {
+    platform::outcome(
+      image_store.handle.create_init_image(
+        reference,
+        &rootfs.display().to_string(),
+        platform.clone(),
+        labels.keys().cloned().collect(),
+        labels.values().cloned().collect(),
+        content_store.handle.duplicate(),
+      ),
+      format!("create init image {reference}"),
+    )
+    .map(|outcome| Self {
+      handle: outcome.init_image(),
+    })
+  }
+
   /// `InitImage.name`.
   pub fn name(&self) -> String {
     self.handle.name()

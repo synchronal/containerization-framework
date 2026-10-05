@@ -73,7 +73,9 @@ pub mod error;
 
 mod platform;
 
+// The bridge's functions take Swift's arguments, however many there are.
 #[cfg(target_os = "macos")]
+#[allow(clippy::too_many_arguments)]
 mod bridge;
 
 pub use crate::error::Error;

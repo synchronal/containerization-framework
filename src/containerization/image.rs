@@ -4,6 +4,7 @@ use crate::containerization_oci;
 use crate::containerization_oci::Content;
 use crate::containerization_oci::Descriptor;
 use crate::containerization_oci::Index;
+use crate::containerization_oci::LocalContentStore;
 use crate::containerization_oci::Manifest;
 use crate::containerization_oci::Platform;
 use crate::error::Error;
@@ -42,7 +43,7 @@ fn named(platform: &Platform) -> String {
   format!("{}/{}", platform.os, platform.architecture)
 }
 
-/// `Image`. Made by [`super::ImageStore`].
+/// `Image`.
 pub struct Image {
   pub(crate) handle: ffi::CzImage,
 }
@@ -52,6 +53,13 @@ unsafe impl Send for Image {}
 unsafe impl Sync for Image {}
 
 impl Image {
+  /// `Image(description:contentStore:)`.
+  pub fn new(description: &Description, content_store: &LocalContentStore) -> Self {
+    Self {
+      handle: content_store.handle.image(description.clone()),
+    }
+  }
+
   /// `Image.reference`.
   pub fn reference(&self) -> String {
     self.handle.reference()
