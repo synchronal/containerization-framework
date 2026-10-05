@@ -2,86 +2,48 @@
 
 ## Unreleased
 
-- Added `ContainerizationExtras`' address types to `containerization_extras`:
-  `IPv4Address`, `IPv6Address`, `IpAddress`, `Prefix`, `CIDRv4`, `CIDRv6`,
-  `Cidr` and `MACAddress`. Swift does the parsing and computes every getter, so
-  each of those calls returns a `Result`. An address's text comes from its
-  `description` method, and addresses are ordered with `PartialOrd` through
-  Swift's `<`.
-- `Error::Failed` now carries the code of a thrown `ContainerizationError`, as
-  a `containerization_error::Code`. Check it with `Error::is_code`, which
-  mirrors `ContainerizationError.isCode(_:)`. Other errors have no code.
-- Added `ProgressEvent::event` and `ProgressEvent::value`, and
-  `containerization_extras::proxy_utils::proxy_from_environment`, which
-  mirrors `ProxyUtils.proxyFromEnvironment(scheme:host:env:)`. Passing `None`
-  for its environment lets Swift read the process environment, as Swift's
-  default does.
-- `Platform` has `parse`, `description` and `matches`. They mirror
-  `Platform(from:)`, `description` and the `~=` operator, and each one asks
-  Swift.
-- `Platform`'s `==` now asks Swift's `==`. As in Swift, an `arm64` platform
-  with no variant equals `arm64/v8`, and `os_version` and `os_features` are
-  ignored. Off macOS, every field must match.
-- Added the OCI image types `Index`, `Manifest`, `ImageConfig`, `Rootfs`,
-  `History` and `containerization_oci::Image`, which is an image's config and
-  a different type from `containerization::Image`. Their `new` functions take
-  the arguments Swift requires and give the rest Swift's defaults.
-  `MediaTypes` and `AnnotationKeys` hold Swift's strings as associated
-  constants.
-- Added `containerization_oci::Reference`, which wraps Swift's `Reference`
-  class. `Reference::new` takes Swift's defaulted arguments as
-  `reference::NewOptions`.
-- Added `ParsedDigest`. Only Swift makes one, so `encoded` is a getter.
-- `Image` has `description`, `descriptor`, `index`, `manifest`,
-  `descriptor_for` and `config`. `descriptor_for` mirrors Swift's
-  `descriptor(for:)`, and takes a suffix because Rust has no overloading.
-- Added the OCI runtime spec to `containerization_oci`: `Spec` and every type
-  it holds, `State`, `ContainerState`, `ContainerProcessState`,
-  `SECCOMP_FD_NAME` and `RuntimeSpecVersion`. Enums backed by strings have
-  `raw_value` and `from_raw_value`. As in Swift, a `Box`'s fields are private.
-- Added `Bundle`. Each of its methods asks Swift.
-- Added `LinuxSeccomp::decode`, `LinuxSeccomp::default_profile`,
-  `Arch::current` and `Arch::current_verified`. `decode` rejects Docker's
-  profile format with `Code::InvalidArgument`, where before its conditional
-  rules silently became unconditional allows.
-- Added the conversions `Process::from_image_config`, `LinuxRLimit::to_oci`,
-  `LinuxCapabilities::to_oci` and `SystemPlatform::oci_platform`, and Swift's
-  `description` for `Process` and `Hook`, which hides the values in `env`.
-- `ImageStore` has `default_store`, `push`, `push_all` and `save`. `pull` and
-  the `push`es take Swift's defaulted arguments as
-  `image_store::PullOptions`, `PushOptions` and `PushAllOptions`.
-- Added `containerization_oci::Authentication`, which holds Swift's value and
-  so can't show its credentials. Make one with `Authentication::basic`, or
-  look one up with the new `KeychainHelper`, whose `list` returns
-  `containerization_os::RegistryInfo`s.
-- Added `RegistryClient` and `RetryOptions`. `RegistryClient::with_host`
-  takes Swift's defaulted arguments as `registry_client::HostOptions`.
-  Neither init takes Swift's TLS configuration or logger.
-- Added `Image::new`, `InitImage::new`, `InitImage::create` and
-  `KernelImage`.
-- `LocalContentStore` has `new_ingest_session`, `complete_ingest_session` and
-  `cancel_ingest_session`. `Content::open` reads a file without a store, and
-  `ContentWriter` has `write` and `copy`.
+Where a Swift method has defaulted arguments, the Rust method takes them in an
+options struct whose `Default` matches Swift, such as
+`image_store::PullOptions`.
+
+- Added the address types from `ContainerizationExtras`, such as
+  `IPv4Address`, `CIDRv4` and `MACAddress`, along with
+  `proxy_utils::proxy_from_environment`. Swift does all the parsing, so these
+  calls return a `Result`.
+- `Error::Failed` now carries the code of a thrown `ContainerizationError`,
+  which you can check with `Error::is_code`.
+- Added the OCI image types, including `Index`, `Manifest`, `Reference` and
+  `ParsedDigest`. `containerization_oci::Image` is an image's config, and is a
+  different type from `containerization::Image`.
+- `Platform` can be parsed, printed and matched, and its `==` now follows
+  Swift's: an `arm64` platform with no variant equals `arm64/v8`, and the OS
+  version and features are ignored. Off macOS, every field must match.
+- Added the OCI runtime spec, including `Spec`, `State` and `Bundle`, and
+  conversions into it such as `Process::from_image_config`. Seccomp profiles
+  are read with `LinuxSeccomp::decode`, which rejects Docker's profile format
+  instead of silently turning its conditional rules into unconditional allows.
+- Images can be pushed to registries and saved to disk through `ImageStore`.
+  `RegistryClient`, `Authentication` and `KeychainHelper` are also available,
+  although `RegistryClient` can't take Swift's TLS configuration or logger.
+- `Image` exposes its descriptor, index, manifest and config. `Image`,
+  `InitImage` and the new `KernelImage` can be created directly.
+- `LocalContentStore` supports ingest sessions, and `ProgressEvent` exposes its
+  event and value.
 
 ### Breaking
 
-- `ImageStore::pull` takes a `PullOptions`. Pass `Default::default()` for
-  Swift's defaults.
-- `ImageStore::get_init_image` takes an `auth` and a `progress` argument.
-  Pass `None` for Swift's defaults.
-
+- `ImageStore::pull` takes a `PullOptions`, and `ImageStore::get_init_image`
+  takes `auth` and `progress` arguments. Pass `Default::default()` or `None`
+  to keep the old behavior.
 - `Mount::share`, `Mount::block` and `Mount::any` take a `runtime_options`
-  argument after `options`, matching Swift. Pass `&[]` for Swift's default.
-- `NatInterface`'s fields hold `CIDRv4`, `IPv4Address`, `CIDRv6`,
-  `IPv6Address` and `MACAddress` instead of strings, as Swift's do. Parse them
-  with each type's `parse`, so a malformed address fails there rather than
-  when the container is created. `NatInterface::new` takes a `CIDRv4` and an
-  optional `IPv4Address` gateway, because Swift's `ipv4Gateway` is optional.
+  argument after `options`. Pass `&[]` to keep the old behavior.
+- `NatInterface` holds parsed address types instead of strings, so a malformed
+  address fails when you parse it rather than when the container is created.
+  Its IPv4 gateway is now optional, as it is in Swift.
+- `SeccompProfile::Profile` holds a `LinuxSeccomp` instead of JSON. Read the
+  JSON with `LinuxSeccomp::decode`.
 - `Error::Failed` has a new `code` field, so a pattern that names its fields
   needs `..`.
-- `SeccompProfile::Profile` holds a `LinuxSeccomp` instead of JSON. Read JSON
-  with `LinuxSeccomp::decode`, so bad JSON fails there rather than when the
-  container is created.
 
 ## v0.3.0
 
