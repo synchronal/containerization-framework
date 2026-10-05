@@ -81,6 +81,34 @@ fn names_resolves_and_tunes_the_container() {
 }
 
 #[test]
+fn addresses_its_interface_as_configured() {
+  let mac_address =
+    cfw::containerization_extras::MACAddress::parse("02:42:ac:11:00:02").expect("Swift parses a MAC address");
+  let ipv6_address =
+    cfw::containerization_extras::CIDRv6::parse("fd00:cf::2/64").expect("Swift parses an IPv6 CIDR block");
+
+  let container = Container::boot_with("cfw-test-config-interface", move |configuration| {
+    let interface = &mut configuration.interfaces[0];
+
+    interface.mac_address = Some(mac_address);
+    interface.ipv6_address = Some(ipv6_address);
+  });
+
+  assert_eq!(
+    container
+      .sh("mac", "cat /sys/class/net/eth0/address")
+      .trim(),
+    "02:42:ac:11:00:02"
+  );
+  assert!(
+    container
+      .sh("ipv6", "ip -6 addr show dev eth0")
+      .contains("inet6 fd00:cf::2/64"),
+    "the interface should carry its IPv6 address"
+  );
+}
+
+#[test]
 fn mounts_what_it_is_given() {
   let shared = tempfile::tempdir().expect("a temporary directory");
   std::fs::write(shared.path().join("greeting"), "shared from the host").expect("a file to share");

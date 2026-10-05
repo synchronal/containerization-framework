@@ -9,6 +9,7 @@ use crate::containerization::linux_rlimit;
 use crate::containerization::mount;
 use crate::containerization::system_platform;
 use crate::containerization::unix_socket_configuration;
+use crate::containerization_extras;
 use crate::containerization_oci;
 use crate::platform::Configure;
 use std::path::PathBuf;
@@ -144,24 +145,53 @@ impl containerization::UnixSocketConfiguration {
 }
 
 impl containerization::NatInterface {
-  pub(crate) fn ipv4_address(&self) -> &str {
-    &self.ipv4_address
+  pub(crate) fn ipv4_address_value(&self) -> u32 {
+    self.ipv4_address.address.value
   }
 
-  pub(crate) fn ipv4_gateway(&self) -> Option<&str> {
-    self.ipv4_gateway.as_deref()
+  pub(crate) fn ipv4_prefix(&self) -> u8 {
+    self.ipv4_address.prefix.length
   }
 
-  pub(crate) fn ipv6_address(&self) -> Option<&str> {
-    self.ipv6_address.as_deref()
+  pub(crate) fn ipv4_gateway(&self) -> Option<u32> {
+    self.ipv4_gateway.map(|gateway| gateway.value)
   }
 
-  pub(crate) fn ipv6_gateway(&self) -> Option<&str> {
-    self.ipv6_gateway.as_deref()
+  pub(crate) fn has_ipv6_address(&self) -> bool {
+    self.ipv6_address.is_some()
   }
 
-  pub(crate) fn mac_address(&self) -> Option<&str> {
-    self.mac_address.as_deref()
+  /// Only when [`Self::has_ipv6_address`].
+  pub(crate) fn ipv6_address(&self) -> &containerization_extras::IPv6Address {
+    &self.ipv6_cidr().address
+  }
+
+  /// Only when [`Self::has_ipv6_address`].
+  pub(crate) fn ipv6_prefix(&self) -> u8 {
+    self.ipv6_cidr().prefix.length
+  }
+
+  fn ipv6_cidr(&self) -> &containerization_extras::CIDRv6 {
+    self
+      .ipv6_address
+      .as_ref()
+      .expect("Swift asks for an IPv6 address only after has_ipv6_address")
+  }
+
+  pub(crate) fn has_ipv6_gateway(&self) -> bool {
+    self.ipv6_gateway.is_some()
+  }
+
+  /// Only when [`Self::has_ipv6_gateway`].
+  pub(crate) fn ipv6_gateway(&self) -> &containerization_extras::IPv6Address {
+    self
+      .ipv6_gateway
+      .as_ref()
+      .expect("Swift asks for an IPv6 gateway only after has_ipv6_gateway")
+  }
+
+  pub(crate) fn mac_address(&self) -> Option<u64> {
+    self.mac_address.map(|address| address.value)
   }
 
   pub(crate) fn mtu(&self) -> u32 {
@@ -551,21 +581,43 @@ impl linux_container::Configuration {
 
   pub(crate) fn push_interface(
     &mut self,
-    ipv4_address: String,
-    ipv4_gateway: Option<String>,
-    ipv6_address: Option<String>,
-    ipv6_gateway: Option<String>,
-    mac_address: Option<String>,
+    ipv4_address: u32,
+    ipv4_prefix: u8,
+    ipv4_gateway: Option<u32>,
+    mac_address: Option<u64>,
     mtu: u32,
   ) {
     self.interfaces.push(containerization::NatInterface {
-      ipv4_address,
-      ipv4_gateway,
-      ipv6_address,
-      ipv6_gateway,
-      mac_address,
+      ipv4_address: containerization_extras::CIDRv4 {
+        address: containerization_extras::IPv4Address::new(ipv4_address),
+        prefix: containerization_extras::Prefix { length: ipv4_prefix },
+      },
+      ipv4_gateway: ipv4_gateway.map(containerization_extras::IPv4Address::new),
+      ipv6_address: None,
+      ipv6_gateway: None,
+      mac_address: mac_address.map(|value| containerization_extras::MACAddress { value }),
       mtu,
     });
+  }
+
+  /// Only after [`Self::push_interface`], for the interface it pushed.
+  pub(crate) fn set_interface_ipv6_address(&mut self, high: u64, low: u64, zone: Option<String>, prefix: u8) {
+    self.last_interface().ipv6_address = Some(containerization_extras::CIDRv6 {
+      address: containerization_extras::IPv6Address::from_halves(high, low, zone),
+      prefix: containerization_extras::Prefix { length: prefix },
+    });
+  }
+
+  /// Only after [`Self::push_interface`], for the interface it pushed.
+  pub(crate) fn set_interface_ipv6_gateway(&mut self, high: u64, low: u64, zone: Option<String>) {
+    self.last_interface().ipv6_gateway = Some(containerization_extras::IPv6Address::from_halves(high, low, zone));
+  }
+
+  fn last_interface(&mut self) -> &mut containerization::NatInterface {
+    self
+      .interfaces
+      .last_mut()
+      .expect("Swift sets an interface's IPv6 addresses only after push_interface")
   }
 
   pub(crate) fn push_socket(
@@ -919,6 +971,9 @@ mod tests {
     );
     configuration.set_hosts(None);
     configuration.push_hosts_entry("127.0.0.1".into(), vec!["localhost".into()], None);
+    configuration.push_interface(0xc0a8_4002, 24, Some(0xc0a8_4001), Some(0x0242_ac11_0002), 1500);
+    configuration.set_interface_ipv6_address(0xfd00_00cf_0000_0000, 2, Some("eth0".into()), 64);
+    configuration.set_interface_ipv6_gateway(0xfd00_00cf_0000_0000, 1, None);
     configuration.set_seccomp_profile(ffi::SeccompMode::Profile, Some("{}".into()));
     configuration
       .process_mut()
@@ -929,6 +984,16 @@ mod tests {
       configuration.mounts_at(0).runtime_kind(),
       ffi::RuntimeKind::Shared
     ));
+    let interface = configuration.interfaces_at(0);
+    assert_eq!(interface.ipv4_address_value(), 0xc0a8_4002);
+    assert_eq!(interface.ipv4_prefix(), 24);
+    assert_eq!(interface.ipv4_gateway(), Some(0xc0a8_4001));
+    assert_eq!(interface.mac_address(), Some(0x0242_ac11_0002));
+    assert_eq!(interface.ipv6_address().value_high(), 0xfd00_00cf_0000_0000);
+    assert_eq!(interface.ipv6_address().value_low(), 2);
+    assert_eq!(interface.ipv6_address().zone(), Some("eth0"));
+    assert_eq!(interface.ipv6_prefix(), 64);
+    assert_eq!(interface.ipv6_gateway().value_low(), 1);
     assert_eq!(configuration.hosts().entries_len(), 1);
     assert_eq!(configuration.seccomp_profile(), Some("{}"));
     assert_eq!(configuration.process().arguments_at(0), "/bin/true");

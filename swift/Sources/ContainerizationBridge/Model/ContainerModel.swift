@@ -67,11 +67,12 @@ extension UnixSocketConfiguration {
 extension NATInterface {
   init(_ interface: RustNatInterfaceRef) throws {
     self.init(
-      ipv4Address: try CIDRv4(interface.ipv4Address().toString()),
-      ipv4Gateway: try interface.ipv4Gateway().map { try IPv4Address($0.toString()) },
-      ipv6Address: try interface.ipv6Address().map { try CIDRv6($0.toString()) },
-      ipv6Gateway: try interface.ipv6Gateway().map { try IPv6Address($0.toString()) },
-      macAddress: try interface.macAddress().map { try MACAddress($0.toString()) },
+      ipv4Address: try CIDRv4(bridged: interface.ipv4AddressValue(), prefix: interface.ipv4Prefix()),
+      ipv4Gateway: interface.ipv4Gateway().map { IPv4Address($0) },
+      ipv6Address: interface.hasIpv6Address()
+        ? try CIDRv6(bridged: interface.ipv6Address(), prefix: interface.ipv6Prefix()) : nil,
+      ipv6Gateway: interface.hasIpv6Gateway() ? IPv6Address(interface.ipv6Gateway()) : nil,
+      macAddress: interface.macAddress().map { MACAddress($0) },
       mtu: interface.mtu()
     )
   }
@@ -321,13 +322,29 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
 
   for interface in configuration.interfaces {
     built.pushInterface(
-      rust(interface.ipv4Address.description),
-      rust(interface.ipv4Gateway?.description),
-      rust(interface.ipv6Address?.description),
-      rust(interface.ipv6Gateway?.description),
-      rust(interface.macAddress?.description),
+      interface.ipv4Address.address.value,
+      interface.ipv4Address.prefix.length,
+      interface.ipv4Gateway?.value,
+      interface.macAddress?.value,
       interface.mtu
     )
+
+    if let address = interface.ipv6Address {
+      built.setInterfaceIpv6Address(
+        UInt64(address.address.value >> 64),
+        UInt64(truncatingIfNeeded: address.address.value),
+        rust(address.address.zone),
+        address.prefix.length
+      )
+    }
+
+    if let gateway = interface.ipv6Gateway {
+      built.setInterfaceIpv6Gateway(
+        UInt64(gateway.value >> 64),
+        UInt64(truncatingIfNeeded: gateway.value),
+        rust(gateway.zone)
+      )
+    }
   }
 
   for socket in configuration.sockets {

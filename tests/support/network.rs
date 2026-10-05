@@ -35,5 +35,9 @@ pub fn interface(name: &str) -> cfw::containerization::NatInterface {
     .rsplit_once('.')
     .expect("the gateway is a dotted quad");
 
-  cfw::containerization::NatInterface::new(format!("{subnet}.{host}/{PREFIX}"), Some(GATEWAY.into()))
+  let address = cfw::containerization_extras::CIDRv4::parse(&format!("{subnet}.{host}/{PREFIX}"))
+    .expect("Swift parses the container's address");
+  let gateway = cfw::containerization_extras::IPv4Address::parse(GATEWAY).expect("Swift parses the gateway");
+
+  cfw::containerization::NatInterface::new(address, Some(gateway))
 }

@@ -20,8 +20,11 @@
 
 - `Mount::share`, `Mount::block` and `Mount::any` take a `runtime_options`
   argument after `options`, matching Swift. Pass `&[]` for Swift's default.
-- `NatInterface::new` takes the gateway as an `Option<String>`, because Swift's
-  `ipv4Gateway` is optional.
+- `NatInterface`'s fields hold `CIDRv4`, `IPv4Address`, `CIDRv6`,
+  `IPv6Address` and `MACAddress` instead of strings, as Swift's do. Parse them
+  with each type's `parse`, so a malformed address fails there rather than
+  when the container is created. `NatInterface::new` takes a `CIDRv4` and an
+  optional `IPv4Address` gateway, because Swift's `ipv4Gateway` is optional.
 - `Error::Failed` has a new `code` field, so a pattern that names its fields
   needs `..`.
 

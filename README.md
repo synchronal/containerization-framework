@@ -12,6 +12,7 @@ named after its parent: `linux_container::Configuration`.
 ```rust
 use containerization_framework as cfw;
 use cfw::containerization as cz;
+use cfw::containerization_extras as cz_extras;
 
 let store = cz::ImageStore::new("/Users/me/.cache/containers".as_ref())?;
 let kernel = cz::Kernel::new("/Users/me/.cache/vmlinux", cz::SystemPlatform::LINUX_ARM);
@@ -24,10 +25,12 @@ let mut manager = cz::ContainerManager::with_initfs_reference(
 )?;
 
 let image = store.get("docker.io/library/alpine:3", true)?;
+let address = cz_extras::CIDRv4::parse("192.168.64.7/24")?;
+let gateway = cz_extras::IPv4Address::parse("192.168.64.1")?;
 let options = cz::container_manager::CreateOptions { networking: false, ..Default::default() };
-let container = manager.create("example", &image, options, |config| {
+let container = manager.create("example", &image, options, move |config| {
     config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
-    config.interfaces = vec![cz::NatInterface::new("192.168.64.7/24", Some("192.168.64.1".into()))];
+    config.interfaces = vec![cz::NatInterface::new(address, Some(gateway))];
     config.dns = Some(cz::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
 })?;
 container.create()?;

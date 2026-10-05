@@ -5,6 +5,11 @@ use crate::bridge::ffi;
 use crate::containerization_extras;
 
 impl containerization_extras::IPv6Address {
+  /// An address whose `UInt128` value crossed as two halves.
+  pub(crate) fn from_halves(high: u64, low: u64, zone: Option<String>) -> Self {
+    Self::new(u128::from(high) << 64 | u128::from(low), zone)
+  }
+
   pub(crate) fn value_high(&self) -> u64 {
     (self.value >> 64) as u64
   }
@@ -44,10 +49,7 @@ impl ffi::CzOutcome {
   }
 
   pub(crate) fn ipv6_address(&self) -> containerization_extras::IPv6Address {
-    containerization_extras::IPv6Address::new(
-      u128::from(self.ipv6_high()) << 64 | u128::from(self.ipv6_low()),
-      self.ipv6_zone(),
-    )
+    containerization_extras::IPv6Address::from_halves(self.ipv6_high(), self.ipv6_low(), self.ipv6_zone())
   }
 
   pub(crate) fn ip_address(&self) -> containerization_extras::IpAddress {

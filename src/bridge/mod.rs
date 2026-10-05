@@ -242,16 +242,24 @@ pub(crate) mod ffi {
     fn direction(self: &RustUnixSocketConfiguration) -> SocketDirection;
 
     type RustNatInterface;
-    #[swift_bridge(swift_name = "ipv4Address")]
-    fn ipv4_address(self: &RustNatInterface) -> &str;
+    #[swift_bridge(swift_name = "ipv4AddressValue")]
+    fn ipv4_address_value(self: &RustNatInterface) -> u32;
+    #[swift_bridge(swift_name = "ipv4Prefix")]
+    fn ipv4_prefix(self: &RustNatInterface) -> u8;
     #[swift_bridge(swift_name = "ipv4Gateway")]
-    fn ipv4_gateway(self: &RustNatInterface) -> Option<&str>;
+    fn ipv4_gateway(self: &RustNatInterface) -> Option<u32>;
+    #[swift_bridge(swift_name = "hasIpv6Address")]
+    fn has_ipv6_address(self: &RustNatInterface) -> bool;
     #[swift_bridge(swift_name = "ipv6Address")]
-    fn ipv6_address(self: &RustNatInterface) -> Option<&str>;
+    fn ipv6_address(self: &RustNatInterface) -> &RustIPv6Address;
+    #[swift_bridge(swift_name = "ipv6Prefix")]
+    fn ipv6_prefix(self: &RustNatInterface) -> u8;
+    #[swift_bridge(swift_name = "hasIpv6Gateway")]
+    fn has_ipv6_gateway(self: &RustNatInterface) -> bool;
     #[swift_bridge(swift_name = "ipv6Gateway")]
-    fn ipv6_gateway(self: &RustNatInterface) -> Option<&str>;
+    fn ipv6_gateway(self: &RustNatInterface) -> &RustIPv6Address;
     #[swift_bridge(swift_name = "macAddress")]
-    fn mac_address(self: &RustNatInterface) -> Option<&str>;
+    fn mac_address(self: &RustNatInterface) -> Option<u64>;
     fn mtu(self: &RustNatInterface) -> u32;
 
     type RustDns;
@@ -406,12 +414,26 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "pushInterface")]
     fn push_interface(
       self: &mut RustLinuxContainerConfiguration,
-      ipv4_address: String,
-      ipv4_gateway: Option<String>,
-      ipv6_address: Option<String>,
-      ipv6_gateway: Option<String>,
-      mac_address: Option<String>,
+      ipv4_address: u32,
+      ipv4_prefix: u8,
+      ipv4_gateway: Option<u32>,
+      mac_address: Option<u64>,
       mtu: u32,
+    );
+    #[swift_bridge(swift_name = "setInterfaceIpv6Address")]
+    fn set_interface_ipv6_address(
+      self: &mut RustLinuxContainerConfiguration,
+      high: u64,
+      low: u64,
+      zone: Option<String>,
+      prefix: u8,
+    );
+    #[swift_bridge(swift_name = "setInterfaceIpv6Gateway")]
+    fn set_interface_ipv6_gateway(
+      self: &mut RustLinuxContainerConfiguration,
+      high: u64,
+      low: u64,
+      zone: Option<String>,
     );
     #[swift_bridge(swift_name = "pushSocket")]
     fn push_socket(
