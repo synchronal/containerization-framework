@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.3.0
+
 - The Rust API now mirrors Containerization's Swift API. Modules are named
   after the Swift modules (`containerization`, `containerization_oci`,
   `containerization_os`), types after the Swift types, and methods after their
