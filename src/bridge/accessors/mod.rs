@@ -13,6 +13,7 @@
 //! swift-bridge's glue.)
 
 mod addresses;
+mod archive;
 mod container;
 mod images;
 mod registry;

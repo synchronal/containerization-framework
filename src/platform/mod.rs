@@ -68,3 +68,33 @@ pub(crate) fn exit_status(outcome: &ffi::CzOutcome) -> containerization::ExitSta
     exited_at: SystemTime::UNIX_EPOCH + Duration::from_secs_f64(outcome.exited_at().max(0.0)),
   }
 }
+
+/// A Swift `Date`, crossing as seconds since 1970, which are negative before
+/// it.
+pub(crate) fn system_time(seconds: f64) -> SystemTime {
+  if seconds < 0.0 {
+    SystemTime::UNIX_EPOCH - Duration::from_secs_f64(-seconds)
+  } else {
+    SystemTime::UNIX_EPOCH + Duration::from_secs_f64(seconds)
+  }
+}
+
+/// A `SystemTime` as a Swift `Date`'s seconds since 1970.
+pub(crate) fn seconds(time: SystemTime) -> f64 {
+  match time.duration_since(SystemTime::UNIX_EPOCH) {
+    Ok(after) => after.as_secs_f64(),
+    Err(before) => -before.duration().as_secs_f64(),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn crosses_dates_on_either_side_of_1970() {
+    for seconds in [-86_400.5, 0.0, 1_700_000_000.25] {
+      assert_eq!(super::seconds(system_time(seconds)), seconds);
+    }
+  }
+}

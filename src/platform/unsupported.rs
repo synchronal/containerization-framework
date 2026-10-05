@@ -11,6 +11,7 @@ use crate::containerization;
 use crate::containerization::container_manager;
 use crate::containerization::image;
 use crate::containerization::linux_container;
+use crate::containerization_archive;
 use crate::containerization_extras;
 use crate::containerization_extras::IPv6Address;
 use crate::containerization_extras::IpAddress;
@@ -61,6 +62,12 @@ taken!(
   written_size -> i64,
   written_digest -> String,
   ext4_reader -> CzExt4Reader,
+  archive_writer -> CzArchiveWriter,
+  archive_reader -> CzArchiveReader,
+  write_entry -> CzWriteEntry,
+  entry_data -> Vec<u8>,
+  archive_entry_reader -> CzArchiveEntryReader,
+  data_map_keys -> Vec<String>,
   reference -> CzReference,
   authentication -> CzAuthentication,
   registry_infos -> Vec<containerization_os::RegistryInfo>,
@@ -125,7 +132,28 @@ handles!(
   CzAuthentication,
   CzKernelImage,
   CzRegistryClient,
+  CzWriteEntry,
+  CzArchiveWriter,
+  CzArchiveWriterTransaction,
+  CzArchiveReader,
+  CzArchiveIterator,
+  CzStreamingIterator,
+  CzArchiveEntryReader,
 );
+
+impl CzOutcome {
+  pub(crate) fn data_map_value(&self, _key: &str) -> Vec<u8> {
+    unreachable!("a failed outcome holds nothing")
+  }
+}
+
+/// Swift would own the descriptor, so it is closed here instead.
+pub(crate) fn cz_archive_reader_with_file_handle(_format: &str, _filter: &str, file_handle: i32) -> CzOutcome {
+  // SAFETY: `ArchiveReader::with_file_handle` passes the descriptor of an
+  // `OwnedFd` it gave up.
+  drop(unsafe { <std::os::fd::OwnedFd as std::os::fd::FromRawFd>::from_raw_fd(file_handle) });
+  CzOutcome
+}
 
 pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
   CzOutcome
@@ -206,6 +234,14 @@ failing!(
     usize,
   ),
   cz_content_writer_copy(&str, &str),
+  cz_ext4_unpack_archive(containerization::Ext4Unpacker, &str, &str, &str),
+  cz_xattr_format_description(&str),
+  cz_write_entry_new(),
+  cz_archive_writer_new(containerization_archive::ArchiveWriterConfiguration),
+  cz_archive_writer_with_file(containerization_archive::ArchiveWriterConfiguration, &str),
+  cz_archive_reader_new(&str),
+  cz_archive_reader_with_format(&str, &str, &str),
+  cz_archive_reader_with_bundle(&str, Vec<u8>, Option<String>),
   cz_local_content_open(&str),
   cz_image_store_default(),
   cz_basic_authentication(&str, &str),
@@ -414,6 +450,240 @@ impl CzAuthentication {
 
 impl CzExt4Reader {
   pub(crate) fn export(&self, _archive: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzWriteEntry {
+  pub(crate) fn duplicate(&self) -> CzWriteEntry {
+    match self.0 {}
+  }
+
+  pub(crate) fn has_size(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn size(&self) -> i64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_size(&self, _is_set: bool, _size: i64) {
+    match self.0 {}
+  }
+
+  pub(crate) fn permissions(&self) -> u16 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_permissions(&self, _permissions: u16) {
+    match self.0 {}
+  }
+
+  pub(crate) fn has_owner(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn owner(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_owner(&self, _is_set: bool, _owner: u32) {
+    match self.0 {}
+  }
+
+  pub(crate) fn has_group(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn group(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_group(&self, _is_set: bool, _group: u32) {
+    match self.0 {}
+  }
+
+  pub(crate) fn hardlink(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_hardlink(&self, _hardlink: Option<String>) {
+    match self.0 {}
+  }
+
+  pub(crate) fn hardlink_utf8(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_hardlink_utf8(&self, _hardlink: Option<String>) {
+    match self.0 {}
+  }
+
+  pub(crate) fn strmode(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn file_type(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_file_type(&self, _file_type: &str) {
+    match self.0 {}
+  }
+
+  pub(crate) fn has_content_access_date(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn content_access_date(&self) -> f64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_content_access_date(&self, _is_set: bool, _seconds: f64) {
+    match self.0 {}
+  }
+
+  pub(crate) fn has_creation_date(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn creation_date(&self) -> f64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_creation_date(&self, _is_set: bool, _seconds: f64) {
+    match self.0 {}
+  }
+
+  pub(crate) fn has_modification_date(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn modification_date(&self) -> f64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_modification_date(&self, _is_set: bool, _seconds: f64) {
+    match self.0 {}
+  }
+
+  pub(crate) fn path(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_path(&self, _path: Option<String>) {
+    match self.0 {}
+  }
+
+  pub(crate) fn path_utf8(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_path_utf8(&self, _path: Option<String>) {
+    match self.0 {}
+  }
+
+  pub(crate) fn symlink_target(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_symlink_target(&self, _target: Option<String>) {
+    match self.0 {}
+  }
+
+  pub(crate) fn xattrs(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_xattrs(&self, _names: Vec<String>, _lengths: Vec<u64>, _values: Vec<u8>) {
+    match self.0 {}
+  }
+}
+
+impl CzArchiveWriter {
+  pub(crate) fn new_entry(&self) -> CzWriteEntry {
+    match self.0 {}
+  }
+
+  pub(crate) fn open(&self, _file: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn open_with_file_descriptor(&self, _file_descriptor: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn finish_encoding(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn make_transaction_writer(&self) -> CzArchiveWriterTransaction {
+    match self.0 {}
+  }
+
+  pub(crate) fn write_entry(&self, _entry: CzWriteEntry, _has_data: bool, _data: Vec<u8>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn archive_directory(&self, _dir: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn archive(&self, _paths: Vec<String>, _base: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzArchiveWriterTransaction {
+  pub(crate) fn write_header(&self, _entry: CzWriteEntry) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn write_chunk(&self, _data: Vec<u8>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn finish(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzArchiveReader {
+  pub(crate) fn make_iterator(&self) -> CzArchiveIterator {
+    match self.0 {}
+  }
+
+  pub(crate) fn make_streaming_iterator(&self) -> CzStreamingIterator {
+    match self.0 {}
+  }
+
+  pub(crate) fn throw_if_stream_failed(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn extract_contents(&self, _to: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn extract_file(&self, _path: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzArchiveIterator {
+  pub(crate) fn next(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzStreamingIterator {
+  pub(crate) fn next(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzArchiveEntryReader {
+  pub(crate) fn read(&self, _max_length: usize) -> CzOutcome {
     match self.0 {}
   }
 }

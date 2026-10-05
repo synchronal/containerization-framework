@@ -63,7 +63,48 @@
 //!
 //! [Containerization]: https://github.com/apple/containerization
 
+/// A Swift enum backed by strings: Rust's cases, each with its `rawValue`.
+macro_rules! raw_values {
+  ($(#[$meta:meta])* $name:ident { $($case:ident = $raw:literal),* $(,)? }) => {
+    $(#[$meta])*
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub enum $name {
+      $(#[doc = concat!("`", $raw, "`.")] $case),*
+    }
+
+    impl $name {
+      /// Every case, in the order the bridge lists Swift's raw values.
+      #[cfg(all(test, target_os = "macos"))]
+      pub(crate) const ALL: &[Self] = &[$(Self::$case),*];
+
+      /// `rawValue`.
+      pub fn raw_value(self) -> &'static str {
+        match self {
+          $(Self::$case => $raw),*
+        }
+      }
+
+      /// `init?(rawValue:)`.
+      pub fn from_raw_value(raw_value: &str) -> Option<Self> {
+        match raw_value {
+          $($raw => Some(Self::$case),)*
+          _ => None,
+        }
+      }
+
+      /// A raw value from Swift. It panics if Swift has a case Rust lacks.
+      /// Not every enum uses it.
+      #[allow(dead_code)]
+      pub(crate) fn from_swift(raw_value: &str) -> Self {
+        Self::from_raw_value(raw_value)
+          .unwrap_or_else(|| panic!("Swift's {} has a case Rust lacks: {raw_value:?}", stringify!($name)))
+      }
+    }
+  };
+}
+
 pub mod containerization;
+pub mod containerization_archive;
 pub mod containerization_error;
 pub mod containerization_ext4;
 pub mod containerization_extras;

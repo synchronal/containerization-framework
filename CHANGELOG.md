@@ -29,6 +29,9 @@ options struct whose `Default` matches Swift, such as
   `InitImage` and the new `KernelImage` can be created directly.
 - `LocalContentStore` supports ingest sessions, and `ProgressEvent` exposes its
   event and value.
+- Archives can be written, read and extracted through the new
+  `containerization_archive` module, and `Ext4Unpacker::unpack_archive`
+  unpacks one into an ext4 filesystem.
 
 ### Breaking
 

@@ -11,6 +11,8 @@ enum BridgeError: Error, CustomStringConvertible {
   case malformed(String, String)
   /// A Rust closure returned an error, which Rust keeps.
   case bodyFailed
+  /// `ArchiveEntryReader.read(_:maxLength:)` returned `-1`.
+  case readFailed
 
   var description: String {
     switch self {
@@ -18,6 +20,8 @@ enum BridgeError: Error, CustomStringConvertible {
       return "the bridged task signalled completion without an outcome"
     case .bodyFailed:
       return "the Rust closure failed"
+    case .readFailed:
+      return "the archive entry's data could not be read"
     case .malformed(let what, let value):
       return "malformed \(what): \(value.debugDescription)"
     }

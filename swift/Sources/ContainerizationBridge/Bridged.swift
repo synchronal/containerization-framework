@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 import Containerization
+import ContainerizationArchive
 import ContainerizationError
 import ContainerizationExtras
 import ContainerizationOCI
@@ -76,6 +77,35 @@ public final class CzOutcome: @unchecked Sendable {
   func linuxProcess() -> CzLinuxProcess { taken() }
   func contentWriter() -> CzContentWriter { taken() }
   func ext4Reader() -> CzExt4Reader { taken() }
+  func archiveWriter() -> CzArchiveWriter { taken() }
+  func archiveReader() -> CzArchiveReader { taken() }
+
+  // An archive entry, alone or with the data or reader it was read with.
+
+  func writeEntry() -> CzWriteEntry {
+    switch value {
+    case let (entry, _) as (WriteEntry, Data): CzWriteEntry(entry)
+    case let (entry, _) as (WriteEntry, ArchiveEntryReader): CzWriteEntry(entry)
+    default: taken()
+    }
+  }
+
+  func entryData() -> RustVec<UInt8> {
+    rustBytes((taken() as (WriteEntry, Data)).1)
+  }
+
+  func archiveEntryReader() -> CzArchiveEntryReader {
+    CzArchiveEntryReader((taken() as (WriteEntry, ArchiveEntryReader)).1)
+  }
+
+  /// A held `[String: Data]`'s keys, and the value of one.
+  func dataMapKeys() -> RustVec<RustString> {
+    rustStrings((taken() as [String: Data]).keys)
+  }
+
+  func dataMapValue(key: RustStr) -> RustVec<UInt8> {
+    rustBytes((taken() as [String: Data])[key.toString()] ?? Data())
+  }
 
   func writtenSize() -> Int64 {
     (taken() as Written).size
@@ -260,13 +290,17 @@ public final class CzOutcome: @unchecked Sendable {
 
   /// A `Data?`, or a `[UInt8]`.
   func bytes() -> RustVec<UInt8> {
-    let vec = RustVec<UInt8>()
-    let bytes = (value as? [UInt8]).map { Data($0) } ?? (taken() as Data?) ?? Data()
-    for byte in bytes {
-      vec.push(value: byte)
-    }
-    return vec
+    rustBytes((value as? [UInt8]).map { Data($0) } ?? (taken() as Data?) ?? Data())
   }
+}
+
+/// Bytes as Rust's `Vec<u8>`.
+func rustBytes(_ bytes: Data) -> RustVec<UInt8> {
+  let vec = RustVec<UInt8>()
+  for byte in bytes {
+    vec.push(value: byte)
+  }
+  return vec
 }
 
 /// What an outcome holds for a `nil` result, which `Any` can't hold apart from

@@ -1,5 +1,6 @@
 use super::Image;
 use super::Mount;
+use crate::containerization_archive::Filter;
 use crate::containerization_ext4::ext4::JournalConfig;
 use crate::containerization_extras::ProgressHandler;
 use crate::containerization_oci::Platform;
@@ -44,5 +45,19 @@ impl Ext4Unpacker {
       format!("unpack {} to {}", image.reference(), at.display()),
     )
     .map(|outcome| outcome.mount())
+  }
+
+  /// `EXT4Unpacker.unpack(archive:compression:at:)`.
+  pub fn unpack_archive(&self, archive: &Path, compression: Filter, at: &Path) -> Result<(), Error> {
+    platform::outcome(
+      ffi::cz_ext4_unpack_archive(
+        *self,
+        &archive.display().to_string(),
+        compression.raw_value(),
+        &at.display().to_string(),
+      ),
+      format!("unpack {} to {}", archive.display(), at.display()),
+    )
+    .map(|_| ())
   }
 }

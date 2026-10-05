@@ -35,6 +35,7 @@ use crate::containerization::container_manager::RootfsCreateOptions as RustRootf
 use crate::containerization::hosts::Entry as RustHostsEntry;
 use crate::containerization::image::Description as RustImageDescription;
 use crate::containerization::linux_container::Configuration as RustLinuxContainerConfiguration;
+use crate::containerization_archive::ArchiveWriterConfiguration as RustArchiveWriterConfiguration;
 use crate::containerization_extras::IPv6Address as RustIPv6Address;
 use crate::containerization_extras::IpAddress as RustIpAddress;
 use crate::containerization_oci::Descriptor as RustDescriptor;
@@ -145,6 +146,14 @@ pub(crate) mod ffi {
     Journal,
   }
 
+  // `Options`, less its payload, with `compression`'s cases spelled out.
+  enum ArchiveOptionKind {
+    CompressionLevel,
+    CompressionStore,
+    CompressionDeflate,
+    Xattrformat,
+  }
+
   // The lists of `Hooks`.
   enum HookKind {
     Prestart,
@@ -243,6 +252,24 @@ pub(crate) mod ffi {
     fn has_journal_mode(self: &RustExt4Unpacker) -> bool;
     #[swift_bridge(swift_name = "journalMode")]
     fn journal_mode(self: &RustExt4Unpacker) -> JournalModeKind;
+
+    // Its enums are their `rawValue`s. An option's level and format are
+    // read only for the kinds that have them.
+    type RustArchiveWriterConfiguration;
+    fn format(self: &RustArchiveWriterConfiguration) -> &str;
+    fn filter(self: &RustArchiveWriterConfiguration) -> &str;
+    #[swift_bridge(swift_name = "optionsLen")]
+    fn options_len(self: &RustArchiveWriterConfiguration) -> usize;
+    #[swift_bridge(swift_name = "optionKindAt")]
+    fn option_kind_at(self: &RustArchiveWriterConfiguration, index: usize) -> ArchiveOptionKind;
+    #[swift_bridge(swift_name = "optionCompressionLevelAt")]
+    fn option_compression_level_at(self: &RustArchiveWriterConfiguration, index: usize) -> u32;
+    #[swift_bridge(swift_name = "optionXattrFormatAt")]
+    fn option_xattr_format_at(self: &RustArchiveWriterConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "localesLen")]
+    fn locales_len(self: &RustArchiveWriterConfiguration) -> usize;
+    #[swift_bridge(swift_name = "localesAt")]
+    fn locales_at(self: &RustArchiveWriterConfiguration, index: usize) -> &str;
 
     type RustRootfsCreateOptions;
     #[swift_bridge(swift_name = "hasWritableLayer")]
@@ -1008,6 +1035,23 @@ pub(crate) mod ffi {
     fn written_digest(self: &CzOutcome) -> String;
     #[swift_bridge(swift_name = "ext4Reader")]
     fn ext4_reader(self: &CzOutcome) -> CzExt4Reader;
+    #[swift_bridge(swift_name = "archiveWriter")]
+    fn archive_writer(self: &CzOutcome) -> CzArchiveWriter;
+    #[swift_bridge(swift_name = "archiveReader")]
+    fn archive_reader(self: &CzOutcome) -> CzArchiveReader;
+    // A `WriteEntry`, alone or with the data or reader an iterator returned
+    // it with.
+    #[swift_bridge(swift_name = "writeEntry")]
+    fn write_entry(self: &CzOutcome) -> CzWriteEntry;
+    #[swift_bridge(swift_name = "entryData")]
+    fn entry_data(self: &CzOutcome) -> Vec<u8>;
+    #[swift_bridge(swift_name = "archiveEntryReader")]
+    fn archive_entry_reader(self: &CzOutcome) -> CzArchiveEntryReader;
+    // A held `[String: Data]`'s keys, and the value of one.
+    #[swift_bridge(swift_name = "dataMapKeys")]
+    fn data_map_keys(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "dataMapValue")]
+    fn data_map_value(self: &CzOutcome, key: &str) -> Vec<u8>;
 
     #[swift_bridge(swift_name = "platformArchitecture")]
     fn platform_architecture(self: &CzOutcome) -> String;
@@ -1776,6 +1820,173 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "openExt4Reader")]
     fn cz_ext4_reader_new(#[swift_bridge(label = "blockDevice")] block_device: &str) -> CzOutcome;
     fn export(self: &CzExt4Reader, archive: &str) -> CzOutcome;
+
+    // `EXT4Unpacker.unpack(archive:compression:at:)`, with the filter as its
+    // `rawValue`.
+    #[swift_bridge(swift_name = "unpackExt4Archive")]
+    fn cz_ext4_unpack_archive(unpacker: RustExt4Unpacker, archive: &str, compression: &str, at: &str) -> CzOutcome;
+
+    // ContainerizationArchive. Enums cross as their `rawValue`s, and a
+    // `WriteEntry` argument as a `duplicate()`.
+    #[swift_bridge(swift_name = "xattrFormatDescription")]
+    fn cz_xattr_format_description(format: &str) -> CzOutcome;
+    // For a unit test: an enum's raw values in the order of Rust's `ALL`, and
+    // `ArchiveWriterConfiguration.defaultLocales`.
+    #[swift_bridge(swift_name = "archiveRawValues")]
+    fn cz_archive_raw_values(name: &str) -> Vec<String>;
+    #[swift_bridge(swift_name = "archiveDefaultLocales")]
+    fn cz_archive_default_locales() -> Vec<String>;
+
+    type CzWriteEntry;
+    #[swift_bridge(swift_name = "newWriteEntry")]
+    fn cz_write_entry_new() -> CzOutcome;
+    fn duplicate(self: &CzWriteEntry) -> CzWriteEntry;
+    #[swift_bridge(swift_name = "hasSize")]
+    fn has_size(self: &CzWriteEntry) -> bool;
+    fn size(self: &CzWriteEntry) -> i64;
+    #[swift_bridge(swift_name = "setSize")]
+    fn set_size(self: &CzWriteEntry, #[swift_bridge(label = "isSet")] is_set: bool, size: i64);
+    fn permissions(self: &CzWriteEntry) -> u16;
+    #[swift_bridge(swift_name = "setPermissions")]
+    fn set_permissions(self: &CzWriteEntry, permissions: u16);
+    #[swift_bridge(swift_name = "hasOwner")]
+    fn has_owner(self: &CzWriteEntry) -> bool;
+    fn owner(self: &CzWriteEntry) -> u32;
+    #[swift_bridge(swift_name = "setOwner")]
+    fn set_owner(self: &CzWriteEntry, #[swift_bridge(label = "isSet")] is_set: bool, owner: u32);
+    #[swift_bridge(swift_name = "hasGroup")]
+    fn has_group(self: &CzWriteEntry) -> bool;
+    fn group(self: &CzWriteEntry) -> u32;
+    #[swift_bridge(swift_name = "setGroup")]
+    fn set_group(self: &CzWriteEntry, #[swift_bridge(label = "isSet")] is_set: bool, group: u32);
+    fn hardlink(self: &CzWriteEntry) -> Option<String>;
+    #[swift_bridge(swift_name = "setHardlink")]
+    fn set_hardlink(self: &CzWriteEntry, hardlink: Option<String>);
+    #[swift_bridge(swift_name = "hardlinkUtf8")]
+    fn hardlink_utf8(self: &CzWriteEntry) -> Option<String>;
+    #[swift_bridge(swift_name = "setHardlinkUtf8")]
+    fn set_hardlink_utf8(self: &CzWriteEntry, hardlink: Option<String>);
+    fn strmode(self: &CzWriteEntry) -> Option<String>;
+    #[swift_bridge(swift_name = "fileType")]
+    fn file_type(self: &CzWriteEntry) -> String;
+    #[swift_bridge(swift_name = "setFileType")]
+    fn set_file_type(self: &CzWriteEntry, #[swift_bridge(label = "fileType")] file_type: &str);
+    // Dates cross as seconds since 1970.
+    #[swift_bridge(swift_name = "hasContentAccessDate")]
+    fn has_content_access_date(self: &CzWriteEntry) -> bool;
+    #[swift_bridge(swift_name = "contentAccessDate")]
+    fn content_access_date(self: &CzWriteEntry) -> f64;
+    #[swift_bridge(swift_name = "setContentAccessDate")]
+    fn set_content_access_date(self: &CzWriteEntry, #[swift_bridge(label = "isSet")] is_set: bool, seconds: f64);
+    #[swift_bridge(swift_name = "hasCreationDate")]
+    fn has_creation_date(self: &CzWriteEntry) -> bool;
+    #[swift_bridge(swift_name = "creationDate")]
+    fn creation_date(self: &CzWriteEntry) -> f64;
+    #[swift_bridge(swift_name = "setCreationDate")]
+    fn set_creation_date(self: &CzWriteEntry, #[swift_bridge(label = "isSet")] is_set: bool, seconds: f64);
+    #[swift_bridge(swift_name = "hasModificationDate")]
+    fn has_modification_date(self: &CzWriteEntry) -> bool;
+    #[swift_bridge(swift_name = "modificationDate")]
+    fn modification_date(self: &CzWriteEntry) -> f64;
+    #[swift_bridge(swift_name = "setModificationDate")]
+    fn set_modification_date(self: &CzWriteEntry, #[swift_bridge(label = "isSet")] is_set: bool, seconds: f64);
+    fn path(self: &CzWriteEntry) -> Option<String>;
+    #[swift_bridge(swift_name = "setPath")]
+    fn set_path(self: &CzWriteEntry, path: Option<String>);
+    #[swift_bridge(swift_name = "pathUtf8")]
+    fn path_utf8(self: &CzWriteEntry) -> Option<String>;
+    #[swift_bridge(swift_name = "setPathUtf8")]
+    fn set_path_utf8(self: &CzWriteEntry, path: Option<String>);
+    #[swift_bridge(swift_name = "symlinkTarget")]
+    fn symlink_target(self: &CzWriteEntry) -> Option<String>;
+    #[swift_bridge(swift_name = "setSymlinkTarget")]
+    fn set_symlink_target(self: &CzWriteEntry, target: Option<String>);
+    // The outcome holds the `[String: Data]`. The setter's values are joined
+    // into one, with each one's length.
+    fn xattrs(self: &CzWriteEntry) -> CzOutcome;
+    #[swift_bridge(swift_name = "setXattrs")]
+    fn set_xattrs(self: &CzWriteEntry, names: Vec<String>, lengths: Vec<u64>, values: Vec<u8>);
+
+    type CzArchiveWriter;
+    #[swift_bridge(swift_name = "newArchiveWriter")]
+    fn cz_archive_writer_new(configuration: RustArchiveWriterConfiguration) -> CzOutcome;
+    // `ArchiveWriter(format:filter:options:locales:file:)`, with its
+    // arguments in a configuration.
+    #[swift_bridge(swift_name = "archiveWriterWithFile")]
+    fn cz_archive_writer_with_file(configuration: RustArchiveWriterConfiguration, file: &str) -> CzOutcome;
+    // `WriteEntry(_:)`, on the writer it takes.
+    #[swift_bridge(swift_name = "newEntry")]
+    fn new_entry(self: &CzArchiveWriter) -> CzWriteEntry;
+    fn open(self: &CzArchiveWriter, file: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "openWithFileDescriptor")]
+    fn open_with_file_descriptor(
+      self: &CzArchiveWriter,
+      #[swift_bridge(label = "fileDescriptor")] file_descriptor: i32,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "finishEncoding")]
+    fn finish_encoding(self: &CzArchiveWriter) -> CzOutcome;
+    #[swift_bridge(swift_name = "makeTransactionWriter")]
+    fn make_transaction_writer(self: &CzArchiveWriter) -> CzArchiveWriterTransaction;
+    // `data` stands for `nil` when `has_data` is false.
+    #[swift_bridge(swift_name = "writeEntry")]
+    fn write_entry(
+      self: &CzArchiveWriter,
+      entry: CzWriteEntry,
+      #[swift_bridge(label = "hasData")] has_data: bool,
+      data: Vec<u8>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "archiveDirectory")]
+    fn archive_directory(self: &CzArchiveWriter, dir: &str) -> CzOutcome;
+    fn archive(self: &CzArchiveWriter, paths: Vec<String>, base: &str) -> CzOutcome;
+
+    type CzArchiveWriterTransaction;
+    #[swift_bridge(swift_name = "writeHeader")]
+    fn write_header(self: &CzArchiveWriterTransaction, entry: CzWriteEntry) -> CzOutcome;
+    #[swift_bridge(swift_name = "writeChunk")]
+    fn write_chunk(self: &CzArchiveWriterTransaction, data: Vec<u8>) -> CzOutcome;
+    fn finish(self: &CzArchiveWriterTransaction) -> CzOutcome;
+
+    type CzArchiveReader;
+    #[swift_bridge(swift_name = "openArchiveReader")]
+    fn cz_archive_reader_new(file: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "archiveReaderWithFormat")]
+    fn cz_archive_reader_with_format(format: &str, filter: &str, file: &str) -> CzOutcome;
+    // The reader owns the descriptor, and closes it.
+    #[swift_bridge(swift_name = "archiveReaderWithFileHandle")]
+    fn cz_archive_reader_with_file_handle(
+      format: &str,
+      filter: &str,
+      #[swift_bridge(label = "fileHandle")] file_handle: i32,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "archiveReaderWithBundle")]
+    fn cz_archive_reader_with_bundle(
+      name: &str,
+      bundle: Vec<u8>,
+      #[swift_bridge(label = "tempDirectoryBaseName")] temp_directory_base_name: Option<String>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "makeIterator")]
+    fn make_iterator(self: &CzArchiveReader) -> CzArchiveIterator;
+    #[swift_bridge(swift_name = "makeStreamingIterator")]
+    fn make_streaming_iterator(self: &CzArchiveReader) -> CzStreamingIterator;
+    #[swift_bridge(swift_name = "throwIfStreamFailed")]
+    fn throw_if_stream_failed(self: &CzArchiveReader) -> CzOutcome;
+    #[swift_bridge(swift_name = "extractContents")]
+    fn extract_contents(self: &CzArchiveReader, to: &str) -> CzOutcome;
+    // The outcome holds the entry and its data.
+    #[swift_bridge(swift_name = "extractFile")]
+    fn extract_file(self: &CzArchiveReader, path: &str) -> CzOutcome;
+
+    // Each `next` outcome holds the entry and its data or reader, or
+    // `Absent`.
+    type CzArchiveIterator;
+    fn next(self: &CzArchiveIterator) -> CzOutcome;
+    type CzStreamingIterator;
+    fn next(self: &CzStreamingIterator) -> CzOutcome;
+
+    // `read(_:maxLength:)`: the outcome holds the bytes read, or fails for
+    // Swift's `-1`.
+    type CzArchiveEntryReader;
+    fn read(self: &CzArchiveEntryReader, #[swift_bridge(label = "maxLength")] max_length: usize) -> CzOutcome;
 
     // `EXT4Unpacker.unpack(_:for:at:progress:)`, with the image as a
     // `duplicate()`.

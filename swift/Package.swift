@@ -35,6 +35,7 @@ let package = Package(
       name: "ContainerizationBridge",
       dependencies: [
         .product(name: "Containerization", package: "containerization"),
+        .product(name: "ContainerizationArchive", package: "containerization"),
         .product(name: "ContainerizationEXT4", package: "containerization"),
         .product(name: "ContainerizationExtras", package: "containerization"),
         .product(name: "ContainerizationOCI", package: "containerization"),
