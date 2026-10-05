@@ -19,6 +19,14 @@ use std::convert::Infallible;
 
 const MACOS_ONLY: &str = "Containerization.framework is macOS only";
 
+/// `ProgressEvent`, less its value.
+pub(crate) enum ProgressKind {
+  Items,
+  TotalItems,
+  Size,
+  TotalSize,
+}
+
 /// Always a failure, so nothing is taken from it.
 pub(crate) struct CzOutcome;
 
@@ -64,6 +72,10 @@ taken!(
   mac_address -> containerization_extras::MACAddress,
   uint128 -> u128,
   platform -> containerization_oci::Platform,
+  descriptor -> containerization_oci::Descriptor,
+  index -> containerization_oci::Index,
+  manifest -> containerization_oci::Manifest,
+  oci_image -> containerization_oci::Image,
   mount -> containerization::Mount,
   exit_code -> i32,
   exited_at -> f64,
@@ -107,6 +119,42 @@ pub(crate) fn cz_content_writer_new(_base: &str) -> CzOutcome {
 }
 
 pub(crate) fn cz_platform_current() -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_parse(_platform: &str) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_description(_platform: containerization_oci::Platform) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_equals(
+  _lhs: containerization_oci::Platform,
+  _rhs: containerization_oci::Platform,
+) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_matches(
+  _lhs: containerization_oci::Platform,
+  _rhs: containerization_oci::Platform,
+) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_progress_event_event(_kind: ProgressKind, _value: i64) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_proxy_from_environment(
+  _scheme: Option<String>,
+  _host: &str,
+  _has_env: bool,
+  _env_keys: Vec<String>,
+  _env_values: Vec<String>,
+) -> CzOutcome {
   CzOutcome
 }
 
@@ -365,6 +413,26 @@ impl CzImage {
   }
 
   pub(crate) fn media_type(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn descriptor(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn index(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn manifest(&self, _platform: containerization_oci::Platform) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn descriptor_for(&self, _platform: containerization_oci::Platform) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn config(&self, _platform: containerization_oci::Platform) -> CzOutcome {
     match self.0 {}
   }
 

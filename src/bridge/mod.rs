@@ -601,8 +601,145 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "platformVariant")]
     fn platform_variant(self: &CzOutcome) -> Option<String>;
 
+    // A held list's length and elements, and a held `[String: String]`'s keys
+    // and values in the same order.
+    fn len(self: &CzOutcome) -> usize;
+    fn at(self: &CzOutcome, index: usize) -> CzOutcome;
+    #[swift_bridge(swift_name = "mapKeys")]
+    fn map_keys(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "mapValues")]
+    fn map_values(self: &CzOutcome) -> Vec<String>;
+
+    // The OCI image types, field by field. A list, a map, a nested value or
+    // an optional one of those is an outcome of its own.
+    #[swift_bridge(swift_name = "descriptorMediaType")]
+    fn descriptor_media_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "descriptorDigest")]
+    fn descriptor_digest(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "descriptorSize")]
+    fn descriptor_size(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "descriptorUrls")]
+    fn descriptor_urls(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "descriptorAnnotations")]
+    fn descriptor_annotations(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "descriptorPlatform")]
+    fn descriptor_platform(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "descriptorArtifactType")]
+    fn descriptor_artifact_type(self: &CzOutcome) -> Option<String>;
+
+    #[swift_bridge(swift_name = "indexSchemaVersion")]
+    fn index_schema_version(self: &CzOutcome) -> isize;
+    #[swift_bridge(swift_name = "indexMediaType")]
+    fn index_media_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "indexManifests")]
+    fn index_manifests(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "indexAnnotations")]
+    fn index_annotations(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "indexSubject")]
+    fn index_subject(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "indexArtifactType")]
+    fn index_artifact_type(self: &CzOutcome) -> Option<String>;
+
+    #[swift_bridge(swift_name = "manifestSchemaVersion")]
+    fn manifest_schema_version(self: &CzOutcome) -> isize;
+    #[swift_bridge(swift_name = "manifestMediaType")]
+    fn manifest_media_type(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "manifestConfig")]
+    fn manifest_config(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "manifestLayers")]
+    fn manifest_layers(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "manifestAnnotations")]
+    fn manifest_annotations(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "manifestSubject")]
+    fn manifest_subject(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "manifestArtifactType")]
+    fn manifest_artifact_type(self: &CzOutcome) -> Option<String>;
+
+    #[swift_bridge(swift_name = "imageConfigUser")]
+    fn image_config_user(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "imageConfigEnv")]
+    fn image_config_env(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "imageConfigEntrypoint")]
+    fn image_config_entrypoint(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "imageConfigCmd")]
+    fn image_config_cmd(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "imageConfigWorkingDir")]
+    fn image_config_working_dir(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "imageConfigLabels")]
+    fn image_config_labels(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "imageConfigStopSignal")]
+    fn image_config_stop_signal(self: &CzOutcome) -> Option<String>;
+
+    #[swift_bridge(swift_name = "rootfsType")]
+    fn rootfs_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "rootfsDiffIDs")]
+    fn rootfs_diff_ids(self: &CzOutcome) -> Vec<String>;
+
+    #[swift_bridge(swift_name = "historyCreated")]
+    fn history_created(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "historyCreatedBy")]
+    fn history_created_by(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "historyAuthor")]
+    fn history_author(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "historyComment")]
+    fn history_comment(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "historyEmptyLayer")]
+    fn history_empty_layer(self: &CzOutcome) -> Option<bool>;
+
+    #[swift_bridge(swift_name = "ociImageCreated")]
+    fn oci_image_created(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "ociImageAuthor")]
+    fn oci_image_author(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "ociImageArchitecture")]
+    fn oci_image_architecture(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ociImageOs")]
+    fn oci_image_os(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ociImageOsVersion")]
+    fn oci_image_os_version(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "ociImageOsFeatures")]
+    fn oci_image_os_features(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "ociImageVariant")]
+    fn oci_image_variant(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "ociImageConfig")]
+    fn oci_image_config(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "ociImageRootfs")]
+    fn oci_image_rootfs(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "ociImageHistory")]
+    fn oci_image_history(self: &CzOutcome) -> CzOutcome;
+
+    // Swift's `MediaTypes` and `AnnotationKeys`, in the order of Rust's
+    // `ALL`, for a test that compares Rust's copies with them.
+    #[swift_bridge(swift_name = "mediaTypes")]
+    fn cz_media_types() -> Vec<String>;
+    #[swift_bridge(swift_name = "annotationKeys")]
+    fn cz_annotation_keys() -> Vec<String>;
+
     #[swift_bridge(swift_name = "currentPlatform")]
     fn cz_platform_current() -> CzOutcome;
+    #[swift_bridge(swift_name = "parsePlatform")]
+    fn cz_platform_parse(platform: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "platformDescription")]
+    fn cz_platform_description(platform: RustPlatform) -> CzOutcome;
+    #[swift_bridge(swift_name = "platformEquals")]
+    fn cz_platform_equals(lhs: RustPlatform, rhs: RustPlatform) -> CzOutcome;
+    #[swift_bridge(swift_name = "platformMatches")]
+    fn cz_platform_matches(lhs: RustPlatform, rhs: RustPlatform) -> CzOutcome;
+
+    // `ProgressEvent.event`, of the case and value Rust holds.
+    #[swift_bridge(swift_name = "progressEventEvent")]
+    fn cz_progress_event_event(kind: ProgressKind, value: i64) -> CzOutcome;
+
+    // `ProxyUtils.proxyFromEnvironment(scheme:host:env:)`, with `env` as its
+    // keys and values, or Swift's default when `has_env` is false. The
+    // outcome holds the URL's `absoluteString`, or nothing.
+    #[swift_bridge(swift_name = "proxyFromEnvironment")]
+    fn cz_proxy_from_environment(
+      scheme: Option<String>,
+      host: &str,
+      #[swift_bridge(label = "hasEnv")] has_env: bool,
+      #[swift_bridge(label = "envKeys")] env_keys: Vec<String>,
+      #[swift_bridge(label = "envValues")] env_values: Vec<String>,
+    ) -> CzOutcome;
 
     // Addresses, field by field: Rust builds its own. Each address getter
     // also reads the address in an `IPAddress`, a CIDR block or a `CIDR`, and
@@ -915,6 +1052,12 @@ pub(crate) mod ffi {
     fn digest(self: &CzImage) -> String;
     #[swift_bridge(swift_name = "mediaType")]
     fn media_type(self: &CzImage) -> String;
+    fn descriptor(self: &CzImage) -> CzOutcome;
+    fn index(self: &CzImage) -> CzOutcome;
+    fn manifest(self: &CzImage, platform: RustPlatform) -> CzOutcome;
+    #[swift_bridge(swift_name = "descriptorFor")]
+    fn descriptor_for(self: &CzImage, platform: RustPlatform) -> CzOutcome;
+    fn config(self: &CzImage, platform: RustPlatform) -> CzOutcome;
     #[swift_bridge(swift_name = "referencedDigests")]
     fn referenced_digests(self: &CzImage) -> CzOutcome;
     #[swift_bridge(swift_name = "getContent")]

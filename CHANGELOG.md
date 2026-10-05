@@ -11,6 +11,26 @@
 - `Error::Failed` now carries the code of a thrown `ContainerizationError`, as
   a `containerization_error::Code`. Check it with `Error::is_code`, which
   mirrors `ContainerizationError.isCode(_:)`. Other errors have no code.
+- Added `ProgressEvent::event` and `ProgressEvent::value`, and
+  `containerization_extras::proxy_utils::proxy_from_environment`, which
+  mirrors `ProxyUtils.proxyFromEnvironment(scheme:host:env:)`. Passing `None`
+  for its environment lets Swift read the process environment, as Swift's
+  default does.
+- `Platform` has `parse`, `description` and `matches`. They mirror
+  `Platform(from:)`, `description` and the `~=` operator, and each one asks
+  Swift.
+- `Platform`'s `==` now asks Swift's `==`. As in Swift, an `arm64` platform
+  with no variant equals `arm64/v8`, and `os_version` and `os_features` are
+  ignored. Off macOS, every field must match.
+- Added the OCI image types `Index`, `Manifest`, `ImageConfig`, `Rootfs`,
+  `History` and `containerization_oci::Image`, which is an image's config and
+  a different type from `containerization::Image`. Their `new` functions take
+  the arguments Swift requires and give the rest Swift's defaults.
+  `MediaTypes` and `AnnotationKeys` hold Swift's strings as associated
+  constants.
+- `Image` has `description`, `descriptor`, `index`, `manifest`,
+  `descriptor_for` and `config`. `descriptor_for` mirrors Swift's
+  `descriptor(for:)`, and takes a suffix because Rust has no overloading.
 - A custom seccomp profile is decoded with `LinuxSeccomp.decode(from:)` again.
   A profile in Docker's format now fails the container with
   `Code::InvalidArgument`. Before, its conditional rules silently became

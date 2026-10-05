@@ -37,6 +37,13 @@ final class CzOutcome: @unchecked Sendable {
     }
   }
 
+  /// An outcome holding part of another's value, or `Absent` for `nil`, for
+  /// Rust to read with the same getters. (Not an `init`: a trailing closure
+  /// could bind to its `Any?`.)
+  static func holding(_ part: Any?) -> CzOutcome {
+    CzOutcome { absent(part) }
+  }
+
   func error() -> String? {
     failure
   }
@@ -46,11 +53,11 @@ final class CzOutcome: @unchecked Sendable {
     failureCode
   }
 
-  private func taken<T>() -> T {
+  func taken<T>() -> T {
     cast(value)
   }
 
-  private func cast<T>(_ held: Any?) -> T {
+  func cast<T>(_ held: Any?) -> T {
     guard let held = held as? T else {
       preconditionFailure("Rust took a \(T.self) from an outcome holding \(String(describing: held))")
     }
@@ -136,6 +143,25 @@ final class CzOutcome: @unchecked Sendable {
   /// Whether an optional result is there, rather than `Absent`.
   func isSome() -> Bool {
     !(value is Absent)
+  }
+
+  /// The length of a held array.
+  func len() -> UInt {
+    UInt((taken() as [Any]).count)
+  }
+
+  /// The `index`th element of a held array, as an outcome of its own.
+  func at(index: UInt) -> CzOutcome {
+    CzOutcome.holding((taken() as [Any])[Int(index)])
+  }
+
+  /// A held `[String: String]`'s keys, and its values in the same order.
+  func mapKeys() -> RustVec<RustString> {
+    rustStrings((taken() as [String: String]).keys)
+  }
+
+  func mapValues() -> RustVec<RustString> {
+    rustStrings((taken() as [String: String]).values)
   }
 
   /// Whether the address held, alone or in a CIDR block, is IPv6.

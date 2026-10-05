@@ -13,6 +13,7 @@ mod ipv6_address;
 mod mac_address;
 mod prefix;
 mod progress_event;
+pub mod proxy_utils;
 
 pub use self::cidr::Cidr;
 pub use self::cidr_v4::CIDRv4;

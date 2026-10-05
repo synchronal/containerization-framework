@@ -84,6 +84,104 @@ impl ffi::CzOutcome {
       variant: self.platform_variant(),
     }
   }
+
+  /// What an outcome holds, or `None` for `Absent`.
+  fn optional<T>(&self, read: impl FnOnce(&Self) -> T) -> Option<T> {
+    self.is_some().then(|| read(self))
+  }
+
+  /// Each element of a held list.
+  fn list<T>(&self, read: impl Fn(&Self) -> T) -> Vec<T> {
+    (0..self.len()).map(|index| read(&self.at(index))).collect()
+  }
+
+  /// A held `[String: String]`.
+  fn map(&self) -> BTreeMap<String, String> {
+    self.map_keys().into_iter().zip(self.map_values()).collect()
+  }
+
+  /// The `Descriptor` an outcome holds, read field by field.
+  pub(crate) fn descriptor(&self) -> containerization_oci::Descriptor {
+    containerization_oci::Descriptor {
+      media_type: self.descriptor_media_type(),
+      digest: self.descriptor_digest(),
+      size: self.descriptor_size(),
+      urls: self.descriptor_urls().optional(Self::strings),
+      annotations: self.descriptor_annotations().optional(Self::map),
+      platform: self.descriptor_platform().optional(Self::platform),
+      artifact_type: self.descriptor_artifact_type(),
+    }
+  }
+
+  pub(crate) fn index(&self) -> containerization_oci::Index {
+    containerization_oci::Index {
+      schema_version: self.index_schema_version(),
+      media_type: self.index_media_type(),
+      manifests: self.index_manifests().list(Self::descriptor),
+      annotations: self.index_annotations().optional(Self::map),
+      subject: self.index_subject().optional(Self::descriptor),
+      artifact_type: self.index_artifact_type(),
+    }
+  }
+
+  pub(crate) fn manifest(&self) -> containerization_oci::Manifest {
+    containerization_oci::Manifest {
+      schema_version: self.manifest_schema_version(),
+      media_type: self.manifest_media_type(),
+      config: self.manifest_config().descriptor(),
+      layers: self.manifest_layers().list(Self::descriptor),
+      annotations: self.manifest_annotations().optional(Self::map),
+      subject: self.manifest_subject().optional(Self::descriptor),
+      artifact_type: self.manifest_artifact_type(),
+    }
+  }
+
+  fn image_config(&self) -> containerization_oci::ImageConfig {
+    containerization_oci::ImageConfig {
+      user: self.image_config_user(),
+      env: self.image_config_env().optional(Self::strings),
+      entrypoint: self.image_config_entrypoint().optional(Self::strings),
+      cmd: self.image_config_cmd().optional(Self::strings),
+      working_dir: self.image_config_working_dir(),
+      labels: self.image_config_labels().optional(Self::map),
+      stop_signal: self.image_config_stop_signal(),
+    }
+  }
+
+  fn rootfs(&self) -> containerization_oci::Rootfs {
+    containerization_oci::Rootfs {
+      r#type: self.rootfs_type(),
+      diff_ids: self.rootfs_diff_ids(),
+    }
+  }
+
+  fn history(&self) -> containerization_oci::History {
+    containerization_oci::History {
+      created: self.history_created(),
+      created_by: self.history_created_by(),
+      author: self.history_author(),
+      comment: self.history_comment(),
+      empty_layer: self.history_empty_layer(),
+    }
+  }
+
+  /// The `ContainerizationOCI.Image` an outcome holds.
+  pub(crate) fn oci_image(&self) -> containerization_oci::Image {
+    containerization_oci::Image {
+      created: self.oci_image_created(),
+      author: self.oci_image_author(),
+      architecture: self.oci_image_architecture(),
+      os: self.oci_image_os(),
+      os_version: self.oci_image_os_version(),
+      os_features: self.oci_image_os_features().optional(Self::strings),
+      variant: self.oci_image_variant(),
+      config: self.oci_image_config().optional(Self::image_config),
+      rootfs: self.oci_image_rootfs().rootfs(),
+      history: self
+        .oci_image_history()
+        .optional(|history| history.list(Self::history)),
+    }
+  }
 }
 
 impl containerization_oci::Descriptor {
@@ -221,5 +319,21 @@ impl container_manager::RootfsCreateOptions {
 
   pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
     self.vm.memory_in_bytes
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::bridge::ffi;
+  use crate::containerization_oci;
+
+  #[test]
+  fn copies_swifts_media_types() {
+    assert_eq!(ffi::cz_media_types(), containerization_oci::MediaTypes::ALL);
+  }
+
+  #[test]
+  fn copies_swifts_annotation_keys() {
+    assert_eq!(ffi::cz_annotation_keys(), containerization_oci::AnnotationKeys::ALL);
   }
 }

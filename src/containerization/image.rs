@@ -1,7 +1,11 @@
 //! `Image`, and its nested `Image.Description`.
 
+use crate::containerization_oci;
 use crate::containerization_oci::Content;
 use crate::containerization_oci::Descriptor;
+use crate::containerization_oci::Index;
+use crate::containerization_oci::Manifest;
+use crate::containerization_oci::Platform;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -33,6 +37,11 @@ impl Description {
   }
 }
 
+/// A platform in an error's action, without asking Swift for its description.
+fn named(platform: &Platform) -> String {
+  format!("{}/{}", platform.os, platform.architecture)
+}
+
 /// `Image`. Made by [`super::ImageStore`].
 pub struct Image {
   pub(crate) handle: ffi::CzImage,
@@ -56,6 +65,50 @@ impl Image {
   /// `Image.mediaType`.
   pub fn media_type(&self) -> String {
     self.handle.media_type()
+  }
+
+  /// `Image.description`.
+  pub fn description(&self) -> Description {
+    Description::new(self.reference(), self.descriptor())
+  }
+
+  /// `Image.descriptor`.
+  pub fn descriptor(&self) -> Descriptor {
+    self.handle.descriptor().descriptor()
+  }
+
+  /// `Image.index()`.
+  pub fn index(&self) -> Result<Index, Error> {
+    platform::outcome(self.handle.index(), format!("read the index of {}", self.reference()))
+      .map(|outcome| outcome.index())
+  }
+
+  /// `Image.manifest(for:)`.
+  pub fn manifest(&self, for_platform: &Platform) -> Result<Manifest, Error> {
+    platform::outcome(
+      self.handle.manifest(for_platform.clone()),
+      format!("read the manifest of {} for {}", self.reference(), named(for_platform)),
+    )
+    .map(|outcome| outcome.manifest())
+  }
+
+  /// `Image.descriptor(for:)`. Rust has no overloading, so the suffix names
+  /// the argument label that tells it apart from [`Self::descriptor`].
+  pub fn descriptor_for(&self, for_platform: &Platform) -> Result<Descriptor, Error> {
+    platform::outcome(
+      self.handle.descriptor_for(for_platform.clone()),
+      format!("find the manifest of {} for {}", self.reference(), named(for_platform)),
+    )
+    .map(|outcome| outcome.descriptor())
+  }
+
+  /// `Image.config(for:)`.
+  pub fn config(&self, for_platform: &Platform) -> Result<containerization_oci::Image, Error> {
+    platform::outcome(
+      self.handle.config(for_platform.clone()),
+      format!("read the config of {} for {}", self.reference(), named(for_platform)),
+    )
+    .map(|outcome| outcome.oci_image())
   }
 
   /// `Image.referencedDigests()`.

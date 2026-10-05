@@ -5,6 +5,8 @@
 import Containerization
 import Foundation
 
+import struct ContainerizationOCI.Platform
+
 func openImageStore(path: RustStr) -> CzOutcome {
   let path = URL(filePath: path.toString())
 
@@ -145,6 +147,38 @@ final class CzImage: Sendable {
 
   func mediaType() -> String {
     image.mediaType
+  }
+
+  /// `descriptor`, which doesn't throw: Rust reads it without asking `error`.
+  func descriptor() -> CzOutcome {
+    CzOutcome.holding(image.descriptor)
+  }
+
+  func index() -> CzOutcome {
+    let image = image
+
+    return CzOutcome { try blocking { try await image.index() } }
+  }
+
+  func manifest(platform: RustPlatform) -> CzOutcome {
+    let platform = Platform(platform)
+    let image = image
+
+    return CzOutcome { try blocking { try await image.manifest(for: platform) } }
+  }
+
+  func descriptorFor(platform: RustPlatform) -> CzOutcome {
+    let platform = Platform(platform)
+    let image = image
+
+    return CzOutcome { try blocking { try await image.descriptor(for: platform) } }
+  }
+
+  func config(platform: RustPlatform) -> CzOutcome {
+    let platform = Platform(platform)
+    let image = image
+
+    return CzOutcome { try blocking { try await image.config(for: platform) } }
   }
 
   func referencedDigests() -> CzOutcome {
