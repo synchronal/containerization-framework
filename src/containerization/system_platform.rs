@@ -1,6 +1,11 @@
 //! `SystemPlatform`, and its nested `SystemPlatform.OS` and
 //! `SystemPlatform.Architecture`.
 
+use crate::containerization_oci;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
+
 /// `SystemPlatform.OS`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Os {
@@ -34,4 +39,13 @@ impl SystemPlatform {
     os: Os::Linux,
     architecture: Architecture::Amd64,
   };
+
+  /// `SystemPlatform.ociPlatform()`.
+  pub fn oci_platform(&self) -> Result<containerization_oci::Platform, Error> {
+    platform::outcome(
+      ffi::cz_system_platform_oci_platform(*self),
+      "convert a system platform to OCI's",
+    )
+    .map(|outcome| outcome.platform())
+  }
 }

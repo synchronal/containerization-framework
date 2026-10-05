@@ -67,7 +67,7 @@ private func configured(
   nonisolated(unsafe) let configuration = configuration
 
   return { config in
-    try fill(seed, from: config)
+    fill(seed, from: config)
     configuration.call(seed)
     config = try LinuxContainer.Configuration(seed)
   }

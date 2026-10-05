@@ -1,4 +1,8 @@
 use super::strings;
+use crate::containerization_oci;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
 
 /// `LinuxCapabilities`. Each set holds `CapabilityName`s by name, e.g.
 /// `CAP_CHOWN`.
@@ -38,5 +42,15 @@ impl LinuxCapabilities {
       permitted: defaults,
       ambient: Vec::new(),
     }
+  }
+
+  /// `LinuxCapabilities.toOCI()`, which leaves out empty sets. It fails on a
+  /// name Swift doesn't know.
+  pub fn to_oci(&self) -> Result<containerization_oci::LinuxCapabilities, Error> {
+    platform::outcome(
+      ffi::cz_linux_capabilities_to_oci(self.clone()),
+      "convert capabilities to OCI's",
+    )
+    .map(|outcome| outcome.oci_linux_capabilities())
   }
 }

@@ -705,11 +705,12 @@ impl linux_container::Configuration {
     self.boot_log = Some(containerization::BootLog::FileHandle(descriptor));
   }
 
-  pub(crate) fn set_seccomp_profile(&mut self, mode: ffi::SeccompMode, profile: Option<String>) {
+  /// `profile` holds the `LinuxSeccomp` of a `Profile`, or `Absent`.
+  pub(crate) fn set_seccomp_profile(&mut self, mode: ffi::SeccompMode, profile: ffi::CzOutcome) {
     self.seccomp_profile = match mode {
       ffi::SeccompMode::Unconfined => linux_container::SeccompProfile::Unconfined,
       ffi::SeccompMode::Default => linux_container::SeccompProfile::Default,
-      ffi::SeccompMode::Profile => linux_container::SeccompProfile::Profile(profile.unwrap_or_default()),
+      ffi::SeccompMode::Profile => linux_container::SeccompProfile::Profile(profile.seccomp()),
     };
   }
 
@@ -833,16 +834,31 @@ impl linux_container::Configuration {
     }
   }
 
-  /// The custom profile's JSON, when [`Self::seccomp_mode`] is `Profile`.
-  pub(crate) fn seccomp_profile(&self) -> Option<&str> {
+  /// The custom profile. Swift asks only when [`Self::seccomp_mode`] is
+  /// `Profile`.
+  pub(crate) fn seccomp_profile(&self) -> &containerization_oci::LinuxSeccomp {
     match &self.seccomp_profile {
-      linux_container::SeccompProfile::Profile(profile) => Some(profile),
-      _ => None,
+      linux_container::SeccompProfile::Profile(profile) => profile,
+      _ => panic!("Swift asks for the profile only when the mode is `Profile`"),
     }
   }
 
   pub(crate) fn use_init(&self) -> bool {
     self.use_init
+  }
+}
+
+impl containerization::LinuxRLimit {
+  pub(crate) fn kind(&self) -> ffi::RlimitKind {
+    rlimit_kind(self.kind)
+  }
+
+  pub(crate) fn hard(&self) -> u64 {
+    self.hard
+  }
+
+  pub(crate) fn soft(&self) -> u64 {
+    self.soft
   }
 }
 
@@ -894,6 +910,7 @@ mod tests {
   use crate::containerization;
   use crate::containerization::linux_container;
   use crate::containerization::mount;
+  use crate::containerization_oci;
 
   #[test]
   fn reads_an_absent_option_as_absent() {
@@ -903,7 +920,7 @@ mod tests {
     assert!(!configuration.has_hosts());
     assert!(!configuration.has_boot_log());
     assert_eq!(configuration.process().stdin(), None);
-    assert_eq!(configuration.seccomp_profile(), None);
+    assert!(matches!(configuration.seccomp_mode(), ffi::SeccompMode::Unconfined));
   }
 
   #[test]
@@ -944,13 +961,22 @@ mod tests {
 
   #[test]
   fn reads_an_enum_as_its_kind_and_what_it_carries() {
+    let profile = containerization_oci::LinuxSeccomp::new(
+      containerization_oci::LinuxSeccompAction::ActErrno,
+      None,
+      Vec::new(),
+      Vec::new(),
+      "",
+      "",
+      Vec::new(),
+    );
     let configuration = linux_container::Configuration {
-      seccomp_profile: linux_container::SeccompProfile::Profile("{}".into()),
+      seccomp_profile: linux_container::SeccompProfile::Profile(profile.clone()),
       ..Default::default()
     };
 
     assert!(matches!(configuration.seccomp_mode(), ffi::SeccompMode::Profile));
-    assert_eq!(configuration.seccomp_profile(), Some("{}"));
+    assert_eq!(configuration.seccomp_profile(), &profile);
 
     let mount = containerization::Mount::block("ext4", "/images/data.ext4", "/data", &[], &[]);
     assert!(matches!(mount.runtime_kind(), ffi::RuntimeKind::Virtioblk));
@@ -974,7 +1000,6 @@ mod tests {
     configuration.push_interface(0xc0a8_4002, 24, Some(0xc0a8_4001), Some(0x0242_ac11_0002), 1500);
     configuration.set_interface_ipv6_address(0xfd00_00cf_0000_0000, 2, Some("eth0".into()), 64);
     configuration.set_interface_ipv6_gateway(0xfd00_00cf_0000_0000, 1, None);
-    configuration.set_seccomp_profile(ffi::SeccompMode::Profile, Some("{}".into()));
     configuration
       .process_mut()
       .set_arguments(vec!["/bin/true".into()]);
@@ -995,7 +1020,6 @@ mod tests {
     assert_eq!(interface.ipv6_prefix(), 64);
     assert_eq!(interface.ipv6_gateway().value_low(), 1);
     assert_eq!(configuration.hosts().entries_len(), 1);
-    assert_eq!(configuration.seccomp_profile(), Some("{}"));
     assert_eq!(configuration.process().arguments_at(0), "/bin/true");
   }
 }

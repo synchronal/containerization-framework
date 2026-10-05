@@ -86,17 +86,17 @@ impl ffi::CzOutcome {
   }
 
   /// What an outcome holds, or `None` for `Absent`.
-  fn optional<T>(&self, read: impl FnOnce(&Self) -> T) -> Option<T> {
+  pub(super) fn optional<T>(&self, read: impl FnOnce(&Self) -> T) -> Option<T> {
     self.is_some().then(|| read(self))
   }
 
   /// Each element of a held list.
-  fn list<T>(&self, read: impl Fn(&Self) -> T) -> Vec<T> {
+  pub(super) fn list<T>(&self, read: impl Fn(&Self) -> T) -> Vec<T> {
     (0..self.len()).map(|index| read(&self.at(index))).collect()
   }
 
   /// A held `[String: String]`.
-  fn map(&self) -> BTreeMap<String, String> {
+  pub(super) fn map(&self) -> BTreeMap<String, String> {
     self.map_keys().into_iter().zip(self.map_values()).collect()
   }
 

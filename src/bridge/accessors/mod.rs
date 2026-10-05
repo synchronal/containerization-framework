@@ -15,6 +15,7 @@
 mod addresses;
 mod container;
 mod images;
+mod spec;
 
 use std::collections::BTreeMap;
 use std::path::Path;

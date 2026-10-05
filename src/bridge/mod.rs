@@ -25,6 +25,7 @@ use crate::containerization::Hosts as RustHosts;
 use crate::containerization::Kernel as RustKernel;
 use crate::containerization::LinuxCapabilities as RustLinuxCapabilities;
 use crate::containerization::LinuxProcessConfiguration as RustLinuxProcessConfiguration;
+use crate::containerization::LinuxRLimit as RustLinuxRLimit;
 use crate::containerization::Mount as RustMount;
 use crate::containerization::NatInterface as RustNatInterface;
 use crate::containerization::SystemPlatform as RustSystemPlatform;
@@ -37,7 +38,24 @@ use crate::containerization::linux_container::Configuration as RustLinuxContaine
 use crate::containerization_extras::IPv6Address as RustIPv6Address;
 use crate::containerization_extras::IpAddress as RustIpAddress;
 use crate::containerization_oci::Descriptor as RustDescriptor;
+use crate::containerization_oci::Hook as RustHook;
+use crate::containerization_oci::Hooks as RustHooks;
+use crate::containerization_oci::ImageConfig as RustImageConfig;
+use crate::containerization_oci::Linux as RustLinux;
+use crate::containerization_oci::LinuxBlockIO as RustLinuxBlockIO;
+use crate::containerization_oci::LinuxCPU as RustLinuxCPU;
+use crate::containerization_oci::LinuxCapabilities as RustOciLinuxCapabilities;
+use crate::containerization_oci::LinuxDevice as RustLinuxDevice;
+use crate::containerization_oci::LinuxDeviceCgroup as RustLinuxDeviceCgroup;
+use crate::containerization_oci::LinuxIDMapping as RustLinuxIDMapping;
+use crate::containerization_oci::LinuxMemory as RustLinuxMemory;
+use crate::containerization_oci::LinuxResources as RustLinuxResources;
+use crate::containerization_oci::LinuxSeccomp as RustLinuxSeccomp;
+use crate::containerization_oci::LinuxSyscall as RustLinuxSyscall;
+use crate::containerization_oci::Mount as RustOciMount;
 use crate::containerization_oci::Platform as RustPlatform;
+use crate::containerization_oci::Process as RustProcess;
+use crate::containerization_oci::Spec as RustSpec;
 use crate::containerization_oci::User as RustUser;
 use crate::platform::Configure as RustConfigure;
 use crate::platform::Progress as RustProgressHandler;
@@ -58,7 +76,7 @@ pub(crate) mod ffi {
     OutOf,
   }
 
-  // `SeccompProfile`, less a custom profile's JSON.
+  // `SeccompProfile`, less a custom profile.
   enum SeccompMode {
     Unconfined,
     Default,
@@ -125,6 +143,24 @@ pub(crate) mod ffi {
     Writeback,
     Ordered,
     Journal,
+  }
+
+  // The lists of `Hooks`.
+  enum HookKind {
+    Prestart,
+    CreateRuntime,
+    CreateContainer,
+    StartContainer,
+    Poststart,
+    Poststop,
+  }
+
+  // The throttle lists of `LinuxBlockIO`.
+  enum ThrottleKind {
+    ReadBps,
+    WriteBps,
+    ReadIops,
+    WriteIops,
   }
 
   extern "Rust" {
@@ -475,7 +511,7 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "setBootLogFileHandle")]
     fn set_boot_log_file_handle(self: &mut RustLinuxContainerConfiguration, descriptor: i32);
     #[swift_bridge(swift_name = "setSeccompProfile")]
-    fn set_seccomp_profile(self: &mut RustLinuxContainerConfiguration, mode: SeccompMode, profile: Option<String>);
+    fn set_seccomp_profile(self: &mut RustLinuxContainerConfiguration, mode: SeccompMode, profile: CzOutcome);
     fn process(self: &RustLinuxContainerConfiguration) -> &RustLinuxProcessConfiguration;
     fn cpus(self: &RustLinuxContainerConfiguration) -> u32;
     #[swift_bridge(swift_name = "memoryInBytes")]
@@ -523,7 +559,7 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "seccompMode")]
     fn seccomp_mode(self: &RustLinuxContainerConfiguration) -> SeccompMode;
     #[swift_bridge(swift_name = "seccompProfile")]
-    fn seccomp_profile(self: &RustLinuxContainerConfiguration) -> Option<&str>;
+    fn seccomp_profile(self: &RustLinuxContainerConfiguration) -> &RustLinuxSeccomp;
     #[swift_bridge(swift_name = "useInit")]
     fn use_init(self: &RustLinuxContainerConfiguration) -> bool;
 
@@ -555,6 +591,391 @@ pub(crate) mod ffi {
     fn init_args_len(self: &RustKernel) -> usize;
     #[swift_bridge(swift_name = "initArgsAt")]
     fn init_args_at(self: &RustKernel, index: usize) -> &str;
+
+    type RustLinuxRLimit;
+    fn kind(self: &RustLinuxRLimit) -> RlimitKind;
+    fn hard(self: &RustLinuxRLimit) -> u64;
+    fn soft(self: &RustLinuxRLimit) -> u64;
+
+    type RustImageConfig;
+    fn user(self: &RustImageConfig) -> Option<&str>;
+    #[swift_bridge(swift_name = "hasEnv")]
+    fn has_env(self: &RustImageConfig) -> bool;
+    #[swift_bridge(swift_name = "envLen")]
+    fn env_len(self: &RustImageConfig) -> usize;
+    #[swift_bridge(swift_name = "envAt")]
+    fn env_at(self: &RustImageConfig, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasEntrypoint")]
+    fn has_entrypoint(self: &RustImageConfig) -> bool;
+    #[swift_bridge(swift_name = "entrypointLen")]
+    fn entrypoint_len(self: &RustImageConfig) -> usize;
+    #[swift_bridge(swift_name = "entrypointAt")]
+    fn entrypoint_at(self: &RustImageConfig, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasCmd")]
+    fn has_cmd(self: &RustImageConfig) -> bool;
+    #[swift_bridge(swift_name = "cmdLen")]
+    fn cmd_len(self: &RustImageConfig) -> usize;
+    #[swift_bridge(swift_name = "cmdAt")]
+    fn cmd_at(self: &RustImageConfig, index: usize) -> &str;
+    #[swift_bridge(swift_name = "workingDir")]
+    fn working_dir(self: &RustImageConfig) -> Option<&str>;
+    #[swift_bridge(swift_name = "hasLabels")]
+    fn has_labels(self: &RustImageConfig) -> bool;
+    #[swift_bridge(swift_name = "labelsLen")]
+    fn labels_len(self: &RustImageConfig) -> usize;
+    #[swift_bridge(swift_name = "labelKeyAt")]
+    fn label_key_at(self: &RustImageConfig, index: usize) -> &str;
+    #[swift_bridge(swift_name = "labelValueAt")]
+    fn label_value_at(self: &RustImageConfig, index: usize) -> &str;
+    #[swift_bridge(swift_name = "stopSignal")]
+    fn stop_signal(self: &RustImageConfig) -> Option<&str>;
+
+    // The OCI runtime spec. An enum is its `rawValue`.
+    type RustSpec;
+    fn version(self: &RustSpec) -> &str;
+    #[swift_bridge(swift_name = "hasHooks")]
+    fn has_hooks(self: &RustSpec) -> bool;
+    fn hooks(self: &RustSpec) -> &RustHooks;
+    #[swift_bridge(swift_name = "hasProcess")]
+    fn has_process(self: &RustSpec) -> bool;
+    fn process(self: &RustSpec) -> &RustProcess;
+    fn hostname(self: &RustSpec) -> &str;
+    fn domainname(self: &RustSpec) -> &str;
+    #[swift_bridge(swift_name = "mountsLen")]
+    fn mounts_len(self: &RustSpec) -> usize;
+    #[swift_bridge(swift_name = "mountsAt")]
+    fn mounts_at(self: &RustSpec, index: usize) -> &RustOciMount;
+    #[swift_bridge(swift_name = "hasAnnotations")]
+    fn has_annotations(self: &RustSpec) -> bool;
+    #[swift_bridge(swift_name = "annotationsLen")]
+    fn annotations_len(self: &RustSpec) -> usize;
+    #[swift_bridge(swift_name = "annotationKeyAt")]
+    fn annotation_key_at(self: &RustSpec, index: usize) -> &str;
+    #[swift_bridge(swift_name = "annotationValueAt")]
+    fn annotation_value_at(self: &RustSpec, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasRoot")]
+    fn has_root(self: &RustSpec) -> bool;
+    #[swift_bridge(swift_name = "rootPath")]
+    fn root_path(self: &RustSpec) -> &str;
+    #[swift_bridge(swift_name = "rootReadonly")]
+    fn root_readonly(self: &RustSpec) -> bool;
+    #[swift_bridge(swift_name = "hasLinux")]
+    fn has_linux(self: &RustSpec) -> bool;
+    fn linux(self: &RustSpec) -> &RustLinux;
+
+    type RustProcess;
+    fn cwd(self: &RustProcess) -> &str;
+    #[swift_bridge(swift_name = "envLen")]
+    fn env_len(self: &RustProcess) -> usize;
+    #[swift_bridge(swift_name = "envAt")]
+    fn env_at(self: &RustProcess, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasConsoleSize")]
+    fn has_console_size(self: &RustProcess) -> bool;
+    #[swift_bridge(swift_name = "consoleHeight")]
+    fn console_height(self: &RustProcess) -> usize;
+    #[swift_bridge(swift_name = "consoleWidth")]
+    fn console_width(self: &RustProcess) -> usize;
+    #[swift_bridge(swift_name = "selinuxLabel")]
+    fn selinux_label(self: &RustProcess) -> &str;
+    #[swift_bridge(swift_name = "noNewPrivileges")]
+    fn no_new_privileges(self: &RustProcess) -> bool;
+    #[swift_bridge(swift_name = "commandLine")]
+    fn command_line(self: &RustProcess) -> &str;
+    #[swift_bridge(swift_name = "oomScoreAdj")]
+    fn oom_score_adj(self: &RustProcess) -> Option<isize>;
+    #[swift_bridge(swift_name = "hasCapabilities")]
+    fn has_capabilities(self: &RustProcess) -> bool;
+    fn capabilities(self: &RustProcess) -> &RustOciLinuxCapabilities;
+    #[swift_bridge(swift_name = "apparmorProfile")]
+    fn apparmor_profile(self: &RustProcess) -> &str;
+    fn user(self: &RustProcess) -> &RustUser;
+    #[swift_bridge(swift_name = "rlimitsLen")]
+    fn rlimits_len(self: &RustProcess) -> usize;
+    #[swift_bridge(swift_name = "rlimitTypeAt")]
+    fn rlimit_type_at(self: &RustProcess, index: usize) -> &str;
+    #[swift_bridge(swift_name = "rlimitHardAt")]
+    fn rlimit_hard_at(self: &RustProcess, index: usize) -> u64;
+    #[swift_bridge(swift_name = "rlimitSoftAt")]
+    fn rlimit_soft_at(self: &RustProcess, index: usize) -> u64;
+    #[swift_bridge(swift_name = "argsLen")]
+    fn args_len(self: &RustProcess) -> usize;
+    #[swift_bridge(swift_name = "argsAt")]
+    fn args_at(self: &RustProcess, index: usize) -> &str;
+    fn terminal(self: &RustProcess) -> bool;
+
+    type RustOciLinuxCapabilities;
+    #[swift_bridge(swift_name = "hasSet")]
+    fn has_set(self: &RustOciLinuxCapabilities, set: CapabilitySet) -> bool;
+    #[swift_bridge(swift_name = "setLen")]
+    fn set_len(self: &RustOciLinuxCapabilities, set: CapabilitySet) -> usize;
+    #[swift_bridge(swift_name = "setAt")]
+    fn set_at(self: &RustOciLinuxCapabilities, set: CapabilitySet, index: usize) -> &str;
+
+    type RustOciMount;
+    #[swift_bridge(swift_name = "mountType")]
+    fn mount_type(self: &RustOciMount) -> &str;
+    fn source(self: &RustOciMount) -> &str;
+    fn destination(self: &RustOciMount) -> &str;
+    #[swift_bridge(swift_name = "optionsLen")]
+    fn options_len(self: &RustOciMount) -> usize;
+    #[swift_bridge(swift_name = "optionsAt")]
+    fn options_at(self: &RustOciMount, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasUidMappings")]
+    fn has_uid_mappings(self: &RustOciMount) -> bool;
+    #[swift_bridge(swift_name = "uidMappingsLen")]
+    fn uid_mappings_len(self: &RustOciMount) -> usize;
+    #[swift_bridge(swift_name = "uidMappingsAt")]
+    fn uid_mappings_at(self: &RustOciMount, index: usize) -> &RustLinuxIDMapping;
+    #[swift_bridge(swift_name = "hasGidMappings")]
+    fn has_gid_mappings(self: &RustOciMount) -> bool;
+    #[swift_bridge(swift_name = "gidMappingsLen")]
+    fn gid_mappings_len(self: &RustOciMount) -> usize;
+    #[swift_bridge(swift_name = "gidMappingsAt")]
+    fn gid_mappings_at(self: &RustOciMount, index: usize) -> &RustLinuxIDMapping;
+
+    type RustLinuxIDMapping;
+    #[swift_bridge(swift_name = "containerID")]
+    fn container_id(self: &RustLinuxIDMapping) -> u32;
+    #[swift_bridge(swift_name = "hostID")]
+    fn host_id(self: &RustLinuxIDMapping) -> u32;
+    fn size(self: &RustLinuxIDMapping) -> u32;
+
+    type RustHook;
+    fn path(self: &RustHook) -> &str;
+    #[swift_bridge(swift_name = "argsLen")]
+    fn args_len(self: &RustHook) -> usize;
+    #[swift_bridge(swift_name = "argsAt")]
+    fn args_at(self: &RustHook, index: usize) -> &str;
+    #[swift_bridge(swift_name = "envLen")]
+    fn env_len(self: &RustHook) -> usize;
+    #[swift_bridge(swift_name = "envAt")]
+    fn env_at(self: &RustHook, index: usize) -> &str;
+    fn timeout(self: &RustHook) -> Option<isize>;
+
+    type RustHooks;
+    #[swift_bridge(swift_name = "hooksLen")]
+    fn hooks_len(self: &RustHooks, kind: HookKind) -> usize;
+    #[swift_bridge(swift_name = "hooksAt")]
+    fn hooks_at(self: &RustHooks, kind: HookKind, index: usize) -> &RustHook;
+
+    type RustLinux;
+    #[swift_bridge(swift_name = "uidMappingsLen")]
+    fn uid_mappings_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "uidMappingsAt")]
+    fn uid_mappings_at(self: &RustLinux, index: usize) -> &RustLinuxIDMapping;
+    #[swift_bridge(swift_name = "gidMappingsLen")]
+    fn gid_mappings_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "gidMappingsAt")]
+    fn gid_mappings_at(self: &RustLinux, index: usize) -> &RustLinuxIDMapping;
+    #[swift_bridge(swift_name = "hasSysctl")]
+    fn has_sysctl(self: &RustLinux) -> bool;
+    #[swift_bridge(swift_name = "sysctlLen")]
+    fn sysctl_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "sysctlKeyAt")]
+    fn sysctl_key_at(self: &RustLinux, index: usize) -> &str;
+    #[swift_bridge(swift_name = "sysctlValueAt")]
+    fn sysctl_value_at(self: &RustLinux, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hasResources")]
+    fn has_resources(self: &RustLinux) -> bool;
+    fn resources(self: &RustLinux) -> &RustLinuxResources;
+    #[swift_bridge(swift_name = "cgroupsPath")]
+    fn cgroups_path(self: &RustLinux) -> &str;
+    #[swift_bridge(swift_name = "namespacesLen")]
+    fn namespaces_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "namespaceTypeAt")]
+    fn namespace_type_at(self: &RustLinux, index: usize) -> &str;
+    #[swift_bridge(swift_name = "namespacePathAt")]
+    fn namespace_path_at(self: &RustLinux, index: usize) -> &str;
+    #[swift_bridge(swift_name = "devicesLen")]
+    fn devices_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "devicesAt")]
+    fn devices_at(self: &RustLinux, index: usize) -> &RustLinuxDevice;
+    #[swift_bridge(swift_name = "hasSeccomp")]
+    fn has_seccomp(self: &RustLinux) -> bool;
+    fn seccomp(self: &RustLinux) -> &RustLinuxSeccomp;
+    #[swift_bridge(swift_name = "rootfsPropagation")]
+    fn rootfs_propagation(self: &RustLinux) -> &str;
+    #[swift_bridge(swift_name = "maskedPathsLen")]
+    fn masked_paths_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "maskedPathsAt")]
+    fn masked_paths_at(self: &RustLinux, index: usize) -> &str;
+    #[swift_bridge(swift_name = "readonlyPathsLen")]
+    fn readonly_paths_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "readonlyPathsAt")]
+    fn readonly_paths_at(self: &RustLinux, index: usize) -> &str;
+    #[swift_bridge(swift_name = "mountLabel")]
+    fn mount_label(self: &RustLinux) -> &str;
+    #[swift_bridge(swift_name = "hasPersonality")]
+    fn has_personality(self: &RustLinux) -> bool;
+    #[swift_bridge(swift_name = "personalityDomain")]
+    fn personality_domain(self: &RustLinux) -> &str;
+    #[swift_bridge(swift_name = "personalityFlagsLen")]
+    fn personality_flags_len(self: &RustLinux) -> usize;
+    #[swift_bridge(swift_name = "personalityFlagsAt")]
+    fn personality_flags_at(self: &RustLinux, index: usize) -> &str;
+
+    type RustLinuxResources;
+    #[swift_bridge(swift_name = "devicesLen")]
+    fn devices_len(self: &RustLinuxResources) -> usize;
+    #[swift_bridge(swift_name = "devicesAt")]
+    fn devices_at(self: &RustLinuxResources, index: usize) -> &RustLinuxDeviceCgroup;
+    #[swift_bridge(swift_name = "hasMemory")]
+    fn has_memory(self: &RustLinuxResources) -> bool;
+    fn memory(self: &RustLinuxResources) -> &RustLinuxMemory;
+    #[swift_bridge(swift_name = "hasCpu")]
+    fn has_cpu(self: &RustLinuxResources) -> bool;
+    fn cpu(self: &RustLinuxResources) -> &RustLinuxCPU;
+    #[swift_bridge(swift_name = "pidsLimit")]
+    fn pids_limit(self: &RustLinuxResources) -> Option<i64>;
+    #[swift_bridge(swift_name = "hasBlockIO")]
+    fn has_block_io(self: &RustLinuxResources) -> bool;
+    #[swift_bridge(swift_name = "blockIO")]
+    fn block_io(self: &RustLinuxResources) -> &RustLinuxBlockIO;
+    #[swift_bridge(swift_name = "hugepageLimitsLen")]
+    fn hugepage_limits_len(self: &RustLinuxResources) -> usize;
+    #[swift_bridge(swift_name = "hugepageLimitPagesizeAt")]
+    fn hugepage_limit_pagesize_at(self: &RustLinuxResources, index: usize) -> &str;
+    #[swift_bridge(swift_name = "hugepageLimitLimitAt")]
+    fn hugepage_limit_limit_at(self: &RustLinuxResources, index: usize) -> u64;
+    #[swift_bridge(swift_name = "hasNetwork")]
+    fn has_network(self: &RustLinuxResources) -> bool;
+    #[swift_bridge(swift_name = "networkClassID")]
+    fn network_class_id(self: &RustLinuxResources) -> Option<u32>;
+    #[swift_bridge(swift_name = "networkPrioritiesLen")]
+    fn network_priorities_len(self: &RustLinuxResources) -> usize;
+    #[swift_bridge(swift_name = "networkPriorityNameAt")]
+    fn network_priority_name_at(self: &RustLinuxResources, index: usize) -> &str;
+    #[swift_bridge(swift_name = "networkPriorityAt")]
+    fn network_priority_at(self: &RustLinuxResources, index: usize) -> u32;
+    #[swift_bridge(swift_name = "hasRdma")]
+    fn has_rdma(self: &RustLinuxResources) -> bool;
+    #[swift_bridge(swift_name = "rdmaLen")]
+    fn rdma_len(self: &RustLinuxResources) -> usize;
+    #[swift_bridge(swift_name = "rdmaKeyAt")]
+    fn rdma_key_at(self: &RustLinuxResources, index: usize) -> &str;
+    #[swift_bridge(swift_name = "rdmaHcsHandlesAt")]
+    fn rdma_hcs_handles_at(self: &RustLinuxResources, index: usize) -> Option<u32>;
+    #[swift_bridge(swift_name = "rdmaHcaObjectsAt")]
+    fn rdma_hca_objects_at(self: &RustLinuxResources, index: usize) -> Option<u32>;
+    #[swift_bridge(swift_name = "hasUnified")]
+    fn has_unified(self: &RustLinuxResources) -> bool;
+    #[swift_bridge(swift_name = "unifiedLen")]
+    fn unified_len(self: &RustLinuxResources) -> usize;
+    #[swift_bridge(swift_name = "unifiedKeyAt")]
+    fn unified_key_at(self: &RustLinuxResources, index: usize) -> &str;
+    #[swift_bridge(swift_name = "unifiedValueAt")]
+    fn unified_value_at(self: &RustLinuxResources, index: usize) -> &str;
+
+    type RustLinuxMemory;
+    fn limit(self: &RustLinuxMemory) -> Option<i64>;
+    fn reservation(self: &RustLinuxMemory) -> Option<i64>;
+    fn swap(self: &RustLinuxMemory) -> Option<i64>;
+    fn kernel(self: &RustLinuxMemory) -> Option<i64>;
+    #[swift_bridge(swift_name = "kernelTCP")]
+    fn kernel_tcp(self: &RustLinuxMemory) -> Option<i64>;
+    fn swappiness(self: &RustLinuxMemory) -> Option<u64>;
+    #[swift_bridge(swift_name = "disableOOMKiller")]
+    fn disable_oom_killer(self: &RustLinuxMemory) -> Option<bool>;
+    #[swift_bridge(swift_name = "useHierarchy")]
+    fn use_hierarchy(self: &RustLinuxMemory) -> Option<bool>;
+    #[swift_bridge(swift_name = "checkBeforeUpdate")]
+    fn check_before_update(self: &RustLinuxMemory) -> Option<bool>;
+
+    type RustLinuxCPU;
+    fn shares(self: &RustLinuxCPU) -> Option<u64>;
+    fn quota(self: &RustLinuxCPU) -> Option<i64>;
+    fn burst(self: &RustLinuxCPU) -> Option<u64>;
+    fn period(self: &RustLinuxCPU) -> Option<u64>;
+    #[swift_bridge(swift_name = "realtimeRuntime")]
+    fn realtime_runtime(self: &RustLinuxCPU) -> Option<i64>;
+    #[swift_bridge(swift_name = "realtimePeriod")]
+    fn realtime_period(self: &RustLinuxCPU) -> Option<i64>;
+    fn cpus(self: &RustLinuxCPU) -> &str;
+    fn mems(self: &RustLinuxCPU) -> &str;
+    fn idle(self: &RustLinuxCPU) -> Option<i64>;
+
+    type RustLinuxBlockIO;
+    fn weight(self: &RustLinuxBlockIO) -> Option<u16>;
+    #[swift_bridge(swift_name = "leafWeight")]
+    fn leaf_weight(self: &RustLinuxBlockIO) -> Option<u16>;
+    #[swift_bridge(swift_name = "weightDeviceLen")]
+    fn weight_device_len(self: &RustLinuxBlockIO) -> usize;
+    #[swift_bridge(swift_name = "weightDeviceMajorAt")]
+    fn weight_device_major_at(self: &RustLinuxBlockIO, index: usize) -> i64;
+    #[swift_bridge(swift_name = "weightDeviceMinorAt")]
+    fn weight_device_minor_at(self: &RustLinuxBlockIO, index: usize) -> i64;
+    #[swift_bridge(swift_name = "weightDeviceWeightAt")]
+    fn weight_device_weight_at(self: &RustLinuxBlockIO, index: usize) -> Option<u16>;
+    #[swift_bridge(swift_name = "weightDeviceLeafWeightAt")]
+    fn weight_device_leaf_weight_at(self: &RustLinuxBlockIO, index: usize) -> Option<u16>;
+    #[swift_bridge(swift_name = "throttleLen")]
+    fn throttle_len(self: &RustLinuxBlockIO, kind: ThrottleKind) -> usize;
+    #[swift_bridge(swift_name = "throttleMajorAt")]
+    fn throttle_major_at(self: &RustLinuxBlockIO, kind: ThrottleKind, index: usize) -> i64;
+    #[swift_bridge(swift_name = "throttleMinorAt")]
+    fn throttle_minor_at(self: &RustLinuxBlockIO, kind: ThrottleKind, index: usize) -> i64;
+    #[swift_bridge(swift_name = "throttleRateAt")]
+    fn throttle_rate_at(self: &RustLinuxBlockIO, kind: ThrottleKind, index: usize) -> u64;
+
+    type RustLinuxDevice;
+    fn path(self: &RustLinuxDevice) -> &str;
+    #[swift_bridge(swift_name = "deviceType")]
+    fn device_type(self: &RustLinuxDevice) -> &str;
+    fn major(self: &RustLinuxDevice) -> i64;
+    fn minor(self: &RustLinuxDevice) -> i64;
+    #[swift_bridge(swift_name = "fileMode")]
+    fn file_mode(self: &RustLinuxDevice) -> Option<u32>;
+    fn uid(self: &RustLinuxDevice) -> Option<u32>;
+    fn gid(self: &RustLinuxDevice) -> Option<u32>;
+
+    type RustLinuxDeviceCgroup;
+    fn allow(self: &RustLinuxDeviceCgroup) -> bool;
+    #[swift_bridge(swift_name = "deviceType")]
+    fn device_type(self: &RustLinuxDeviceCgroup) -> &str;
+    fn major(self: &RustLinuxDeviceCgroup) -> Option<i64>;
+    fn minor(self: &RustLinuxDeviceCgroup) -> Option<i64>;
+    fn access(self: &RustLinuxDeviceCgroup) -> Option<&str>;
+
+    type RustLinuxSeccomp;
+    #[swift_bridge(swift_name = "defaultAction")]
+    fn default_action(self: &RustLinuxSeccomp) -> &str;
+    #[swift_bridge(swift_name = "defaultErrnoRet")]
+    fn default_errno_ret(self: &RustLinuxSeccomp) -> Option<usize>;
+    #[swift_bridge(swift_name = "architecturesLen")]
+    fn architectures_len(self: &RustLinuxSeccomp) -> usize;
+    #[swift_bridge(swift_name = "architecturesAt")]
+    fn architectures_at(self: &RustLinuxSeccomp, index: usize) -> &str;
+    #[swift_bridge(swift_name = "flagsLen")]
+    fn flags_len(self: &RustLinuxSeccomp) -> usize;
+    #[swift_bridge(swift_name = "flagsAt")]
+    fn flags_at(self: &RustLinuxSeccomp, index: usize) -> &str;
+    #[swift_bridge(swift_name = "listenerPath")]
+    fn listener_path(self: &RustLinuxSeccomp) -> &str;
+    #[swift_bridge(swift_name = "listenerMetadata")]
+    fn listener_metadata(self: &RustLinuxSeccomp) -> &str;
+    #[swift_bridge(swift_name = "syscallsLen")]
+    fn syscalls_len(self: &RustLinuxSeccomp) -> usize;
+    #[swift_bridge(swift_name = "syscallsAt")]
+    fn syscalls_at(self: &RustLinuxSeccomp, index: usize) -> &RustLinuxSyscall;
+
+    type RustLinuxSyscall;
+    #[swift_bridge(swift_name = "namesLen")]
+    fn names_len(self: &RustLinuxSyscall) -> usize;
+    #[swift_bridge(swift_name = "namesAt")]
+    fn names_at(self: &RustLinuxSyscall, index: usize) -> &str;
+    fn action(self: &RustLinuxSyscall) -> &str;
+    #[swift_bridge(swift_name = "errnoRet")]
+    fn errno_ret(self: &RustLinuxSyscall) -> Option<usize>;
+    #[swift_bridge(swift_name = "argsLen")]
+    fn args_len(self: &RustLinuxSyscall) -> usize;
+    #[swift_bridge(swift_name = "argIndexAt")]
+    fn arg_index_at(self: &RustLinuxSyscall, index: usize) -> usize;
+    #[swift_bridge(swift_name = "argValueAt")]
+    fn arg_value_at(self: &RustLinuxSyscall, index: usize) -> u64;
+    #[swift_bridge(swift_name = "argValueTwoAt")]
+    fn arg_value_two_at(self: &RustLinuxSyscall, index: usize) -> u64;
+    #[swift_bridge(swift_name = "argOpAt")]
+    fn arg_op_at(self: &RustLinuxSyscall, index: usize) -> &str;
   }
 
   extern "Swift" {
@@ -706,6 +1127,384 @@ pub(crate) mod ffi {
     fn oci_image_rootfs(self: &CzOutcome) -> CzOutcome;
     #[swift_bridge(swift_name = "ociImageHistory")]
     fn oci_image_history(self: &CzOutcome) -> CzOutcome;
+
+    // A held `[String: T]`'s keys, sorted, and an outcome holding its values
+    // in the same order.
+    #[swift_bridge(swift_name = "entryKeys")]
+    fn entry_keys(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "entryValues")]
+    fn entry_values(self: &CzOutcome) -> CzOutcome;
+
+    // The OCI runtime spec, field by field. An enum is its `rawValue`.
+    #[swift_bridge(swift_name = "specVersion")]
+    fn spec_version(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "specHooks")]
+    fn spec_hooks(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "specProcess")]
+    fn spec_process(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "specHostname")]
+    fn spec_hostname(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "specDomainname")]
+    fn spec_domainname(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "specMounts")]
+    fn spec_mounts(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "specAnnotations")]
+    fn spec_annotations(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "specRoot")]
+    fn spec_root(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "specLinux")]
+    fn spec_linux(self: &CzOutcome) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "processCwd")]
+    fn process_cwd(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "processEnv")]
+    fn process_env(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "processConsoleSize")]
+    fn process_console_size(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "processSelinuxLabel")]
+    fn process_selinux_label(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "processNoNewPrivileges")]
+    fn process_no_new_privileges(self: &CzOutcome) -> bool;
+    #[swift_bridge(swift_name = "processCommandLine")]
+    fn process_command_line(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "processOomScoreAdj")]
+    fn process_oom_score_adj(self: &CzOutcome) -> Option<isize>;
+    #[swift_bridge(swift_name = "processCapabilities")]
+    fn process_capabilities(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "processApparmorProfile")]
+    fn process_apparmor_profile(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "processUser")]
+    fn process_user(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "processRlimits")]
+    fn process_rlimits(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "processArgs")]
+    fn process_args(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "processTerminal")]
+    fn process_terminal(self: &CzOutcome) -> bool;
+
+    // `Box`'s fields are internal, so Swift reads them by reflection.
+    #[swift_bridge(swift_name = "boxHeight")]
+    fn box_height(self: &CzOutcome) -> usize;
+    #[swift_bridge(swift_name = "boxWidth")]
+    fn box_width(self: &CzOutcome) -> usize;
+
+    #[swift_bridge(swift_name = "userUid")]
+    fn user_uid(self: &CzOutcome) -> u32;
+    #[swift_bridge(swift_name = "userGid")]
+    fn user_gid(self: &CzOutcome) -> u32;
+    #[swift_bridge(swift_name = "userUmask")]
+    fn user_umask(self: &CzOutcome) -> Option<u32>;
+    #[swift_bridge(swift_name = "userAdditionalGids")]
+    fn user_additional_gids(self: &CzOutcome) -> Vec<u32>;
+    #[swift_bridge(swift_name = "userUsername")]
+    fn user_username(self: &CzOutcome) -> String;
+
+    #[swift_bridge(swift_name = "capabilitiesSet")]
+    fn capabilities_set(self: &CzOutcome, set: CapabilitySet) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "rootPath")]
+    fn root_path(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "rootReadonly")]
+    fn root_readonly(self: &CzOutcome) -> bool;
+
+    #[swift_bridge(swift_name = "ociMountType")]
+    fn oci_mount_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ociMountSource")]
+    fn oci_mount_source(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ociMountDestination")]
+    fn oci_mount_destination(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "ociMountOptions")]
+    fn oci_mount_options(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "ociMountUidMappings")]
+    fn oci_mount_uid_mappings(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "ociMountGidMappings")]
+    fn oci_mount_gid_mappings(self: &CzOutcome) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "hookPath")]
+    fn hook_path(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "hookArgs")]
+    fn hook_args(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "hookEnv")]
+    fn hook_env(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "hookTimeout")]
+    fn hook_timeout(self: &CzOutcome) -> Option<isize>;
+    #[swift_bridge(swift_name = "hooksOf")]
+    fn hooks_of(self: &CzOutcome, kind: HookKind) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "linuxUidMappings")]
+    fn linux_uid_mappings(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxGidMappings")]
+    fn linux_gid_mappings(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxSysctl")]
+    fn linux_sysctl(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxResources")]
+    fn linux_resources(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxCgroupsPath")]
+    fn linux_cgroups_path(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "linuxNamespaces")]
+    fn linux_namespaces(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxDevices")]
+    fn linux_devices(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxSeccomp")]
+    fn linux_seccomp(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxRootfsPropagation")]
+    fn linux_rootfs_propagation(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "linuxMaskedPaths")]
+    fn linux_masked_paths(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "linuxReadonlyPaths")]
+    fn linux_readonly_paths(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "linuxMountLabel")]
+    fn linux_mount_label(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "linuxPersonality")]
+    fn linux_personality(self: &CzOutcome) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "namespaceType")]
+    fn namespace_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "namespacePath")]
+    fn namespace_path(self: &CzOutcome) -> String;
+
+    #[swift_bridge(swift_name = "idMappingContainerID")]
+    fn id_mapping_container_id(self: &CzOutcome) -> u32;
+    #[swift_bridge(swift_name = "idMappingHostID")]
+    fn id_mapping_host_id(self: &CzOutcome) -> u32;
+    #[swift_bridge(swift_name = "idMappingSize")]
+    fn id_mapping_size(self: &CzOutcome) -> u32;
+
+    #[swift_bridge(swift_name = "rlimitType")]
+    fn rlimit_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "rlimitHard")]
+    fn rlimit_hard(self: &CzOutcome) -> u64;
+    #[swift_bridge(swift_name = "rlimitSoft")]
+    fn rlimit_soft(self: &CzOutcome) -> u64;
+
+    #[swift_bridge(swift_name = "resourcesDevices")]
+    fn resources_devices(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesMemory")]
+    fn resources_memory(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesCpu")]
+    fn resources_cpu(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesPids")]
+    fn resources_pids(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesBlockIO")]
+    fn resources_block_io(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesHugepageLimits")]
+    fn resources_hugepage_limits(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesNetwork")]
+    fn resources_network(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesRdma")]
+    fn resources_rdma(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "resourcesUnified")]
+    fn resources_unified(self: &CzOutcome) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "memoryLimit")]
+    fn memory_limit(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "memoryReservation")]
+    fn memory_reservation(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "memorySwap")]
+    fn memory_swap(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "memoryKernel")]
+    fn memory_kernel(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "memoryKernelTCP")]
+    fn memory_kernel_tcp(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "memorySwappiness")]
+    fn memory_swappiness(self: &CzOutcome) -> Option<u64>;
+    #[swift_bridge(swift_name = "memoryDisableOOMKiller")]
+    fn memory_disable_oom_killer(self: &CzOutcome) -> Option<bool>;
+    #[swift_bridge(swift_name = "memoryUseHierarchy")]
+    fn memory_use_hierarchy(self: &CzOutcome) -> Option<bool>;
+    #[swift_bridge(swift_name = "memoryCheckBeforeUpdate")]
+    fn memory_check_before_update(self: &CzOutcome) -> Option<bool>;
+
+    #[swift_bridge(swift_name = "cpuShares")]
+    fn cpu_shares(self: &CzOutcome) -> Option<u64>;
+    #[swift_bridge(swift_name = "cpuQuota")]
+    fn cpu_quota(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "cpuBurst")]
+    fn cpu_burst(self: &CzOutcome) -> Option<u64>;
+    #[swift_bridge(swift_name = "cpuPeriod")]
+    fn cpu_period(self: &CzOutcome) -> Option<u64>;
+    #[swift_bridge(swift_name = "cpuRealtimeRuntime")]
+    fn cpu_realtime_runtime(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "cpuRealtimePeriod")]
+    fn cpu_realtime_period(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "cpuCpus")]
+    fn cpu_cpus(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "cpuMems")]
+    fn cpu_mems(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "cpuIdle")]
+    fn cpu_idle(self: &CzOutcome) -> Option<i64>;
+
+    #[swift_bridge(swift_name = "pidsLimit")]
+    fn pids_limit(self: &CzOutcome) -> i64;
+
+    #[swift_bridge(swift_name = "blockIOWeight")]
+    fn block_io_weight(self: &CzOutcome) -> Option<u16>;
+    #[swift_bridge(swift_name = "blockIOLeafWeight")]
+    fn block_io_leaf_weight(self: &CzOutcome) -> Option<u16>;
+    #[swift_bridge(swift_name = "blockIOWeightDevice")]
+    fn block_io_weight_device(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "blockIOThrottle")]
+    fn block_io_throttle(self: &CzOutcome, kind: ThrottleKind) -> CzOutcome;
+    #[swift_bridge(swift_name = "weightDeviceMajor")]
+    fn weight_device_major(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "weightDeviceMinor")]
+    fn weight_device_minor(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "weightDeviceWeight")]
+    fn weight_device_weight(self: &CzOutcome) -> Option<u16>;
+    #[swift_bridge(swift_name = "weightDeviceLeafWeight")]
+    fn weight_device_leaf_weight(self: &CzOutcome) -> Option<u16>;
+    #[swift_bridge(swift_name = "throttleDeviceMajor")]
+    fn throttle_device_major(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "throttleDeviceMinor")]
+    fn throttle_device_minor(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "throttleDeviceRate")]
+    fn throttle_device_rate(self: &CzOutcome) -> u64;
+
+    #[swift_bridge(swift_name = "hugepageLimitPagesize")]
+    fn hugepage_limit_pagesize(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "hugepageLimitLimit")]
+    fn hugepage_limit_limit(self: &CzOutcome) -> u64;
+
+    #[swift_bridge(swift_name = "networkClassID")]
+    fn network_class_id(self: &CzOutcome) -> Option<u32>;
+    #[swift_bridge(swift_name = "networkPriorities")]
+    fn network_priorities(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "interfacePriorityName")]
+    fn interface_priority_name(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "interfacePriorityPriority")]
+    fn interface_priority_priority(self: &CzOutcome) -> u32;
+
+    #[swift_bridge(swift_name = "rdmaHcsHandles")]
+    fn rdma_hcs_handles(self: &CzOutcome) -> Option<u32>;
+    #[swift_bridge(swift_name = "rdmaHcaObjects")]
+    fn rdma_hca_objects(self: &CzOutcome) -> Option<u32>;
+
+    #[swift_bridge(swift_name = "devicePath")]
+    fn device_path(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "deviceType")]
+    fn device_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "deviceMajor")]
+    fn device_major(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "deviceMinor")]
+    fn device_minor(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "deviceFileMode")]
+    fn device_file_mode(self: &CzOutcome) -> Option<u32>;
+    #[swift_bridge(swift_name = "deviceUid")]
+    fn device_uid(self: &CzOutcome) -> Option<u32>;
+    #[swift_bridge(swift_name = "deviceGid")]
+    fn device_gid(self: &CzOutcome) -> Option<u32>;
+
+    #[swift_bridge(swift_name = "deviceCgroupAllow")]
+    fn device_cgroup_allow(self: &CzOutcome) -> bool;
+    #[swift_bridge(swift_name = "deviceCgroupType")]
+    fn device_cgroup_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "deviceCgroupMajor")]
+    fn device_cgroup_major(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "deviceCgroupMinor")]
+    fn device_cgroup_minor(self: &CzOutcome) -> Option<i64>;
+    #[swift_bridge(swift_name = "deviceCgroupAccess")]
+    fn device_cgroup_access(self: &CzOutcome) -> Option<String>;
+
+    #[swift_bridge(swift_name = "personalityDomain")]
+    fn personality_domain(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "personalityFlags")]
+    fn personality_flags(self: &CzOutcome) -> Vec<String>;
+
+    #[swift_bridge(swift_name = "seccompDefaultAction")]
+    fn seccomp_default_action(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "seccompDefaultErrnoRet")]
+    fn seccomp_default_errno_ret(self: &CzOutcome) -> Option<usize>;
+    #[swift_bridge(swift_name = "seccompArchitectures")]
+    fn seccomp_architectures(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "seccompFlags")]
+    fn seccomp_flags(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "seccompListenerPath")]
+    fn seccomp_listener_path(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "seccompListenerMetadata")]
+    fn seccomp_listener_metadata(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "seccompSyscalls")]
+    fn seccomp_syscalls(self: &CzOutcome) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "syscallNames")]
+    fn syscall_names(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "syscallAction")]
+    fn syscall_action(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "syscallErrnoRet")]
+    fn syscall_errno_ret(self: &CzOutcome) -> Option<usize>;
+    #[swift_bridge(swift_name = "syscallArgs")]
+    fn syscall_args(self: &CzOutcome) -> CzOutcome;
+    #[swift_bridge(swift_name = "seccompArgIndex")]
+    fn seccomp_arg_index(self: &CzOutcome) -> usize;
+    #[swift_bridge(swift_name = "seccompArgValue")]
+    fn seccomp_arg_value(self: &CzOutcome) -> u64;
+    #[swift_bridge(swift_name = "seccompArgValueTwo")]
+    fn seccomp_arg_value_two(self: &CzOutcome) -> u64;
+    #[swift_bridge(swift_name = "seccompArgOp")]
+    fn seccomp_arg_op(self: &CzOutcome) -> String;
+
+    #[swift_bridge(swift_name = "runtimeSpecVersionMajor")]
+    fn runtime_spec_version_major(self: &CzOutcome) -> isize;
+    #[swift_bridge(swift_name = "runtimeSpecVersionMinor")]
+    fn runtime_spec_version_minor(self: &CzOutcome) -> isize;
+    #[swift_bridge(swift_name = "runtimeSpecVersionPatch")]
+    fn runtime_spec_version_patch(self: &CzOutcome) -> isize;
+    #[swift_bridge(swift_name = "runtimeSpecVersionDev")]
+    fn runtime_spec_version_dev(self: &CzOutcome) -> String;
+
+    #[swift_bridge(swift_name = "processFromImageConfig")]
+    fn cz_process_from_image_config(config: RustImageConfig) -> CzOutcome;
+    #[swift_bridge(swift_name = "processDescription")]
+    fn cz_process_description(process: RustProcess) -> CzOutcome;
+    #[swift_bridge(swift_name = "hookDescription")]
+    fn cz_hook_description(hook: RustHook) -> CzOutcome;
+    #[swift_bridge(swift_name = "decodeLinuxSeccomp")]
+    fn cz_linux_seccomp_decode(data: Vec<u8>) -> CzOutcome;
+    // `capabilities` stands for `nil` when `has_capabilities` is false.
+    #[swift_bridge(swift_name = "defaultSeccompProfile")]
+    fn cz_linux_seccomp_default_profile(
+      #[swift_bridge(label = "hasCapabilities")] has_capabilities: bool,
+      capabilities: RustOciLinuxCapabilities,
+      arch: &str,
+    ) -> CzOutcome;
+    // The outcome holds the case's `rawValue`, or `Absent`.
+    #[swift_bridge(swift_name = "currentArch")]
+    fn cz_arch_current() -> CzOutcome;
+    #[swift_bridge(swift_name = "currentVerifiedArch")]
+    fn cz_arch_current_verified() -> CzOutcome;
+    #[swift_bridge(swift_name = "currentRuntimeSpecVersion")]
+    fn cz_runtime_spec_version_current() -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxRLimitToOCI")]
+    fn cz_linux_rlimit_to_oci(rlimit: RustLinuxRLimit) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxCapabilitiesToOCI")]
+    fn cz_linux_capabilities_to_oci(capabilities: RustLinuxCapabilities) -> CzOutcome;
+    #[swift_bridge(swift_name = "systemPlatformOCIPlatform")]
+    fn cz_system_platform_oci_platform(platform: RustSystemPlatform) -> CzOutcome;
+
+    // `Bundle`, as its path. Each outcome holds a path, except `loadConfig`'s,
+    // which holds a `Spec`.
+    #[swift_bridge(swift_name = "createBundle")]
+    fn cz_bundle_create(path: &str, spec: RustSpec) -> CzOutcome;
+    #[swift_bridge(swift_name = "createBundleFromData")]
+    fn cz_bundle_create_from_data(path: &str, spec: Vec<u8>) -> CzOutcome;
+    #[swift_bridge(swift_name = "loadBundle")]
+    fn cz_bundle_load(path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "bundleConfigPath")]
+    fn cz_bundle_config_path(path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "bundleRootfsPath")]
+    fn cz_bundle_rootfs_path(path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "deleteBundle")]
+    fn cz_bundle_delete(path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "bundleLoadConfig")]
+    fn cz_bundle_load_config(path: &str) -> CzOutcome;
+
+    // For unit tests: an enum's raw values in the order of Rust's `ALL`,
+    // `seccompFdName`, and what a type's initializer makes with no arguments.
+    #[swift_bridge(swift_name = "rawValues")]
+    fn cz_raw_values(name: &str) -> Vec<String>;
+    #[swift_bridge(swift_name = "seccompFdName")]
+    fn cz_seccomp_fd_name() -> String;
+    #[swift_bridge(swift_name = "defaultValue")]
+    fn cz_default(name: &str) -> CzOutcome;
 
     // Swift's `MediaTypes` and `AnnotationKeys`, in the order of Rust's
     // `ALL`, for a test that compares Rust's copies with them.

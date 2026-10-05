@@ -133,7 +133,7 @@ extension Containerization.LinuxCapabilities {
 }
 
 /// `LinuxRLimit.Kind` and the bridge's `RlimitKind`, case for case.
-private var rlimitKinds: [(LinuxRLimit.Kind, RlimitKind)] {
+var rlimitKinds: [(LinuxRLimit.Kind, RlimitKind)] {
   [
     (.addressSpace, .AddressSpace),
     (.coreFileSize, .CoreFileSize),
@@ -212,10 +212,7 @@ extension LinuxContainer.Configuration {
       switch configuration.seccompMode() {
       case .Unconfined: .unconfined
       case .Default: .default
-      case .Profile:
-        .profile(
-          try LinuxSeccomp.decode(from: Data((configuration.seccompProfile()?.toString() ?? "").utf8))
-        )
+      case .Profile: .profile(LinuxSeccomp(configuration.seccompProfile()))
       }
     useInit = configuration.useInit()
   }
@@ -298,7 +295,7 @@ func fill(_ built: RustLinuxProcessConfigurationRefMut, from process: LinuxProce
 }
 
 /// `configuration` into Rust's, replacing whatever it held.
-func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: LinuxContainer.Configuration) throws {
+func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: LinuxContainer.Configuration) {
   fill(built.processMut(), from: configuration.process)
   built.setCpus(UInt32(configuration.cpus))
   built.setMemoryInBytes(configuration.memoryInBytes)
@@ -394,11 +391,9 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
   }
 
   switch configuration.seccompProfile {
-  case .unconfined: built.setSeccompProfile(.Unconfined, RustString?.none)
-  case .default: built.setSeccompProfile(.Default, RustString?.none)
-  case .profile(let profile):
-    let json = String(decoding: try JSONEncoder().encode(profile), as: UTF8.self)
-    built.setSeccompProfile(.Profile, json.intoRustString())
+  case .unconfined: built.setSeccompProfile(.Unconfined, CzOutcome.holding(nil))
+  case .default: built.setSeccompProfile(.Default, CzOutcome.holding(nil))
+  case .profile(let profile): built.setSeccompProfile(.Profile, CzOutcome.holding(profile))
   }
 }
 

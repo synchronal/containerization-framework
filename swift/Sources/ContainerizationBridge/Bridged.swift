@@ -18,7 +18,8 @@ import ContainerizationOCI
 import Foundation
 
 /// Unchecked: Rust reads an outcome once, on the thread it was returned to.
-final class CzOutcome: @unchecked Sendable {
+/// Public because swift-bridge's glue for a Rust method that takes one is.
+public final class CzOutcome: @unchecked Sendable {
   private let failure: String?
   private let failureCode: String?
   private let value: Any?

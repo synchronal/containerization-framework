@@ -319,45 +319,22 @@ fn refuses_seccomp_without_an_oci_runtime() {
   assert!(error.to_string().contains("seccomp"), "{error}");
 }
 
+/// The profile crosses to Swift and back, so the container gets as far as
+/// starting `runc`.
 #[test]
-fn refuses_a_seccomp_profile_that_is_not_one() {
+fn carries_a_seccomp_profile_of_its_own() {
+  let profile = cfw::containerization_oci::LinuxSeccomp::default_profile(
+    None,
+    cfw::containerization_oci::Arch::current_verified().expect("a seccomp architecture"),
+  )
+  .expect("the default profile");
   let refused = Container::try_boot_with("cfw-test-config-seccomp-profile", |configuration| {
     configuration.oci_runtime_path = Some("/sbin/runc".into());
-    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Profile("not json".into());
+    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Profile(profile);
   });
 
-  let error = refused
-    .err()
-    .expect("a malformed profile should fail the container");
-  assert!(
-    error
-      .to_string()
-      .contains("create cfw-test-config-seccomp-profile"),
-    "{error}"
-  );
-}
-
-/// A plain decoder would accept this, dropping `includes` to allow `mount`
-/// unconditionally. The container would then fail only for lacking `runc`.
-#[test]
-fn refuses_a_docker_format_seccomp_profile() {
-  let profile = r#"{
-    "defaultAction": "SCMP_ACT_ERRNO",
-    "syscalls": [{"names": ["mount"], "action": "SCMP_ACT_ALLOW", "includes": {"caps": ["CAP_SYS_ADMIN"]}}]
-  }"#;
-  let refused = Container::try_boot_with("cfw-test-config-seccomp-docker", |configuration| {
-    configuration.oci_runtime_path = Some("/sbin/runc".into());
-    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Profile(profile.into());
-  });
-
-  let error = refused
-    .err()
-    .expect("a Docker-format profile should fail the container");
-  assert!(
-    error.is_code(cfw::containerization_error::Code::InvalidArgument),
-    "{error}"
-  );
-  assert!(error.to_string().contains("Docker's format"), "{error}");
+  let error = refused.err().expect("the stock init image has no runc");
+  assert!(error.to_string().contains("failed to start process"), "{error}");
 }
 
 /// The stock init image carries no `runc`. That one runs when present is

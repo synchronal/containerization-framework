@@ -35,10 +35,18 @@
 - `Image` has `description`, `descriptor`, `index`, `manifest`,
   `descriptor_for` and `config`. `descriptor_for` mirrors Swift's
   `descriptor(for:)`, and takes a suffix because Rust has no overloading.
-- A custom seccomp profile is decoded with `LinuxSeccomp.decode(from:)` again.
-  A profile in Docker's format now fails the container with
-  `Code::InvalidArgument`. Before, its conditional rules silently became
-  unconditional allows.
+- Added the OCI runtime spec to `containerization_oci`: `Spec` and every type
+  it holds, `State`, `ContainerState`, `ContainerProcessState`,
+  `SECCOMP_FD_NAME` and `RuntimeSpecVersion`. Enums backed by strings have
+  `raw_value` and `from_raw_value`. As in Swift, a `Box`'s fields are private.
+- Added `Bundle`. Each of its methods asks Swift.
+- Added `LinuxSeccomp::decode`, `LinuxSeccomp::default_profile`,
+  `Arch::current` and `Arch::current_verified`. `decode` rejects Docker's
+  profile format with `Code::InvalidArgument`, where before its conditional
+  rules silently became unconditional allows.
+- Added the conversions `Process::from_image_config`, `LinuxRLimit::to_oci`,
+  `LinuxCapabilities::to_oci` and `SystemPlatform::oci_platform`, and Swift's
+  `description` for `Process` and `Hook`, which hides the values in `env`.
 
 ### Breaking
 
@@ -51,6 +59,9 @@
   optional `IPv4Address` gateway, because Swift's `ipv4Gateway` is optional.
 - `Error::Failed` has a new `code` field, so a pattern that names its fields
   needs `..`.
+- `SeccompProfile::Profile` holds a `LinuxSeccomp` instead of JSON. Read JSON
+  with `LinuxSeccomp::decode`, so bad JSON fails there rather than when the
+  container is created.
 
 ## v0.3.0
 

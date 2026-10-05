@@ -12,6 +12,7 @@ use super::NatInterface;
 use super::Signal;
 use super::UnixSocketConfiguration;
 use super::strings;
+use crate::containerization_oci;
 use crate::containerization_os::terminal;
 use crate::error::Error;
 use crate::platform;
@@ -24,8 +25,9 @@ pub enum SeccompProfile {
   #[default]
   Unconfined,
   Default,
-  /// A `LinuxSeccomp`, as the JSON of an OCI runtime spec's `linux.seccomp`.
-  Profile(String),
+  /// A profile of its own. [`containerization_oci::LinuxSeccomp::decode`]
+  /// reads one from JSON.
+  Profile(containerization_oci::LinuxSeccomp),
 }
 
 /// `LinuxContainer.Configuration`.
