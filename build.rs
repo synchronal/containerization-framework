@@ -9,8 +9,8 @@
 //! with, yields a new one. That directory holds the compiled dependency graph, so
 //! a copy per fingerprint costs ~2 GiB and a full rebuild of Containerization.
 //!
-//! macOS only. On other platforms the session and builder are stand-ins
-//! (`src/platform/unsupported.rs`) that compile, but return errors on every invocation.
+//! macOS only. On other platforms the bridge is a stand-in
+//! (`src/platform/unsupported.rs`) that compiles, but fails every constructor.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

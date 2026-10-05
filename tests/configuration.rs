@@ -3,8 +3,8 @@
 //! Configuring a container and its processes.
 //!
 //! What only a booted guest can show: that each setting reaches the container,
-//! and that one the framework refuses fails the boot rather than being dropped.
-//! The defaults these settings replace are asserted in `session.rs`.
+//! and that one Containerization refuses fails the container rather than being
+//! dropped.
 //!
 //! Each test is a VM, so one container checks every setting that can share it.
 
@@ -16,6 +16,9 @@ use support::container::Container;
 /// One of Containerization's standard masked paths that this kernel has: a
 /// path it lacks, like `/proc/kcore`, is never mounted over either way.
 const STANDARD_MASKED_PATH: &str = "/proc/keys";
+
+/// A file Alpine ships, to mask.
+const IMAGE_FILE: &str = "/etc/alpine-release";
 
 /// What a shell's failed write said, however it failed. Braced so the
 /// redirection's own error is caught: a trailing `2>&1` would miss it.
@@ -35,21 +38,19 @@ fn is_mounted_over(container: &Container, id: &str, path: &str) -> bool {
 
 #[test]
 fn names_resolves_and_tunes_the_container() {
-  let container = Container::boot_with("cfw-test-config-names", |spec| {
-    let configuration = &mut spec.configuration;
-
+  let container = Container::boot_with("cfw-test-config-names", |configuration| {
     configuration.hostname = Some("configured-host".into());
     configuration.sysctl = [("net.core.somaxconn".to_string(), "4096".to_string())].into();
-    configuration.dns = Some(cfw::model::Dns {
+    configuration.dns = Some(cfw::containerization::Dns {
       nameservers: vec![support::network::GATEWAY.into(), "1.1.1.1".into()],
       domain: Some("example.test".into()),
       search_domains: vec!["a.test".into(), "b.test".into()],
       options: vec!["ndots:2".into()],
     });
-    configuration.hosts = Some(cfw::model::Hosts {
+    configuration.hosts = Some(cfw::containerization::Hosts {
       entries: vec![
-        cfw::model::HostsEntry::new("127.0.0.1", &["localhost"]),
-        cfw::model::HostsEntry::new(support::network::GATEWAY, &["host.internal", "host"]),
+        cfw::containerization::hosts::Entry::new("127.0.0.1", &["localhost"]),
+        cfw::containerization::hosts::Entry::new(support::network::GATEWAY, &["host.internal", "host"]),
       ],
       comment: Some("written by the suite".into()),
     });
@@ -85,11 +86,16 @@ fn mounts_what_it_is_given() {
   std::fs::write(shared.path().join("greeting"), "shared from the host").expect("a file to share");
   let source = shared.path().display().to_string();
 
-  let container = Container::boot_with("cfw-test-config-mounts", |spec| {
-    let mounts = &mut spec.configuration.mounts;
+  let container = Container::boot_with("cfw-test-config-mounts", move |configuration| {
+    let mounts = &mut configuration.mounts;
 
-    mounts.push(cfw::model::Mount::share(&source, "/shared", &["ro"]));
-    mounts.push(cfw::model::Mount::any("tmpfs", "tmpfs", "/scratch", &["size=1m"]));
+    mounts.push(cfw::containerization::Mount::share(&source, "/shared", &["ro"]));
+    mounts.push(cfw::containerization::Mount::any(
+      "tmpfs",
+      "tmpfs",
+      "/scratch",
+      &["size=1m"],
+    ));
   });
 
   assert_eq!(container.sh("shared", "cat /shared/greeting"), "shared from the host");
@@ -116,27 +122,54 @@ fn mounts_what_it_is_given() {
 fn runs_a_process_as_configured() {
   let container = Container::boot("cfw-test-config-process");
 
-  let configuration = cfw::model::LinuxProcessConfiguration {
-    environment_variables: vec!["GREETING=configured".into()],
-    working_directory: Some("/tmp".into()),
-    user: Some(cfw::model::User::named("nobody")),
-    ..cfw::model::LinuxProcessConfiguration::new(&["/bin/sh", "-c", "pwd; id -un; echo $GREETING"])
+  let mut configuration =
+    cfw::containerization::LinuxProcessConfiguration::new(&["/bin/sh", "-c", "pwd; id -un; echo $GREETING"]);
+  configuration
+    .environment_variables
+    .push("GREETING=configured".into());
+  configuration.working_directory = "/tmp".into();
+  configuration.user = cfw::containerization_oci::User {
+    username: "nobody".into(),
+    ..Default::default()
   };
 
   assert_eq!(
-    container.capture_with("process", &configuration),
+    container.capture_with("process", configuration),
     "/tmp\nnobody\nconfigured\n"
+  );
+}
+
+/// What the closure sees comes back over a channel: it runs on Swift's thread,
+/// where a failed assertion couldn't unwind.
+#[test]
+fn hands_the_closure_what_the_manager_seeded() {
+  let (send, seen) = std::sync::mpsc::channel();
+
+  let _container = Container::boot_with("cfw-test-config-seeded", move |configuration| {
+    let _ = send.send(configuration.clone());
+  });
+  let seeded = seen.recv().expect("the closure should have run");
+
+  assert!(
+    seeded
+      .process
+      .environment_variables
+      .iter()
+      .any(|variable| variable.starts_with("PATH=")),
+    "the image's environment should be seeded: {:?}",
+    seeded.process.environment_variables
+  );
+  assert!(
+    matches!(seeded.boot_log, Some(cfw::containerization::BootLog::File { .. })),
+    "the manager's boot log should be seeded: {:?}",
+    seeded.boot_log
   );
 }
 
 #[test]
 fn guards_paths_beyond_the_standard_ones() {
-  let container = Container::boot_with("cfw-test-config-guarded", |spec| {
-    let configuration = &mut spec.configuration;
-
-    configuration
-      .masked_paths
-      .push(support::store::MARKER_PATH.into());
+  let container = Container::boot_with("cfw-test-config-guarded", |configuration| {
+    configuration.masked_paths.push(IMAGE_FILE.into());
     configuration.readonly_paths.push("/etc".into());
   });
 
@@ -145,7 +178,7 @@ fn guards_paths_beyond_the_standard_ones() {
     "adding a masked path should keep the standard ones"
   );
   assert_eq!(
-    container.sh("masked", &format!("cat {}", support::store::MARKER_PATH)),
+    container.sh("masked", &format!("cat {IMAGE_FILE}")),
     "",
     "a masked file should read as empty"
   );
@@ -171,9 +204,9 @@ fn guards_paths_beyond_the_standard_ones() {
 
 #[test]
 fn drops_the_standard_guards_when_told() {
-  let container = Container::boot_with("cfw-test-config-unguarded", |spec| {
-    spec.configuration.masked_paths.clear();
-    spec.configuration.readonly_paths.clear();
+  let container = Container::boot_with("cfw-test-config-unguarded", |configuration| {
+    configuration.masked_paths.clear();
+    configuration.readonly_paths.clear();
   });
 
   assert!(
@@ -192,8 +225,8 @@ fn drops_the_standard_guards_when_told() {
 
 #[test]
 fn runs_its_first_process_under_an_init() {
-  let container = Container::boot_with("cfw-test-config-init", |spec| {
-    spec.configuration.use_init = true;
+  let container = Container::boot_with("cfw-test-config-init", |configuration| {
+    configuration.use_init = true;
   });
 
   let pid_one = container.sh("pid-one", "tr '\\0' ' ' < /proc/1/cmdline");
@@ -207,9 +240,10 @@ fn runs_its_first_process_under_an_init() {
 fn writes_its_boot_log_where_told() {
   let logs = tempfile::tempdir().expect("a temporary directory");
   let log = logs.path().join("boot.log");
+  let configured = log.clone();
 
-  let container = Container::boot_with("cfw-test-config-boot-log", |spec| {
-    spec.configuration.boot_log = Some(cfw::model::BootLog::file(&log));
+  let container = Container::boot_with("cfw-test-config-boot-log", move |configuration| {
+    configuration.boot_log = Some(cfw::containerization::BootLog::file(configured));
   });
 
   assert!(
@@ -218,22 +252,17 @@ fn writes_its_boot_log_where_told() {
     log.display()
   );
   assert!(
-    !container
-      .session()
-      .store()
-      .container_dir(container.name())
-      .join("bootlog.log")
-      .exists(),
+    !container.directory().join("bootlog.log").exists(),
     "and not to the container's directory as well"
   );
 }
 
-/// Only an M3 or later can: elsewhere the boot fails, which is the behavior
-/// asked for, and there is nothing further to check.
+/// Only an M3 or later can: elsewhere the container fails, which is the
+/// behavior asked for, and there is nothing further to check.
 #[test]
 fn boots_with_nested_virtualization_where_the_host_has_it() {
-  let booted = Container::try_boot_with("cfw-test-config-nested", |spec| {
-    spec.configuration.virtualization = true;
+  let booted = Container::try_boot_with("cfw-test-config-nested", |configuration| {
+    configuration.virtualization = true;
   });
 
   match booted {
@@ -245,62 +274,52 @@ fn boots_with_nested_virtualization_where_the_host_has_it() {
     {
       eprintln!("this host has no nested virtualization: {error}");
     }
-    Err(error) => panic!("a nested-virtualization boot should succeed or say it is unsupported: {error}"),
+    Err(error) => panic!("a nested-virtualization container should start or say it is unsupported: {error}"),
   }
 }
 
 #[test]
 fn refuses_seccomp_without_an_oci_runtime() {
-  let refused = Container::try_boot_with("cfw-test-config-seccomp", |spec| {
-    spec.configuration.seccomp_profile = cfw::model::SeccompProfile::Default;
+  let refused = Container::try_boot_with("cfw-test-config-seccomp", |configuration| {
+    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Default;
   });
 
   let error = refused
     .err()
-    .expect("a filter nothing installs should fail the boot, not run unfiltered");
+    .expect("a filter nothing installs should fail the container, not run unfiltered");
   assert!(error.to_string().contains("seccomp"), "{error}");
 }
 
 #[test]
 fn refuses_a_seccomp_profile_that_is_not_one() {
-  let refused = Container::try_boot_with("cfw-test-config-seccomp-profile", |spec| {
-    spec.configuration.oci_runtime_path = Some("/sbin/runc".into());
-    spec.configuration.seccomp_profile = cfw::model::SeccompProfile::Profile("not json".into());
+  let refused = Container::try_boot_with("cfw-test-config-seccomp-profile", |configuration| {
+    configuration.oci_runtime_path = Some("/sbin/runc".into());
+    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Profile("not json".into());
   });
 
   let error = refused
     .err()
-    .expect("a malformed profile should fail the boot");
-  assert!(error.to_string().contains("seccomp"), "{error}");
+    .expect("a malformed profile should fail the container");
+  assert!(
+    error
+      .to_string()
+      .contains("create cfw-test-config-seccomp-profile"),
+    "{error}"
+  );
 }
 
 /// The stock init image carries no `runc`. That one runs when present is
 /// beyond what this suite's store can show.
 #[test]
 fn refuses_an_oci_runtime_the_init_image_lacks() {
-  let refused = Container::try_boot_with("cfw-test-config-oci-runtime", |spec| {
-    spec.configuration.oci_runtime_path = Some("/sbin/no-such-runtime".into());
+  let refused = Container::try_boot_with("cfw-test-config-oci-runtime", |configuration| {
+    configuration.oci_runtime_path = Some("/sbin/no-such-runtime".into());
   });
 
   let error = refused
     .err()
-    .expect("a runtime that is not there should fail the boot");
+    .expect("a runtime that is not there should fail the container");
   // The guest names no cause, but this is where it fails: at the start, not
   // as a configuration refused beforehand.
   assert!(error.to_string().contains("failed to start process"), "{error}");
-}
-
-#[test]
-fn refuses_a_nameserver_that_is_not_an_address() {
-  let refused = Container::try_boot_with("cfw-test-config-nameserver", |spec| {
-    spec.configuration.dns = Some(cfw::model::Dns {
-      nameservers: vec!["dns.example.test".into()],
-      ..Default::default()
-    });
-  });
-
-  let error = refused
-    .err()
-    .expect("a hostname nameserver should fail the boot");
-  assert!(error.to_string().contains("dns.example.test"), "{error}");
 }

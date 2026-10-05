@@ -1,10 +1,66 @@
-//! Getters for a container to boot, and a process to run in one.
+//! Getters and setters for Containerization's value types.
 
 use super::entry_at;
 use crate::bridge::ffi;
-use crate::model;
+use crate::containerization;
+use crate::containerization::hosts;
+use crate::containerization::linux_container;
+use crate::containerization::linux_rlimit;
+use crate::containerization::mount;
+use crate::containerization::system_platform;
+use crate::containerization::unix_socket_configuration;
+use crate::containerization_oci;
+use std::path::PathBuf;
 
-impl model::Mount {
+fn runtime_options_of(kind: ffi::RuntimeKind, options: Vec<String>) -> mount::RuntimeOptions {
+  match kind {
+    ffi::RuntimeKind::Virtioblk => mount::RuntimeOptions::Virtioblk(options),
+    ffi::RuntimeKind::Virtiofs => mount::RuntimeOptions::Virtiofs(options),
+    ffi::RuntimeKind::Shared => mount::RuntimeOptions::Shared,
+    ffi::RuntimeKind::Generic => mount::RuntimeOptions::Any(options),
+  }
+}
+
+impl ffi::CzOutcome {
+  /// The `Mount` an outcome holds, read field by field.
+  pub(crate) fn mount(&self) -> containerization::Mount {
+    containerization::Mount {
+      r#type: self.mount_type(),
+      source: self.mount_source(),
+      destination: self.mount_destination(),
+      options: self.mount_options(),
+      runtime_options: runtime_options_of(self.mount_runtime_kind(), self.mount_runtime_options()),
+    }
+  }
+}
+
+impl crate::containerization::container_manager::CreateOptions {
+  pub(crate) fn rootfs_size_in_bytes(&self) -> u64 {
+    self.rootfs_size_in_bytes
+  }
+
+  pub(crate) fn writable_layer_size_in_bytes(&self) -> Option<u64> {
+    self.writable_layer_size_in_bytes
+  }
+
+  pub(crate) fn read_only(&self) -> bool {
+    self.read_only
+  }
+
+  pub(crate) fn networking(&self) -> bool {
+    self.networking
+  }
+
+  pub(crate) fn vm_cpus(&self) -> u32 {
+    self.vm.cpus
+  }
+
+  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
+    self.vm.memory_in_bytes
+  }
+}
+
+impl containerization::Mount {
   pub(crate) fn mount_type(&self) -> &str {
     &self.r#type
   }
@@ -27,9 +83,10 @@ impl model::Mount {
 
   pub(crate) fn runtime_kind(&self) -> ffi::RuntimeKind {
     match self.runtime_options {
-      model::RuntimeOptions::Virtioblk(_) => ffi::RuntimeKind::Virtioblk,
-      model::RuntimeOptions::Virtiofs(_) => ffi::RuntimeKind::Virtiofs,
-      model::RuntimeOptions::Any(_) => ffi::RuntimeKind::Generic,
+      mount::RuntimeOptions::Virtioblk(_) => ffi::RuntimeKind::Virtioblk,
+      mount::RuntimeOptions::Virtiofs(_) => ffi::RuntimeKind::Virtiofs,
+      mount::RuntimeOptions::Shared => ffi::RuntimeKind::Shared,
+      mount::RuntimeOptions::Any(_) => ffi::RuntimeKind::Generic,
     }
   }
 
@@ -44,14 +101,15 @@ impl model::Mount {
   /// What the runtime options carry, whatever their kind.
   fn runtime_option_values(&self) -> &[String] {
     match &self.runtime_options {
-      model::RuntimeOptions::Virtioblk(options)
-      | model::RuntimeOptions::Virtiofs(options)
-      | model::RuntimeOptions::Any(options) => options,
+      mount::RuntimeOptions::Virtioblk(options)
+      | mount::RuntimeOptions::Virtiofs(options)
+      | mount::RuntimeOptions::Any(options) => options,
+      mount::RuntimeOptions::Shared => &[],
     }
   }
 }
 
-impl model::UnixSocketConfiguration {
+impl containerization::UnixSocketConfiguration {
   pub(crate) fn source(&self) -> String {
     super::path(&self.source)
   }
@@ -66,13 +124,13 @@ impl model::UnixSocketConfiguration {
 
   pub(crate) fn direction(&self) -> ffi::SocketDirection {
     match self.direction {
-      model::Direction::Into => ffi::SocketDirection::Into,
-      model::Direction::OutOf => ffi::SocketDirection::OutOf,
+      unix_socket_configuration::Direction::Into => ffi::SocketDirection::Into,
+      unix_socket_configuration::Direction::OutOf => ffi::SocketDirection::OutOf,
     }
   }
 }
 
-impl model::NatInterface {
+impl containerization::NatInterface {
   pub(crate) fn ipv4_address(&self) -> &str {
     &self.ipv4_address
   }
@@ -98,7 +156,7 @@ impl model::NatInterface {
   }
 }
 
-impl model::Dns {
+impl containerization::Dns {
   pub(crate) fn nameservers_len(&self) -> usize {
     self.nameservers.len()
   }
@@ -128,7 +186,7 @@ impl model::Dns {
   }
 }
 
-impl model::HostsEntry {
+impl hosts::Entry {
   pub(crate) fn ip_address(&self) -> &str {
     &self.ip_address
   }
@@ -146,12 +204,12 @@ impl model::HostsEntry {
   }
 }
 
-impl model::Hosts {
+impl containerization::Hosts {
   pub(crate) fn entries_len(&self) -> usize {
     self.entries.len()
   }
 
-  pub(crate) fn entries_at(&self, index: usize) -> &model::HostsEntry {
+  pub(crate) fn entries_at(&self, index: usize) -> &hosts::Entry {
     &self.entries[index]
   }
 
@@ -160,17 +218,36 @@ impl model::Hosts {
   }
 }
 
-impl model::BootLog {
+impl containerization::BootLog {
+  pub(crate) fn kind(&self) -> ffi::BootLogKind {
+    match self {
+      Self::File { .. } => ffi::BootLogKind::File,
+      Self::FileHandle(_) => ffi::BootLogKind::FileHandle,
+    }
+  }
+
+  /// Empty unless [`Self::kind`] is `File`.
   pub(crate) fn path(&self) -> String {
-    super::path(&self.path)
+    match self {
+      Self::File { path, .. } => super::path(path),
+      Self::FileHandle(_) => String::new(),
+    }
   }
 
   pub(crate) fn append(&self) -> bool {
-    self.append
+    matches!(self, Self::File { append: true, .. })
+  }
+
+  /// `-1` unless [`Self::kind`] is `FileHandle`.
+  pub(crate) fn file_handle(&self) -> i32 {
+    match self {
+      Self::FileHandle(descriptor) => *descriptor,
+      Self::File { .. } => -1,
+    }
   }
 }
 
-impl model::User {
+impl containerization_oci::User {
   pub(crate) fn uid(&self) -> u32 {
     self.uid
   }
@@ -196,18 +273,141 @@ impl model::User {
   }
 }
 
-impl model::LinuxProcessConfiguration {
-  pub(crate) fn has_arguments(&self) -> bool {
-    self.arguments.is_some()
+impl containerization::LinuxCapabilities {
+  pub(crate) fn set_len(&self, set: ffi::CapabilitySet) -> usize {
+    self.set(set).len()
   }
 
-  /// Zero when [`Self::has_arguments`] is false.
+  pub(crate) fn set_at(&self, set: ffi::CapabilitySet, index: usize) -> &str {
+    &self.set(set)[index]
+  }
+
+  fn set(&self, set: ffi::CapabilitySet) -> &[String] {
+    match set {
+      ffi::CapabilitySet::Bounding => &self.bounding,
+      ffi::CapabilitySet::Effective => &self.effective,
+      ffi::CapabilitySet::Inheritable => &self.inheritable,
+      ffi::CapabilitySet::Permitted => &self.permitted,
+      ffi::CapabilitySet::Ambient => &self.ambient,
+    }
+  }
+}
+
+fn rlimit_kind(kind: linux_rlimit::Kind) -> ffi::RlimitKind {
+  match kind {
+    linux_rlimit::Kind::AddressSpace => ffi::RlimitKind::AddressSpace,
+    linux_rlimit::Kind::CoreFileSize => ffi::RlimitKind::CoreFileSize,
+    linux_rlimit::Kind::CpuTime => ffi::RlimitKind::CpuTime,
+    linux_rlimit::Kind::DataSize => ffi::RlimitKind::DataSize,
+    linux_rlimit::Kind::FileSize => ffi::RlimitKind::FileSize,
+    linux_rlimit::Kind::Locks => ffi::RlimitKind::Locks,
+    linux_rlimit::Kind::LockedMemory => ffi::RlimitKind::LockedMemory,
+    linux_rlimit::Kind::MessageQueue => ffi::RlimitKind::MessageQueue,
+    linux_rlimit::Kind::Nice => ffi::RlimitKind::Nice,
+    linux_rlimit::Kind::OpenFiles => ffi::RlimitKind::OpenFiles,
+    linux_rlimit::Kind::NumberOfProcesses => ffi::RlimitKind::NumberOfProcesses,
+    linux_rlimit::Kind::ResidentSetSize => ffi::RlimitKind::ResidentSetSize,
+    linux_rlimit::Kind::RealtimePriority => ffi::RlimitKind::RealtimePriority,
+    linux_rlimit::Kind::RealtimeTimeout => ffi::RlimitKind::RealtimeTimeout,
+    linux_rlimit::Kind::SignalsPending => ffi::RlimitKind::SignalsPending,
+    linux_rlimit::Kind::StackSize => ffi::RlimitKind::StackSize,
+  }
+}
+
+fn linux_rlimit_kind(kind: ffi::RlimitKind) -> linux_rlimit::Kind {
+  match kind {
+    ffi::RlimitKind::AddressSpace => linux_rlimit::Kind::AddressSpace,
+    ffi::RlimitKind::CoreFileSize => linux_rlimit::Kind::CoreFileSize,
+    ffi::RlimitKind::CpuTime => linux_rlimit::Kind::CpuTime,
+    ffi::RlimitKind::DataSize => linux_rlimit::Kind::DataSize,
+    ffi::RlimitKind::FileSize => linux_rlimit::Kind::FileSize,
+    ffi::RlimitKind::Locks => linux_rlimit::Kind::Locks,
+    ffi::RlimitKind::LockedMemory => linux_rlimit::Kind::LockedMemory,
+    ffi::RlimitKind::MessageQueue => linux_rlimit::Kind::MessageQueue,
+    ffi::RlimitKind::Nice => linux_rlimit::Kind::Nice,
+    ffi::RlimitKind::OpenFiles => linux_rlimit::Kind::OpenFiles,
+    ffi::RlimitKind::NumberOfProcesses => linux_rlimit::Kind::NumberOfProcesses,
+    ffi::RlimitKind::ResidentSetSize => linux_rlimit::Kind::ResidentSetSize,
+    ffi::RlimitKind::RealtimePriority => linux_rlimit::Kind::RealtimePriority,
+    ffi::RlimitKind::RealtimeTimeout => linux_rlimit::Kind::RealtimeTimeout,
+    ffi::RlimitKind::SignalsPending => linux_rlimit::Kind::SignalsPending,
+    ffi::RlimitKind::StackSize => linux_rlimit::Kind::StackSize,
+  }
+}
+
+impl containerization::LinuxProcessConfiguration {
+  pub(crate) fn set_arguments(&mut self, arguments: Vec<String>) {
+    self.arguments = arguments;
+  }
+
+  pub(crate) fn set_environment_variables(&mut self, environment_variables: Vec<String>) {
+    self.environment_variables = environment_variables;
+  }
+
+  pub(crate) fn set_working_directory(&mut self, working_directory: String) {
+    self.working_directory = working_directory;
+  }
+
+  pub(crate) fn set_user(
+    &mut self,
+    uid: u32,
+    gid: u32,
+    umask: Option<u32>,
+    additional_gids: Vec<u32>,
+    username: String,
+  ) {
+    self.user = containerization_oci::User {
+      uid,
+      gid,
+      umask,
+      additional_gids,
+      username,
+    };
+  }
+
+  pub(crate) fn set_no_new_privileges(&mut self, no_new_privileges: bool) {
+    self.no_new_privileges = no_new_privileges;
+  }
+
+  pub(crate) fn set_capabilities(
+    &mut self,
+    bounding: Vec<String>,
+    effective: Vec<String>,
+    inheritable: Vec<String>,
+    permitted: Vec<String>,
+    ambient: Vec<String>,
+  ) {
+    self.capabilities = containerization::LinuxCapabilities {
+      bounding,
+      effective,
+      inheritable,
+      permitted,
+      ambient,
+    };
+  }
+
+  pub(crate) fn set_terminal(&mut self, terminal: bool) {
+    self.terminal = terminal;
+  }
+
+  pub(crate) fn clear_rlimits(&mut self) {
+    self.rlimits.clear();
+  }
+
+  pub(crate) fn push_rlimit(&mut self, kind: ffi::RlimitKind, hard: u64, soft: u64) {
+    self.rlimits.push(containerization::LinuxRLimit {
+      kind: linux_rlimit_kind(kind),
+      hard,
+      soft,
+    });
+  }
+
   pub(crate) fn arguments_len(&self) -> usize {
-    self.arguments.as_deref().unwrap_or_default().len()
+    self.arguments.len()
   }
 
   pub(crate) fn arguments_at(&self, index: usize) -> &str {
-    &self.arguments.as_deref().unwrap_or_default()[index]
+    &self.arguments[index]
   }
 
   pub(crate) fn environment_variables_len(&self) -> usize {
@@ -218,25 +418,237 @@ impl model::LinuxProcessConfiguration {
     &self.environment_variables[index]
   }
 
-  pub(crate) fn working_directory(&self) -> Option<&str> {
-    self.working_directory.as_deref()
+  pub(crate) fn working_directory(&self) -> &str {
+    &self.working_directory
   }
 
-  pub(crate) fn has_user(&self) -> bool {
-    self.user.is_some()
+  pub(crate) fn user(&self) -> &containerization_oci::User {
+    &self.user
   }
 
-  /// Only when [`Self::has_user`].
-  pub(crate) fn user(&self) -> &model::User {
-    self
-      .user
-      .as_ref()
-      .expect("Swift asks for a user only after has_user")
+  pub(crate) fn rlimits_len(&self) -> usize {
+    self.rlimits.len()
+  }
+
+  pub(crate) fn rlimit_kind_at(&self, index: usize) -> ffi::RlimitKind {
+    rlimit_kind(self.rlimits[index].kind)
+  }
+
+  pub(crate) fn rlimit_hard_at(&self, index: usize) -> u64 {
+    self.rlimits[index].hard
+  }
+
+  pub(crate) fn rlimit_soft_at(&self, index: usize) -> u64 {
+    self.rlimits[index].soft
+  }
+
+  pub(crate) fn no_new_privileges(&self) -> bool {
+    self.no_new_privileges
+  }
+
+  pub(crate) fn capabilities(&self) -> &containerization::LinuxCapabilities {
+    &self.capabilities
+  }
+
+  pub(crate) fn terminal(&self) -> bool {
+    self.terminal
+  }
+
+  pub(crate) fn stdin(&self) -> Option<i32> {
+    self.stdin
+  }
+
+  pub(crate) fn stdout(&self) -> Option<i32> {
+    self.stdout
+  }
+
+  pub(crate) fn stderr(&self) -> Option<i32> {
+    self.stderr
   }
 }
 
-impl model::LinuxContainerConfiguration {
-  pub(crate) fn process(&self) -> &model::LinuxProcessConfiguration {
+impl linux_container::Configuration {
+  pub(crate) fn process_mut(&mut self) -> &mut containerization::LinuxProcessConfiguration {
+    &mut self.process
+  }
+
+  pub(crate) fn set_cpus(&mut self, cpus: u32) {
+    self.cpus = cpus;
+  }
+
+  pub(crate) fn set_memory_in_bytes(&mut self, memory_in_bytes: u64) {
+    self.memory_in_bytes = memory_in_bytes;
+  }
+
+  pub(crate) fn set_hostname(&mut self, hostname: Option<String>) {
+    self.hostname = hostname;
+  }
+
+  pub(crate) fn set_masked_paths(&mut self, masked_paths: Vec<String>) {
+    self.masked_paths = masked_paths;
+  }
+
+  pub(crate) fn set_readonly_paths(&mut self, readonly_paths: Vec<String>) {
+    self.readonly_paths = readonly_paths;
+  }
+
+  pub(crate) fn set_virtualization(&mut self, virtualization: bool) {
+    self.virtualization = virtualization;
+  }
+
+  pub(crate) fn set_oci_runtime_path(&mut self, oci_runtime_path: Option<String>) {
+    self.oci_runtime_path = oci_runtime_path;
+  }
+
+  pub(crate) fn set_use_init(&mut self, use_init: bool) {
+    self.use_init = use_init;
+  }
+
+  pub(crate) fn clear_sysctl(&mut self) {
+    self.sysctl.clear();
+  }
+
+  pub(crate) fn clear_interfaces(&mut self) {
+    self.interfaces.clear();
+  }
+
+  pub(crate) fn clear_sockets(&mut self) {
+    self.sockets.clear();
+  }
+
+  pub(crate) fn clear_mounts(&mut self) {
+    self.mounts.clear();
+  }
+
+  pub(crate) fn clear_dns(&mut self) {
+    self.dns = None;
+  }
+
+  pub(crate) fn clear_hosts(&mut self) {
+    self.hosts = None;
+  }
+
+  pub(crate) fn clear_boot_log(&mut self) {
+    self.boot_log = None;
+  }
+
+  pub(crate) fn insert_sysctl(&mut self, key: String, value: String) {
+    self.sysctl.insert(key, value);
+  }
+
+  pub(crate) fn push_interface(
+    &mut self,
+    ipv4_address: String,
+    ipv4_gateway: Option<String>,
+    ipv6_address: Option<String>,
+    ipv6_gateway: Option<String>,
+    mac_address: Option<String>,
+    mtu: u32,
+  ) {
+    self.interfaces.push(containerization::NatInterface {
+      ipv4_address,
+      ipv4_gateway,
+      ipv6_address,
+      ipv6_gateway,
+      mac_address,
+      mtu,
+    });
+  }
+
+  pub(crate) fn push_socket(
+    &mut self,
+    source: String,
+    destination: String,
+    permissions: Option<u32>,
+    direction: ffi::SocketDirection,
+  ) {
+    self
+      .sockets
+      .push(containerization::UnixSocketConfiguration {
+        source: PathBuf::from(source),
+        destination: PathBuf::from(destination),
+        permissions,
+        direction: match direction {
+          ffi::SocketDirection::Into => unix_socket_configuration::Direction::Into,
+          ffi::SocketDirection::OutOf => unix_socket_configuration::Direction::OutOf,
+        },
+      });
+  }
+
+  pub(crate) fn push_mount(
+    &mut self,
+    mount_type: String,
+    source: String,
+    destination: String,
+    options: Vec<String>,
+    kind: ffi::RuntimeKind,
+    runtime_options: Vec<String>,
+  ) {
+    self.mounts.push(containerization::Mount {
+      r#type: mount_type,
+      source,
+      destination,
+      options,
+      runtime_options: runtime_options_of(kind, runtime_options),
+    });
+  }
+
+  pub(crate) fn set_dns(
+    &mut self,
+    nameservers: Vec<String>,
+    domain: Option<String>,
+    search_domains: Vec<String>,
+    options: Vec<String>,
+  ) {
+    self.dns = Some(containerization::Dns {
+      nameservers,
+      domain,
+      search_domains,
+      options,
+    });
+  }
+
+  pub(crate) fn set_hosts(&mut self, comment: Option<String>) {
+    self.hosts = Some(containerization::Hosts {
+      entries: Vec::new(),
+      comment,
+    });
+  }
+
+  /// Only after [`Self::set_hosts`].
+  pub(crate) fn push_hosts_entry(&mut self, ip_address: String, hostnames: Vec<String>, comment: Option<String>) {
+    self
+      .hosts
+      .as_mut()
+      .expect("Swift adds a hosts entry only after set_hosts")
+      .entries
+      .push(hosts::Entry {
+        ip_address,
+        hostnames,
+        comment,
+      });
+  }
+
+  pub(crate) fn set_boot_log_file(&mut self, path: String, append: bool) {
+    self.boot_log = Some(containerization::BootLog::File {
+      path: PathBuf::from(path),
+      append,
+    });
+  }
+
+  pub(crate) fn set_boot_log_file_handle(&mut self, descriptor: i32) {
+    self.boot_log = Some(containerization::BootLog::FileHandle(descriptor));
+  }
+
+  pub(crate) fn set_seccomp_profile(&mut self, mode: ffi::SeccompMode, profile: Option<String>) {
+    self.seccomp_profile = match mode {
+      ffi::SeccompMode::Unconfined => linux_container::SeccompProfile::Unconfined,
+      ffi::SeccompMode::Default => linux_container::SeccompProfile::Default,
+      ffi::SeccompMode::Profile => linux_container::SeccompProfile::Profile(profile.unwrap_or_default()),
+    };
+  }
+
+  pub(crate) fn process(&self) -> &containerization::LinuxProcessConfiguration {
     &self.process
   }
 
@@ -268,7 +680,7 @@ impl model::LinuxContainerConfiguration {
     self.interfaces.len()
   }
 
-  pub(crate) fn interfaces_at(&self, index: usize) -> &model::NatInterface {
+  pub(crate) fn interfaces_at(&self, index: usize) -> &containerization::NatInterface {
     &self.interfaces[index]
   }
 
@@ -276,7 +688,7 @@ impl model::LinuxContainerConfiguration {
     self.sockets.len()
   }
 
-  pub(crate) fn sockets_at(&self, index: usize) -> &model::UnixSocketConfiguration {
+  pub(crate) fn sockets_at(&self, index: usize) -> &containerization::UnixSocketConfiguration {
     &self.sockets[index]
   }
 
@@ -284,7 +696,7 @@ impl model::LinuxContainerConfiguration {
     self.mounts.len()
   }
 
-  pub(crate) fn mounts_at(&self, index: usize) -> &model::Mount {
+  pub(crate) fn mounts_at(&self, index: usize) -> &containerization::Mount {
     &self.mounts[index]
   }
 
@@ -309,7 +721,7 @@ impl model::LinuxContainerConfiguration {
   }
 
   /// Only when [`Self::has_dns`].
-  pub(crate) fn dns(&self) -> &model::Dns {
+  pub(crate) fn dns(&self) -> &containerization::Dns {
     self
       .dns
       .as_ref()
@@ -321,7 +733,7 @@ impl model::LinuxContainerConfiguration {
   }
 
   /// Only when [`Self::has_hosts`].
-  pub(crate) fn hosts(&self) -> &model::Hosts {
+  pub(crate) fn hosts(&self) -> &containerization::Hosts {
     self
       .hosts
       .as_ref()
@@ -337,7 +749,7 @@ impl model::LinuxContainerConfiguration {
   }
 
   /// Only when [`Self::has_boot_log`].
-  pub(crate) fn boot_log(&self) -> &model::BootLog {
+  pub(crate) fn boot_log(&self) -> &containerization::BootLog {
     self
       .boot_log
       .as_ref()
@@ -350,16 +762,16 @@ impl model::LinuxContainerConfiguration {
 
   pub(crate) fn seccomp_mode(&self) -> ffi::SeccompMode {
     match self.seccomp_profile {
-      model::SeccompProfile::Unconfined => ffi::SeccompMode::Unconfined,
-      model::SeccompProfile::Default => ffi::SeccompMode::Default,
-      model::SeccompProfile::Profile(_) => ffi::SeccompMode::Profile,
+      linux_container::SeccompProfile::Unconfined => ffi::SeccompMode::Unconfined,
+      linux_container::SeccompProfile::Default => ffi::SeccompMode::Default,
+      linux_container::SeccompProfile::Profile(_) => ffi::SeccompMode::Profile,
     }
   }
 
   /// The custom profile's JSON, when [`Self::seccomp_mode`] is `Profile`.
   pub(crate) fn seccomp_profile(&self) -> Option<&str> {
     match &self.seccomp_profile {
-      model::SeccompProfile::Profile(profile) => Some(profile),
+      linux_container::SeccompProfile::Profile(profile) => Some(profile),
       _ => None,
     }
   }
@@ -369,60 +781,76 @@ impl model::LinuxContainerConfiguration {
   }
 }
 
-impl model::BootSpec {
-  pub(crate) fn id(&self) -> &str {
-    &self.id
+impl containerization::SystemPlatform {
+  pub(crate) fn os(&self) -> ffi::PlatformOs {
+    match self.os {
+      system_platform::Os::Linux => ffi::PlatformOs::Linux,
+      system_platform::Os::Darwin => ffi::PlatformOs::Darwin,
+    }
   }
 
-  pub(crate) fn reference(&self) -> &str {
-    &self.reference
+  pub(crate) fn architecture(&self) -> ffi::PlatformArchitecture {
+    match self.architecture {
+      system_platform::Architecture::Arm64 => ffi::PlatformArchitecture::Arm64,
+      system_platform::Architecture::Amd64 => ffi::PlatformArchitecture::Amd64,
+    }
+  }
+}
+
+impl containerization::Kernel {
+  pub(crate) fn path(&self) -> String {
+    super::path(&self.path)
   }
 
-  pub(crate) fn rootfs_size_in_bytes(&self) -> u64 {
-    self.rootfs_size_in_bytes
+  pub(crate) fn platform(&self) -> &containerization::SystemPlatform {
+    &self.platform
   }
 
-  pub(crate) fn vm_cpus(&self) -> u32 {
-    self.vm.cpus
+  pub(crate) fn kernel_args_len(&self) -> usize {
+    self.command_line.kernel_args.len()
   }
 
-  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
-    self.vm.memory_in_bytes
+  pub(crate) fn kernel_args_at(&self, index: usize) -> &str {
+    &self.command_line.kernel_args[index]
   }
 
-  pub(crate) fn configuration(&self) -> &model::LinuxContainerConfiguration {
-    &self.configuration
+  pub(crate) fn init_args_len(&self) -> usize {
+    self.command_line.init_args.len()
+  }
+
+  pub(crate) fn init_args_at(&self, index: usize) -> &str {
+    &self.command_line.init_args[index]
   }
 }
 
 #[cfg(test)]
 mod tests {
   use crate::bridge::ffi;
-  use crate::model;
+  use crate::containerization;
+  use crate::containerization::linux_container;
+  use crate::containerization::mount;
 
   #[test]
   fn reads_an_absent_option_as_absent() {
-    let configuration = model::LinuxContainerConfiguration::default();
+    let configuration = linux_container::Configuration::default();
 
     assert!(!configuration.has_dns());
     assert!(!configuration.has_hosts());
     assert!(!configuration.has_boot_log());
-    assert!(!configuration.process().has_arguments());
-    assert_eq!(configuration.process().arguments_len(), 0);
-    assert!(!configuration.process().has_user());
+    assert_eq!(configuration.process().stdin(), None);
     assert_eq!(configuration.seccomp_profile(), None);
   }
 
   #[test]
   fn reads_a_list_as_its_length_and_each_element() {
-    let process = model::LinuxProcessConfiguration::new(&["/bin/echo", "hello"]);
+    let process = containerization::LinuxProcessConfiguration::new(&["/bin/echo", "hello"]);
 
     assert_eq!(process.arguments_len(), 2);
     assert_eq!(process.arguments_at(1), "hello");
 
-    let mount = model::Mount {
-      runtime_options: model::RuntimeOptions::Virtiofs(vec!["cache=auto".into()]),
-      ..model::Mount::share("/Users/user/workspace", "/workspace", &["ro"])
+    let mount = containerization::Mount {
+      runtime_options: mount::RuntimeOptions::Virtiofs(vec!["cache=auto".into()]),
+      ..containerization::Mount::share("/Users/user/workspace", "/workspace", &["ro"])
     };
 
     assert_eq!(mount.options_len(), 1);
@@ -433,7 +861,7 @@ mod tests {
 
   #[test]
   fn reads_a_map_as_its_length_and_each_entry() {
-    let configuration = model::LinuxContainerConfiguration {
+    let configuration = linux_container::Configuration {
       sysctl: [
         ("vm.swappiness".to_string(), "10".to_string()),
         ("net.core.somaxconn".to_string(), "4096".to_string()),
@@ -450,17 +878,46 @@ mod tests {
   }
 
   #[test]
-  fn reads_an_enum_as_its_mode_and_what_it_carries() {
-    let configuration = model::LinuxContainerConfiguration {
-      seccomp_profile: model::SeccompProfile::Profile("{}".into()),
+  fn reads_an_enum_as_its_kind_and_what_it_carries() {
+    let configuration = linux_container::Configuration {
+      seccomp_profile: linux_container::SeccompProfile::Profile("{}".into()),
       ..Default::default()
     };
 
     assert!(matches!(configuration.seccomp_mode(), ffi::SeccompMode::Profile));
     assert_eq!(configuration.seccomp_profile(), Some("{}"));
 
-    let mount = model::Mount::block("ext4", "/images/data.ext4", "/data", &[]);
+    let mount = containerization::Mount::block("ext4", "/images/data.ext4", "/data", &[]);
     assert!(matches!(mount.runtime_kind(), ffi::RuntimeKind::Virtioblk));
     assert_eq!(mount.mount_type(), "ext4");
+  }
+
+  #[test]
+  fn fills_what_it_reads() {
+    let mut configuration = linux_container::Configuration::default();
+    configuration.clear_mounts();
+    configuration.push_mount(
+      "virtiofs".into(),
+      "/host".into(),
+      "/guest".into(),
+      vec!["ro".into()],
+      ffi::RuntimeKind::Shared,
+      Vec::new(),
+    );
+    configuration.set_hosts(None);
+    configuration.push_hosts_entry("127.0.0.1".into(), vec!["localhost".into()], None);
+    configuration.set_seccomp_profile(ffi::SeccompMode::Profile, Some("{}".into()));
+    configuration
+      .process_mut()
+      .set_arguments(vec!["/bin/true".into()]);
+
+    assert_eq!(configuration.mounts_len(), 1, "Swift's mounts replace the defaults");
+    assert!(matches!(
+      configuration.mounts_at(0).runtime_kind(),
+      ffi::RuntimeKind::Shared
+    ));
+    assert_eq!(configuration.hosts().entries_len(), 1);
+    assert_eq!(configuration.seccomp_profile(), Some("{}"));
+    assert_eq!(configuration.process().arguments_at(0), "/bin/true");
   }
 }

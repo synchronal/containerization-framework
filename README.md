@@ -3,39 +3,48 @@
 Rust bindings for Apple's [Containerization](https://github.com/apple/containerization)
 framework: Linux containers.
 
+The Rust API mirrors Containerization's Swift API as much as possible.
+Modules are named after the Swift modules, types after the Swift types, and
+methods after their Swift methods, except for using snake case. A Swift type
+nested in another, like `LinuxContainer.Configuration`, is found in a module
+named after its parent: `linux_container::Configuration`.
+
 ```rust
 use containerization_framework as cfw;
-use cfw::model::{Dns, LinuxProcessConfiguration, NatInterface, VmResources};
+use cfw::containerization as cz;
 
-let cache = std::path::Path::new("/Users/me/.cache/containers");
-let store = cfw::Store::at(
-    cache,
-    cache.join(format!("vmlinux-{}", cfw::KERNEL_VERSION)),
-    cfw::INITFS_REFERENCE,
-    cache.join(format!("vminit-{}.ext4", cfw::INITFS_VERSION)),
-);
-let session = cfw::Session::new(store);
-
-let mut spec = cfw::BootSpec::new("example", "docker.io/library/debian:stable-slim");
-spec.vm = VmResources { cpus: 4, memory_in_bytes: (4 << 30) + VmResources::GUEST_MEMORY_OVERHEAD };
-spec.configuration.cpus = 4;
-spec.configuration.memory_in_bytes = 4 << 30;
-spec.configuration.process = LinuxProcessConfiguration::new(&["/bin/sleep", "infinity"]);
-spec.configuration.interfaces = vec![NatInterface::new("192.168.64.7/24", "192.168.64.1")];
-spec.configuration.dns = Some(Dns { nameservers: vec!["192.168.64.1".into()], ..Dns::default() });
-
-session.boot(&spec)?;
-
-let code = session.exec(
-    "example",
-    "hello",
-    &LinuxProcessConfiguration::new(&["/bin/echo", "hello"]),
-    cfw::Stdio::inherit(false),
+let store = cz::ImageStore::new("/Users/me/.cache/containers".as_ref())?;
+let kernel = cz::Kernel::new("/Users/me/.cache/vmlinux", cz::SystemPlatform::LINUX_ARM);
+let mut manager = cz::ContainerManager::with_initfs_reference(
+    &kernel,
+    "ghcr.io/apple/containerization/vminit:0.48.0",
+    &store,
+    false,
+    false,
 )?;
+
+let image = store.get("docker.io/library/alpine:3", true)?;
+let options = cz::container_manager::CreateOptions { networking: false, ..Default::default() };
+let container = manager.create("example", &image, options, |config| {
+    config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
+    config.interfaces = vec![cz::NatInterface::new("192.168.64.7/24", "192.168.64.1")];
+    config.dns = Some(cz::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
+})?;
+container.create()?;
+container.start()?;
+
+let process = container.exec("hello", cz::LinuxProcessConfiguration::new(&["/bin/echo", "hello"]))?;
+process.start()?;
+let status = process.wait(None)?;
+process.delete()?;
+
+container.stop()?;
+manager.delete("example")?;
 ```
 
-A container belongs to the process that booted it and dies with it. Nothing
-lists containers, though other processes may join running ones.
+Swift's `async` methods block until they finish, and errors they throw are
+returned as `cfw::Error`. A container belongs to the process that created it,
+and stops when that process exits.
 
 ## Requirements
 
@@ -50,7 +59,7 @@ On non-macOS platforms, this crate compiles but returns errors on every call.
 
 **A binary using this crate must carry the `com.apple.security.virtualization`
 entitlement.** Without it Virtualization.framework refuses to start a VM, and
-`Session::boot` fails saying so.
+`LinuxContainer::create` fails.
 
 A `containerization.entitlements` file ships with this crate; binaries compiled
 against `containerization-framework` should pass it, or a copy of it, to `codesign`
@@ -87,48 +96,46 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 
 ## Shape
 
-- [`Store`] is an image store on disk, in Containerization's layout.
-- [`Builder`] provisions it (a kernel and the `vminitd` init image) and turns a
-  [`BuildPlan`] into an image: pull the base, unpack it to a writable ext4
-  block, boot it, run each step, and store the result as a single-layer image.
-  No daemon, no builder image, no Dockerfile.
-- [`Session`] boots a [`BootSpec`]'s container from an image and runs
-  processes in it.
+- `containerization`: `ImageStore`, `Image`, `InitImage`, `Kernel`,
+  `ContainerManager`, `LinuxContainer`, `LinuxProcess`, and the configuration
+  types they take (`linux_container::Configuration`,
+  `LinuxProcessConfiguration`, `Mount`, `Dns`, `Hosts`, ...). Their defaults
+  match Containerization's.
+- `containerization_oci`: `LocalContentStore`, `Content`, `User`.
+- `containerization_os`: `terminal::Size`.
 
-Configuration types in `model` mirror Containerization's
-(`LinuxContainerConfiguration`, `LinuxProcessConfiguration`, `Mount`, ...), with
-the same names and defaults, so its documentation applies. One difference:
-fields the image seeds (arguments, working directory, user) are `Option`s, and
-`None` keeps the image's.
+A few things work differently because Rust can't express them the way Swift
+does:
 
-Build caching is by rootfs snapshot rather than by layer: a rebuild resumes from
-the deepest step whose `cache_key` still matches. This crate only stores and
-compares them -- caching, cache invalidation, etc. are the responsibility of
-callers.
+- Rust has no default arguments, so `ContainerManager.create`'s optional
+  arguments are fields of `container_manager::CreateOptions`. Its `Default`
+  uses the same values as Swift.
+- Where Swift takes a `ReaderStream` or `Writer` for a process's `stdin`,
+  `stdout` and `stderr`, Rust takes a file descriptor. Swift uses a duplicate
+  of it, so you keep yours open and close it yourself.
+- `ContainerManager.create` takes a Rust closure. It receives the
+  configuration the manager has prepared and runs on a Swift thread, so it
+  must be `Send + 'static`.
+- `Content.decode()` is generic over Swift's `Decodable`, which Rust can't
+  call. Read `Content::data` and decode the bytes yourself.
 
 ## Unimplemented
 
-The framework is larger than these bindings. Not exposed: signals to a guest
-process, `LinuxPod` (several containers in one VM), container statistics,
-filesystem freeze/thaw/trim, host↔guest file copy, registry authentication and
-push, OCI layout import/export, per-process rlimits and capabilities, and Rosetta
-(so no linux/amd64 — arm64 only).
+The framework is larger than these bindings. Not exposed: `LinuxPod`, a
+`Network` for `ContainerManager`, `VZVirtualMachineManager` and
+`LinuxContainer`'s own initializers, container statistics, filesystem
+operations, host↔guest file copy, vsock, content ingest, registry
+authentication, progress, push, and OCI layout save and load.
 
 An OCI runtime (and so seccomp) is configurable, but requires an init image with
-`runc`, which Apple does not publish. Pass one's reference to `Store::at`.
+`runc`, which Apple does not publish.
 
 ## Versioning
 
-The Containerization release and the kernel are pinned separately, and a
-mismatch fails at runtime rather than at build time. `Session::version()` names
-both.
-
-The pins are public (`KERNEL_VERSION`, `KERNEL_URL`, `INITFS_VERSION`,
-`INITFS_REFERENCE`). As in Containerization, the caller chooses where the kernel
-and unpacked init image live (`Store::at`). Provisioning fills empty paths and
-leaves existing files alone, so name paths for the pinned versions, as above,
-to pick up upgrades. Another init image must carry the pinned release's
-`vminitd`.
+The init image's `vminitd` must match the Containerization release this crate
+builds against (0.48.0, in `swift/Package.swift`): they share a protocol, and a
+mismatch fails at runtime rather than at build time. As in Containerization,
+the caller chooses the kernel and the init image.
 
 ## Testing
 
@@ -141,8 +148,8 @@ calling process.
 
 Those tests share an image store at `~/.cache/containerization-framework-tests`,
 kept between runs. The first run fills it — a kernel download, the init image, and
-a small image built from `alpine:3` — so it needs the network; later runs reuse it.
-This directory can be deleted.
+`alpine:3` — so it needs the network; later runs reuse it. This directory can be
+deleted.
 
 ## License
 

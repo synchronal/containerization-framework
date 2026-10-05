@@ -1,65 +1,315 @@
-//! Stand-ins for the bridge on every platform but macOS: the same functions,
-//! each failing, so [`crate::Session`] and [`crate::Builder`] are written once
-//! and a cross-platform workspace still compiles.
+//! Stand-ins for the bridge on every platform but macOS: the same types and
+//! functions, so the wrappers are written once and a cross-platform workspace
+//! still compiles.
 //!
-//! Signatures match `bridge::ffi`'s, with the model types in place of their
-//! `Rust`-prefixed aliases. [`super::checked`] words the failure.
+//! Nothing can make a Swift object here: every constructor's outcome is a
+//! failure, and every handle is uninhabited, so its methods never run.
 
-use super::FAILED;
-use crate::model;
+use crate::containerization;
+use crate::containerization::container_manager;
+use crate::containerization::linux_container;
+use std::convert::Infallible;
 
-pub(crate) fn czbridge_boot(
-  _spec: model::BootSpec,
-  _store_root: &str,
-  _kernel_path: &str,
-  _initfs_reference: &str,
-  _initfs_path: &str,
-) -> i32 {
-  FAILED
+const MACOS_ONLY: &str = "Containerization.framework is macOS only";
+
+/// Always a failure, so nothing is taken from it.
+pub(crate) struct CzOutcome;
+
+impl CzOutcome {
+  pub(crate) fn error(&self) -> Option<String> {
+    Some(MACOS_ONLY.to_string())
+  }
 }
 
-pub(crate) fn czbridge_exec(
-  _name: &str,
-  _id: &str,
-  _configuration: model::LinuxProcessConfiguration,
-  _terminal: i32,
-  _stdin: i32,
-  _stdout: i32,
-  _stderr: i32,
-) -> i32 {
-  FAILED
+macro_rules! taken {
+  ($($name:ident -> $type:ty),* $(,)?) => {
+    impl CzOutcome {
+      $(pub(crate) fn $name(&self) -> $type {
+        unreachable!("a failed outcome holds nothing")
+      })*
+    }
+  };
 }
 
-pub(crate) fn czbridge_build(
-  _plan: model::BuildPlan,
-  _store_root: &str,
-  _kernel_path: &str,
-  _initfs_reference: &str,
-  _initfs_path: &str,
-) -> i32 {
-  FAILED
+taken!(
+  local_content_store -> CzLocalContentStore,
+  content -> CzContent,
+  image_store -> CzImageStore,
+  image -> CzImage,
+  images -> CzImages,
+  init_image -> CzInitImage,
+  container_manager -> CzContainerManager,
+  linux_container -> CzLinuxContainer,
+  linux_process -> CzLinuxProcess,
+  mount -> containerization::Mount,
+  exit_code -> i32,
+  exited_at -> f64,
+  number -> u64,
+  text -> String,
+  strings -> Vec<String>,
+  has_bytes -> bool,
+  bytes -> Vec<u8>,
+);
+
+macro_rules! handles {
+  ($($name:ident),* $(,)?) => {
+    $(pub(crate) struct $name(Infallible);)*
+  };
 }
 
-pub(crate) fn czbridge_provision(
-  _store_root: &str,
-  _kernel_path: &str,
-  _kernel_url: &str,
-  _kernel_in_archive: &str,
-  _initfs_reference: &str,
-  _initfs_path: &str,
-) -> i32 {
-  FAILED
+handles!(
+  CzLocalContentStore,
+  CzContent,
+  CzImageStore,
+  CzImages,
+  CzImage,
+  CzInitImage,
+  CzContainerManager,
+  CzLinuxContainer,
+  CzLinuxProcess,
+);
+
+pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
+  CzOutcome
 }
 
-pub(crate) fn czbridge_resize(_id: &str, _terminal: i32) -> i32 {
-  FAILED
+pub(crate) fn cz_image_store_new(_path: &str) -> CzOutcome {
+  CzOutcome
 }
 
-/// Nothing can be running, since nothing can boot.
-pub(crate) fn czbridge_is_running(_name: &str) -> bool {
-  false
+impl CzLocalContentStore {
+  pub(crate) fn get(&self, _digest: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete_digests(&self, _digests: Vec<String>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete_keeping(&self, _keeping: Vec<String>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn total_allocated_size(&self) -> CzOutcome {
+    match self.0 {}
+  }
 }
 
-pub(crate) fn czbridge_is_unpacked(_store_root: &str, _image_reference: &str) -> i32 {
-  FAILED
+impl CzContent {
+  pub(crate) fn is_some(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn path(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn digest(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn size(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn data(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn data_range(&self, _offset: u64, _length: usize) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzImageStore {
+  pub(crate) fn path(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn get(&self, _reference: &str, _pull: bool) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn list(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete(&self, _reference: &str, _perform_cleanup: bool) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn tag(&self, _existing: &str, _new: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn pull(&self, _reference: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn get_init_image(&self, _reference: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn clean_up_orphaned_blobs(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn calculate_orphaned_blobs_size(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn container_manager(
+    &self,
+    _kernel: containerization::Kernel,
+    _initfs: containerization::Mount,
+    _rosetta: bool,
+    _nested_virtualization: bool,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn container_manager_with_initfs_reference(
+    &self,
+    _kernel: containerization::Kernel,
+    _initfs_reference: &str,
+    _rosetta: bool,
+    _nested_virtualization: bool,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzImages {
+  pub(crate) fn len(&self) -> usize {
+    match self.0 {}
+  }
+
+  pub(crate) fn at(&self, _index: usize) -> CzImage {
+    match self.0 {}
+  }
+}
+
+impl CzImage {
+  pub(crate) fn duplicate(&self) -> CzImage {
+    match self.0 {}
+  }
+
+  pub(crate) fn reference(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn digest(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn media_type(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn referenced_digests(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn get_content(&self, _digest: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzInitImage {
+  pub(crate) fn name(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn init_block(&self, _at: &str, _platform: containerization::SystemPlatform) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzContainerManager {
+  pub(crate) fn create(
+    &self,
+    _id: &str,
+    _image: CzImage,
+    _options: container_manager::CreateOptions,
+    _seed: linux_container::Configuration,
+    _configuration: Box<dyn FnOnce(linux_container::Configuration) -> linux_container::Configuration>,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzLinuxContainer {
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn start(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn kill(&self, _signal: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn wait(&self, _timeout_in_seconds: Option<i64>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize(&self, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn exec(&self, _id: &str, _configuration: containerization::LinuxProcessConfiguration) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close_stdin(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzLinuxProcess {
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn pid(&self) -> i32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn start(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn kill(&self, _signal: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize(&self, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close_stdin(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn wait(&self, _timeout_in_seconds: Option<i64>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete(&self) -> CzOutcome {
+    match self.0 {}
+  }
 }

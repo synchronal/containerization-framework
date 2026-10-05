@@ -1,6 +1,6 @@
 //! The bridge on macOS, its stand-in elsewhere, and how either one's failure
-//! reads. [`crate::Session`] and [`crate::Builder`] call through here, so they
-//! are written once for every platform.
+//! reads. Every wrapper calls through here, so each is written once for every
+//! platform.
 
 #[cfg(not(target_os = "macos"))]
 pub(crate) mod unsupported;
@@ -11,29 +11,35 @@ pub(crate) use crate::bridge::ffi;
 #[cfg(not(target_os = "macos"))]
 pub(crate) use self::unsupported as ffi;
 
-/// The bridge's failure code; can't collide with a guest exit code (0...255).
-const FAILED: i32 = -1;
+use crate::containerization;
+use crate::error::Error;
+use std::time::Duration;
+use std::time::SystemTime;
 
-/// Turns the bridge's `-1` into a failure of `action`, with the message Swift
-/// left behind.
-#[cfg(target_os = "macos")]
-pub(crate) fn checked(code: i32, action: impl Into<String>) -> Result<i32, crate::Error> {
-  if code == FAILED {
-    return Err(crate::Error::failed(action, ffi::czbridge_last_error()));
+/// What a throwing Swift call returned, or what it threw as a failure of
+/// `action`.
+pub(crate) fn outcome(outcome: ffi::CzOutcome, action: impl Into<String>) -> Result<ffi::CzOutcome, Error> {
+  match outcome.error() {
+    Some(message) => Err(error(action, message)),
+    None => Ok(outcome),
   }
+}
 
-  Ok(code)
+#[cfg(target_os = "macos")]
+fn error(action: impl Into<String>, message: String) -> Error {
+  Error::failed(action, message)
 }
 
 /// Elsewhere the bridge only ever fails, and nothing was attempted.
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn checked(code: i32, action: impl Into<String>) -> Result<i32, crate::Error> {
-  if code == FAILED {
-    return Err(crate::Error::unavailable(
-      action,
-      "Containerization.framework is macOS only",
-    ));
-  }
+fn error(action: impl Into<String>, message: String) -> Error {
+  Error::unavailable(action, message)
+}
 
-  Ok(code)
+/// `ExitStatus`, its `exitedAt` crossing as seconds since 1970.
+pub(crate) fn exit_status(outcome: &ffi::CzOutcome) -> containerization::ExitStatus {
+  containerization::ExitStatus {
+    exit_code: outcome.exit_code(),
+    exited_at: SystemTime::UNIX_EPOCH + Duration::from_secs_f64(outcome.exited_at().max(0.0)),
+  }
 }

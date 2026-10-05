@@ -2,6 +2,60 @@
 
 ## Unreleased
 
+- The Rust API now mirrors Containerization's Swift API. Modules are named
+  after the Swift modules (`containerization`, `containerization_oci`,
+  `containerization_os`), types after the Swift types, and methods after their
+  Swift methods. A Swift type nested in another, like
+  `LinuxContainer.Configuration`, is found in a module named after its parent:
+  `linux_container::Configuration`.
+- Added wrappers for `ImageStore`, `Image`, `InitImage`, `Kernel`,
+  `SystemPlatform`, `ContainerManager`, `LinuxContainer`, `LinuxProcess`,
+  `ExitStatus`, `Signal`, `LocalContentStore` and `Content`.
+- Processes can now be given rlimits, capabilities, `noNewPrivileges` and a
+  terminal. Mounts can use `Mount.RuntimeOptions.shared`, and a boot log can
+  write to a file descriptor.
+- `ContainerManager::create` takes Swift's optional arguments in a
+  `container_manager::CreateOptions` struct, whose defaults match Swift's. Its
+  closure receives the configuration the manager prepared and can change it.
+
+### Breaking
+
+The types this crate built on top of Containerization have been removed. Use
+the Containerization types they were built from.
+
+- `Session` is removed. Create containers with `ContainerManager::create`,
+  then call `create`, `start` and `exec` on the `LinuxContainer` it returns.
+  `exec` returns a `LinuxProcess`, which you `start` and `wait` on. There is
+  no replacement for `is_running` or `is_unpacked`; keep the `LinuxContainer`
+  you created. Each container now unpacks its own copy of the image, as
+  Containerization does, instead of cloning one shared copy.
+- `Session::version` and the kernel and init image constants (`KERNEL_URL`,
+  `KERNEL_IN_ARCHIVE`, `KERNEL_VERSION`, `INITFS_REFERENCE`,
+  `INITFS_VERSION`) are removed. Callers choose the kernel and init image
+  themselves; the init image must match Containerization 0.48.0.
+- `Builder`, `BuildPlan`, `BuildStep`, `Shell` and `CachePolicy` are removed,
+  with no replacement. This crate no longer builds images or downloads
+  kernels.
+- `Store` and `StoreError` are replaced by `ImageStore`.
+- `BootSpec` is replaced by the arguments to `ContainerManager::create`.
+- `Stdio`, `lend`, `is_tty` and `UNATTACHED` are removed. Pass file
+  descriptors in `LinuxProcessConfiguration`'s `stdin`, `stdout` and `stderr`.
+- The `model` module is now `containerization`. Some types moved with their
+  Swift names: `LinuxContainerConfiguration` is now
+  `linux_container::Configuration`, `HostsEntry` is `hosts::Entry`,
+  `RuntimeOptions` is `mount::RuntimeOptions`, `Direction` is
+  `unix_socket_configuration::Direction`, and `User` is
+  `containerization_oci::User`.
+- `LinuxProcessConfiguration` now has the same fields and defaults as Swift's.
+  `arguments`, `working_directory` and `user` are no longer `Option`s, and the
+  environment defaults to just `PATH`. Only the container's first process
+  starts from the image's settings, because `ContainerManager` fills them in.
+- Processes started with `exec` no longer get `TERM=xterm`, or the image's
+  user and environment. Set them in the process's configuration.
+- DNS nameservers are no longer checked for hostnames before a container
+  starts.
+- `BootLog` is now an enum: `File { path, append }` or `FileHandle`.
+
 ## v0.2.2
 
 - Update Containerization to 0.48.0

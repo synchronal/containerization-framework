@@ -10,8 +10,8 @@ const FIRST_HOST: u32 = 2;
 const LAST_HOST: u32 = 250;
 
 /// Resolve through the NAT's gateway.
-pub fn gateway_dns() -> cfw::model::Dns {
-  cfw::model::Dns {
+pub fn gateway_dns() -> cfw::containerization::Dns {
+  cfw::containerization::Dns {
     nameservers: vec![GATEWAY.to_string()],
     ..Default::default()
   }
@@ -21,7 +21,7 @@ pub fn gateway_dns() -> cfw::model::Dns {
 ///
 /// Nothing hands out leases, so the caller allocates. Hashed from the name:
 /// stable per container, distinct between concurrent ones.
-pub fn interface(name: &str) -> cfw::model::NatInterface {
+pub fn interface(name: &str) -> cfw::containerization::NatInterface {
   // FNV-1a: short and well spread.
   let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
 
@@ -35,5 +35,5 @@ pub fn interface(name: &str) -> cfw::model::NatInterface {
     .rsplit_once('.')
     .expect("the gateway is a dotted quad");
 
-  cfw::model::NatInterface::new(format!("{subnet}.{host}/{PREFIX}"), GATEWAY)
+  cfw::containerization::NatInterface::new(format!("{subnet}.{host}/{PREFIX}"), GATEWAY)
 }

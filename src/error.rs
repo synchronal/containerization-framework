@@ -46,13 +46,6 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// A store that isn't ready is a missing prerequisite, not a failure.
-impl From<crate::store::StoreError> for Error {
-  fn from(error: crate::store::StoreError) -> Self {
-    Self::unavailable("use the image store", error)
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -66,17 +59,6 @@ mod tests {
     assert_eq!(
       Error::unavailable("read the image store", "it has never been provisioned").to_string(),
       "cannot read the image store: it has never been provisioned"
-    );
-  }
-
-  #[test]
-  fn reads_an_unready_store_as_unavailable() {
-    let error = Error::from(crate::store::StoreError::Missing("/nowhere".into()));
-
-    assert!(matches!(error, Error::Unavailable { .. }));
-    assert_eq!(
-      error.to_string(),
-      "cannot use the image store: no image store at /nowhere"
     );
   }
 
