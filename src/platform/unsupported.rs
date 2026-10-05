@@ -11,6 +11,9 @@ use crate::containerization;
 use crate::containerization::container_manager;
 use crate::containerization::image;
 use crate::containerization::linux_container;
+use crate::containerization_extras;
+use crate::containerization_extras::IPv6Address;
+use crate::containerization_extras::IpAddress;
 use crate::containerization_oci;
 use std::convert::Infallible;
 
@@ -49,6 +52,17 @@ taken!(
   written_size -> i64,
   written_digest -> String,
   ext4_reader -> CzExt4Reader,
+  boolean -> bool,
+  is_some -> bool,
+  ipv4_address -> containerization_extras::IPv4Address,
+  ipv6_address -> containerization_extras::IPv6Address,
+  ip_address -> containerization_extras::IpAddress,
+  prefix -> containerization_extras::Prefix,
+  cidr_v4 -> containerization_extras::CIDRv4,
+  cidr_v6 -> containerization_extras::CIDRv6,
+  cidr -> containerization_extras::Cidr,
+  mac_address -> containerization_extras::MACAddress,
+  uint128 -> u128,
   platform -> containerization_oci::Platform,
   mount -> containerization::Mount,
   exit_code -> i32,
@@ -99,6 +113,93 @@ pub(crate) fn cz_platform_current() -> CzOutcome {
 pub(crate) fn cz_ext4_reader_new(_block_device: &str) -> CzOutcome {
   CzOutcome
 }
+
+/// Free functions that only ever fail here, by their argument types.
+macro_rules! failing {
+  ($($name:ident($($type:ty),*)),* $(,)?) => {
+    $(pub(crate) fn $name($(_: $type),*) -> CzOutcome {
+      CzOutcome
+    })*
+  };
+}
+
+failing!(
+  cz_ipv4_address_from_bytes(Vec<u8>),
+  cz_ipv4_address_parse(&str),
+  cz_ipv4_address_bytes(u32),
+  cz_ipv4_address_description(u32),
+  cz_ipv4_address_is_unspecified(u32),
+  cz_ipv4_address_is_loopback(u32),
+  cz_ipv4_address_is_multicast(u32),
+  cz_ipv4_address_is_link_local(u32),
+  cz_ipv4_address_is_broadcast(u32),
+  cz_ipv4_address_less_than(u32, u32),
+  cz_ipv6_address_parse(&str),
+  cz_ipv6_address_from_bytes(Vec<u8>, Option<String>),
+  cz_ipv6_address_unspecified(),
+  cz_ipv6_address_loopback(),
+  cz_ipv6_address_bytes(IPv6Address),
+  cz_ipv6_address_description(IPv6Address),
+  cz_ipv6_address_is_unspecified(IPv6Address),
+  cz_ipv6_address_is_loopback(IPv6Address),
+  cz_ipv6_address_is_multicast(IPv6Address),
+  cz_ipv6_address_is_link_local(IPv6Address),
+  cz_ipv6_address_is_unique_local(IPv6Address),
+  cz_ipv6_address_is_global_unicast(IPv6Address),
+  cz_ipv6_address_is_documentation(IPv6Address),
+  cz_ipv6_address_less_than(IPv6Address, IPv6Address),
+  cz_ip_address_parse(&str),
+  cz_ip_address_description(IpAddress),
+  cz_ip_address_is_v4(IpAddress),
+  cz_ip_address_is_v6(IpAddress),
+  cz_ip_address_ipv4(IpAddress),
+  cz_ip_address_ipv6(IpAddress),
+  cz_ip_address_is_loopback(IpAddress),
+  cz_ip_address_is_multicast(IpAddress),
+  cz_ip_address_is_unspecified(IpAddress),
+  cz_prefix_new(u8),
+  cz_prefix_ipv4(u8),
+  cz_prefix_ipv6(u8),
+  cz_prefix_description(u8),
+  cz_prefix_suffix_mask32(u8),
+  cz_prefix_prefix_mask32(u8),
+  cz_prefix_suffix_mask128(u8),
+  cz_prefix_prefix_mask128(u8),
+  cz_cidr_v4_parse(&str),
+  cz_cidr_v4_new(u32, u8),
+  cz_cidr_v4_from_range(u32, u32),
+  cz_cidr_v4_lower(u32, u8),
+  cz_cidr_v4_upper(u32, u8),
+  cz_cidr_v4_gateway(u32, u8),
+  cz_cidr_v4_contains(u32, u8, u32),
+  cz_cidr_v4_description(u32, u8),
+  cz_cidr_v6_parse(&str),
+  cz_cidr_v6_new(IPv6Address, u8),
+  cz_cidr_v6_from_range(IPv6Address, IPv6Address),
+  cz_cidr_v6_lower(IPv6Address, u8),
+  cz_cidr_v6_upper(IPv6Address, u8),
+  cz_cidr_v6_gateway(IPv6Address, u8),
+  cz_cidr_v6_contains(IPv6Address, u8, IPv6Address),
+  cz_cidr_v6_description(IPv6Address, u8),
+  cz_cidr_parse(&str),
+  cz_cidr_new(IpAddress, u8),
+  cz_cidr_from_range(IpAddress, IpAddress),
+  cz_cidr_address(IpAddress, u8),
+  cz_cidr_prefix(IpAddress, u8),
+  cz_cidr_lower(IpAddress, u8),
+  cz_cidr_upper(IpAddress, u8),
+  cz_cidr_contains(IpAddress, u8, IpAddress),
+  cz_cidr_description(IpAddress, u8),
+  cz_mac_address_new(u64),
+  cz_mac_address_from_bytes(Vec<u8>),
+  cz_mac_address_parse(&str),
+  cz_mac_address_bytes(u64),
+  cz_mac_address_description(u64),
+  cz_mac_address_is_locally_administered(u64),
+  cz_mac_address_is_multicast(u64),
+  cz_mac_address_ipv6_address(u64, IPv6Address),
+  cz_mac_address_less_than(u64, u64),
+);
 
 pub(crate) fn cz_ext4_unpack(
   _unpacker: containerization::Ext4Unpacker,

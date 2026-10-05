@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added `ContainerizationExtras`' address types to `containerization_extras`:
+  `IPv4Address`, `IPv6Address`, `IpAddress`, `Prefix`, `CIDRv4`, `CIDRv6`,
+  `Cidr` and `MACAddress`. Swift does the parsing and computes every getter, so
+  each of those calls returns a `Result`. An address's text comes from its
+  `description` method, and addresses are ordered with `PartialOrd` through
+  Swift's `<`.
 - `Error::Failed` now carries the code of a thrown `ContainerizationError`, as
   a `containerization_error::Code`. Check it with `Error::is_code`, which
   mirrors `ContainerizationError.isCode(_:)`. Other errors have no code.

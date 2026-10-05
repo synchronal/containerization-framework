@@ -12,6 +12,7 @@
 //! Rust function returning one to Swift gets a redundant cast in
 //! swift-bridge's glue.)
 
+mod addresses;
 mod container;
 mod images;
 

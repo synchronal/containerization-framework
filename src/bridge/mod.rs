@@ -34,6 +34,8 @@ use crate::containerization::container_manager::RootfsCreateOptions as RustRootf
 use crate::containerization::hosts::Entry as RustHostsEntry;
 use crate::containerization::image::Description as RustImageDescription;
 use crate::containerization::linux_container::Configuration as RustLinuxContainerConfiguration;
+use crate::containerization_extras::IPv6Address as RustIPv6Address;
+use crate::containerization_extras::IpAddress as RustIpAddress;
 use crate::containerization_oci::Descriptor as RustDescriptor;
 use crate::containerization_oci::Platform as RustPlatform;
 use crate::containerization_oci::User as RustUser;
@@ -136,6 +138,21 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "isSome")]
     fn is_some(self: &RustProgressHandler) -> bool;
     fn call(self: &RustProgressHandler, kinds: Vec<ProgressKind>, values: Vec<i64>);
+
+    // Its `UInt128` value crosses as two halves.
+    type RustIPv6Address;
+    #[swift_bridge(swift_name = "valueHigh")]
+    fn value_high(self: &RustIPv6Address) -> u64;
+    #[swift_bridge(swift_name = "valueLow")]
+    fn value_low(self: &RustIPv6Address) -> u64;
+    fn zone(self: &RustIPv6Address) -> Option<&str>;
+
+    type RustIpAddress;
+    #[swift_bridge(swift_name = "holdsV6")]
+    fn holds_v6(self: &RustIpAddress) -> bool;
+    #[swift_bridge(swift_name = "v4Value")]
+    fn v4_value(self: &RustIpAddress) -> u32;
+    fn v6(self: &RustIpAddress) -> &RustIPv6Address;
 
     type RustPlatform;
     fn architecture(self: &RustPlatform) -> &str;
@@ -564,6 +581,197 @@ pub(crate) mod ffi {
 
     #[swift_bridge(swift_name = "currentPlatform")]
     fn cz_platform_current() -> CzOutcome;
+
+    // Addresses, field by field: Rust builds its own. Each address getter
+    // also reads the address in an `IPAddress`, a CIDR block or a `CIDR`, and
+    // `prefixLength` the prefix of a CIDR block or a `CIDR`.
+    fn boolean(self: &CzOutcome) -> bool;
+    // Whether an optional result is there.
+    #[swift_bridge(swift_name = "isSome")]
+    fn is_some(self: &CzOutcome) -> bool;
+    #[swift_bridge(swift_name = "isIPv6")]
+    fn is_ipv6(self: &CzOutcome) -> bool;
+    #[swift_bridge(swift_name = "ipv4Value")]
+    fn ipv4_value(self: &CzOutcome) -> u32;
+    #[swift_bridge(swift_name = "ipv6High")]
+    fn ipv6_high(self: &CzOutcome) -> u64;
+    #[swift_bridge(swift_name = "ipv6Low")]
+    fn ipv6_low(self: &CzOutcome) -> u64;
+    #[swift_bridge(swift_name = "ipv6Zone")]
+    fn ipv6_zone(self: &CzOutcome) -> Option<String>;
+    #[swift_bridge(swift_name = "prefixLength")]
+    fn prefix_length(self: &CzOutcome) -> u8;
+    #[swift_bridge(swift_name = "macValue")]
+    fn mac_value(self: &CzOutcome) -> u64;
+    // A `UInt128`, in two halves.
+    #[swift_bridge(swift_name = "wideHigh")]
+    fn wide_high(self: &CzOutcome) -> u64;
+    #[swift_bridge(swift_name = "wideLow")]
+    fn wide_low(self: &CzOutcome) -> u64;
+
+    // `IPv4Address`, as its value.
+    #[swift_bridge(swift_name = "ipv4AddressFromBytes")]
+    fn cz_ipv4_address_from_bytes(bytes: Vec<u8>) -> CzOutcome;
+    #[swift_bridge(swift_name = "parseIPv4Address")]
+    fn cz_ipv4_address_parse(string: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressBytes")]
+    fn cz_ipv4_address_bytes(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressDescription")]
+    fn cz_ipv4_address_description(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressIsUnspecified")]
+    fn cz_ipv4_address_is_unspecified(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressIsLoopback")]
+    fn cz_ipv4_address_is_loopback(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressIsMulticast")]
+    fn cz_ipv4_address_is_multicast(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressIsLinkLocal")]
+    fn cz_ipv4_address_is_link_local(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressIsBroadcast")]
+    fn cz_ipv4_address_is_broadcast(value: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4AddressLessThan")]
+    fn cz_ipv4_address_less_than(lhs: u32, rhs: u32) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "parseIPv6Address")]
+    fn cz_ipv6_address_parse(address: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressFromBytes")]
+    fn cz_ipv6_address_from_bytes(bytes: Vec<u8>, zone: Option<String>) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressUnspecified")]
+    fn cz_ipv6_address_unspecified() -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressLoopback")]
+    fn cz_ipv6_address_loopback() -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressBytes")]
+    fn cz_ipv6_address_bytes(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressDescription")]
+    fn cz_ipv6_address_description(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsUnspecified")]
+    fn cz_ipv6_address_is_unspecified(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsLoopback")]
+    fn cz_ipv6_address_is_loopback(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsMulticast")]
+    fn cz_ipv6_address_is_multicast(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsLinkLocal")]
+    fn cz_ipv6_address_is_link_local(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsUniqueLocal")]
+    fn cz_ipv6_address_is_unique_local(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsGlobalUnicast")]
+    fn cz_ipv6_address_is_global_unicast(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressIsDocumentation")]
+    fn cz_ipv6_address_is_documentation(address: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6AddressLessThan")]
+    fn cz_ipv6_address_less_than(lhs: RustIPv6Address, rhs: RustIPv6Address) -> CzOutcome;
+
+    #[swift_bridge(swift_name = "parseIPAddress")]
+    fn cz_ip_address_parse(string: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressDescription")]
+    fn cz_ip_address_description(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIsV4")]
+    fn cz_ip_address_is_v4(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIsV6")]
+    fn cz_ip_address_is_v6(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIPv4")]
+    fn cz_ip_address_ipv4(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIPv6")]
+    fn cz_ip_address_ipv6(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIsLoopback")]
+    fn cz_ip_address_is_loopback(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIsMulticast")]
+    fn cz_ip_address_is_multicast(address: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipAddressIsUnspecified")]
+    fn cz_ip_address_is_unspecified(address: RustIpAddress) -> CzOutcome;
+
+    // `Prefix`, as its length.
+    #[swift_bridge(swift_name = "prefixWithLength")]
+    fn cz_prefix_new(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixIPv4")]
+    fn cz_prefix_ipv4(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixIPv6")]
+    fn cz_prefix_ipv6(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixDescription")]
+    fn cz_prefix_description(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixSuffixMask32")]
+    fn cz_prefix_suffix_mask32(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixPrefixMask32")]
+    fn cz_prefix_prefix_mask32(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixSuffixMask128")]
+    fn cz_prefix_suffix_mask128(length: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixPrefixMask128")]
+    fn cz_prefix_prefix_mask128(length: u8) -> CzOutcome;
+
+    // `CIDRv4`, as its address's value and its prefix's length.
+    #[swift_bridge(swift_name = "parseCIDRv4")]
+    fn cz_cidr_v4_parse(cidr: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4")]
+    fn cz_cidr_v4_new(address: u32, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4FromRange")]
+    fn cz_cidr_v4_from_range(lower: u32, upper: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4Lower")]
+    fn cz_cidr_v4_lower(address: u32, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4Upper")]
+    fn cz_cidr_v4_upper(address: u32, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4Gateway")]
+    fn cz_cidr_v4_gateway(address: u32, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4Contains")]
+    fn cz_cidr_v4_contains(address: u32, prefix: u8, ip: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV4Description")]
+    fn cz_cidr_v4_description(address: u32, prefix: u8) -> CzOutcome;
+
+    // `CIDRv6`, as its address and its prefix's length.
+    #[swift_bridge(swift_name = "parseCIDRv6")]
+    fn cz_cidr_v6_parse(cidr: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6")]
+    fn cz_cidr_v6_new(address: RustIPv6Address, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6FromRange")]
+    fn cz_cidr_v6_from_range(lower: RustIPv6Address, upper: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6Lower")]
+    fn cz_cidr_v6_lower(address: RustIPv6Address, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6Upper")]
+    fn cz_cidr_v6_upper(address: RustIPv6Address, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6Gateway")]
+    fn cz_cidr_v6_gateway(address: RustIPv6Address, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6Contains")]
+    fn cz_cidr_v6_contains(address: RustIPv6Address, prefix: u8, ip: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrV6Description")]
+    fn cz_cidr_v6_description(address: RustIPv6Address, prefix: u8) -> CzOutcome;
+
+    // `CIDR`, as its case's address and its prefix's length.
+    #[swift_bridge(swift_name = "parseCIDR")]
+    fn cz_cidr_parse(cidr: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidr")]
+    fn cz_cidr_new(address: RustIpAddress, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrFromRange")]
+    fn cz_cidr_from_range(lower: RustIpAddress, upper: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrAddress")]
+    fn cz_cidr_address(address: RustIpAddress, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrPrefix")]
+    fn cz_cidr_prefix(address: RustIpAddress, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrLower")]
+    fn cz_cidr_lower(address: RustIpAddress, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrUpper")]
+    fn cz_cidr_upper(address: RustIpAddress, prefix: u8) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrContains")]
+    fn cz_cidr_contains(address: RustIpAddress, prefix: u8, ip: RustIpAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "cidrDescription")]
+    fn cz_cidr_description(address: RustIpAddress, prefix: u8) -> CzOutcome;
+
+    // `MACAddress`, as its value.
+    #[swift_bridge(swift_name = "macAddress")]
+    fn cz_mac_address_new(value: u64) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressFromBytes")]
+    fn cz_mac_address_from_bytes(bytes: Vec<u8>) -> CzOutcome;
+    #[swift_bridge(swift_name = "parseMACAddress")]
+    fn cz_mac_address_parse(string: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressBytes")]
+    fn cz_mac_address_bytes(value: u64) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressDescription")]
+    fn cz_mac_address_description(value: u64) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressIsLocallyAdministered")]
+    fn cz_mac_address_is_locally_administered(value: u64) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressIsMulticast")]
+    fn cz_mac_address_is_multicast(value: u64) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressIPv6Address")]
+    fn cz_mac_address_ipv6_address(value: u64, network: RustIPv6Address) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddressLessThan")]
+    fn cz_mac_address_less_than(lhs: u64, rhs: u64) -> CzOutcome;
 
     type CzExt4Reader;
     #[swift_bridge(swift_name = "openExt4Reader")]

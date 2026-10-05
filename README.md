@@ -104,7 +104,9 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 - `containerization_oci`: `LocalContentStore`, `Content`, `ContentWriter`,
   `Descriptor`, `Platform`, `User`.
 - `containerization_ext4`: `ext4::Ext4Reader`, `ext4::JournalConfig`.
-- `containerization_extras`: `ProgressEvent`, `ProgressHandler`.
+- `containerization_extras`: `IPv4Address`, `IPv6Address`, `IpAddress`,
+  `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr`, `MACAddress`, `ProgressEvent`,
+  `ProgressHandler`.
 - `containerization_os`: `terminal::Size`.
 
 A few things work differently because Rust can't express them the way Swift
@@ -126,6 +128,14 @@ does:
   `ProgressHandler`, and a `ProgressHandler` must also be `Sync`.
 - `Content.decode()` is generic over Swift's `Decodable`, which Rust can't
   call. Read `Content::data` and decode the bytes yourself.
+- Swift computes everything about an address, from parsing it to its
+  `description` and `isLoopback`. Each of those calls Swift and returns a
+  `Result`, which is why addresses have a `description` method rather than
+  `Display`. For the same reason, their ordering is `PartialOrd`, which asks
+  Swift's `<` and gives `None` where Swift can't be asked.
+- Where Swift's initializer checks or changes a value, as with `Prefix`,
+  `CIDRv4`, `CIDRv6` and `MACAddress`, only Swift makes one, so their fields
+  are read through getters.
 
 ## Unimplemented
 

@@ -13,6 +13,7 @@
 
 import Containerization
 import ContainerizationError
+import ContainerizationExtras
 import ContainerizationOCI
 import Foundation
 
@@ -46,10 +47,14 @@ final class CzOutcome: @unchecked Sendable {
   }
 
   private func taken<T>() -> T {
-    guard let value = value as? T else {
-      preconditionFailure("Rust took a \(T.self) from an outcome holding \(String(describing: value))")
+    cast(value)
+  }
+
+  private func cast<T>(_ held: Any?) -> T {
+    guard let held = held as? T else {
+      preconditionFailure("Rust took a \(T.self) from an outcome holding \(String(describing: held))")
     }
-    return value
+    return held
   }
 
   func localContentStore() -> CzLocalContentStore { taken() }
@@ -124,6 +129,76 @@ final class CzOutcome: @unchecked Sendable {
     (taken() as Platform).variant
   }
 
+  // Addresses, field by field: Rust builds its own.
+
+  func boolean() -> Bool { taken() }
+
+  /// Whether an optional result is there, rather than `Absent`.
+  func isSome() -> Bool {
+    !(value is Absent)
+  }
+
+  /// Whether the address held, alone or in a CIDR block, is IPv6.
+  func isIPv6() -> Bool {
+    heldAddress() is IPv6Address
+  }
+
+  func ipv4Value() -> UInt32 {
+    (cast(heldAddress()) as IPv4Address).value
+  }
+
+  func ipv6High() -> UInt64 {
+    UInt64((cast(heldAddress()) as IPv6Address).value >> 64)
+  }
+
+  func ipv6Low() -> UInt64 {
+    UInt64(truncatingIfNeeded: (cast(heldAddress()) as IPv6Address).value)
+  }
+
+  func ipv6Zone() -> String? {
+    (cast(heldAddress()) as IPv6Address).zone
+  }
+
+  func prefixLength() -> UInt8 {
+    switch value {
+    case let cidr as CIDRv4: cidr.prefix.length
+    case let cidr as CIDRv6: cidr.prefix.length
+    case let cidr as CIDR: cidr.prefix.length
+    default: (taken() as Prefix).length
+    }
+  }
+
+  func macValue() -> UInt64 {
+    (taken() as MACAddress).value
+  }
+
+  func wideHigh() -> UInt64 {
+    UInt64((taken() as UInt128) >> 64)
+  }
+
+  func wideLow() -> UInt64 {
+    UInt64(truncatingIfNeeded: taken() as UInt128)
+  }
+
+  /// The `IPv4Address` or `IPv6Address` held, alone or in an `IPAddress`, a
+  /// CIDR block or a `CIDR`.
+  private func heldAddress() -> Any? {
+    switch value {
+    case let cidr as CIDRv4: cidr.address
+    case let cidr as CIDRv6: cidr.address
+    case let cidr as CIDR: unwrapped(cidr.address)
+    case let address as IPAddress: unwrapped(address)
+    default: value
+    }
+  }
+
+  private func unwrapped(_ address: IPAddress) -> Any {
+    switch address {
+    case .v4(let address): address
+    case .v6(let address): address
+    }
+  }
+
   func exitCode() -> Int32 {
     (taken() as ExitStatus).exitCode
   }
@@ -156,13 +231,24 @@ final class CzOutcome: @unchecked Sendable {
     (taken() as Data?) != nil
   }
 
+  /// A `Data?`, or a `[UInt8]`.
   func bytes() -> RustVec<UInt8> {
     let vec = RustVec<UInt8>()
-    for byte in (taken() as Data?) ?? Data() {
+    let bytes = (value as? [UInt8]).map { Data($0) } ?? (taken() as Data?) ?? Data()
+    for byte in bytes {
       vec.push(value: byte)
     }
     return vec
   }
+}
+
+/// What an outcome holds for a `nil` result, which `Any` can't hold apart from
+/// a missing value.
+struct Absent {}
+
+/// An optional result, with `nil` as `Absent`.
+func absent(_ value: Any?) -> Any {
+  value ?? Absent()
 }
 
 func rust(_ string: String) -> RustString {
