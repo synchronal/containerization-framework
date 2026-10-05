@@ -28,6 +28,10 @@
   the arguments Swift requires and give the rest Swift's defaults.
   `MediaTypes` and `AnnotationKeys` hold Swift's strings as associated
   constants.
+- Added `containerization_oci::Reference`, which wraps Swift's `Reference`
+  class. `Reference::new` takes Swift's defaulted arguments as
+  `reference::NewOptions`.
+- Added `ParsedDigest`. Only Swift makes one, so `encoded` is a getter.
 - `Image` has `description`, `descriptor`, `index`, `manifest`,
   `descriptor_for` and `config`. `descriptor_for` mirrors Swift's
   `descriptor(for:)`, and takes a suffix because Rust has no overloading.

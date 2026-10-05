@@ -60,6 +60,8 @@ taken!(
   written_size -> i64,
   written_digest -> String,
   ext4_reader -> CzExt4Reader,
+  reference -> CzReference,
+  parsed_digest_encoded -> String,
   boolean -> bool,
   is_some -> bool,
   ipv4_address -> containerization_extras::IPv4Address,
@@ -104,6 +106,7 @@ handles!(
   CzLinuxProcess,
   CzContentWriter,
   CzExt4Reader,
+  CzReference,
 );
 
 pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
@@ -172,6 +175,15 @@ macro_rules! failing {
 }
 
 failing!(
+  cz_reference_new(&str, Option<String>, Option<String>, Option<String>),
+  cz_reference_parse(&str),
+  cz_reference_with_name(&str),
+  cz_reference_resolve_domain(&str),
+  cz_parsed_digest_parse(&str),
+  cz_parsed_digest_parse_path_component(&str),
+  cz_parsed_digest_is_valid(&str),
+  cz_parsed_digest_description(&str),
+  cz_parsed_digest_path(&str, &str),
   cz_ipv4_address_from_bytes(Vec<u8>),
   cz_ipv4_address_parse(&str),
   cz_ipv4_address_bytes(u32),
@@ -257,6 +269,48 @@ pub(crate) fn cz_ext4_unpack(
   _progress: Progress,
 ) -> CzOutcome {
   match image.0 {}
+}
+
+impl CzReference {
+  pub(crate) fn domain(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn resolved_domain(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn path(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn tag(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn digest(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn name(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn description(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn with_tag(&self, _tag: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn with_digest(&self, _digest: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn normalize(&self) {
+    match self.0 {}
+  }
 }
 
 impl CzExt4Reader {

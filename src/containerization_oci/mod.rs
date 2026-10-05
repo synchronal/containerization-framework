@@ -12,7 +12,9 @@ mod index;
 mod local_content_store;
 mod manifest;
 mod media_types;
+mod parsed_digest;
 mod platform;
+pub mod reference;
 mod user;
 
 pub use self::annotation_keys::AnnotationKeys;
@@ -27,5 +29,7 @@ pub use self::index::Index;
 pub use self::local_content_store::LocalContentStore;
 pub use self::manifest::Manifest;
 pub use self::media_types::MediaTypes;
+pub use self::parsed_digest::ParsedDigest;
 pub use self::platform::Platform;
+pub use self::reference::Reference;
 pub use self::user::User;

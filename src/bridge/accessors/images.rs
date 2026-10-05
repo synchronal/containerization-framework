@@ -333,6 +333,14 @@ mod tests {
   }
 
   #[test]
+  fn copies_swifts_digest_algorithm() {
+    assert_eq!(
+      ffi::cz_parsed_digest_algorithm(),
+      containerization_oci::ParsedDigest::ALGORITHM
+    );
+  }
+
+  #[test]
   fn copies_swifts_annotation_keys() {
     assert_eq!(ffi::cz_annotation_keys(), containerization_oci::AnnotationKeys::ALL);
   }

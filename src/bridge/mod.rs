@@ -714,6 +714,47 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "annotationKeys")]
     fn cz_annotation_keys() -> Vec<String>;
 
+    type CzReference;
+    #[swift_bridge(swift_name = "newReference")]
+    fn cz_reference_new(path: &str, domain: Option<String>, tag: Option<String>, digest: Option<String>) -> CzOutcome;
+    #[swift_bridge(swift_name = "parseReference")]
+    fn cz_reference_parse(string: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "referenceWithName")]
+    fn cz_reference_with_name(name: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "referenceResolveDomain")]
+    fn cz_reference_resolve_domain(domain: &str) -> CzOutcome;
+    fn reference(self: &CzOutcome) -> CzReference;
+    fn domain(self: &CzReference) -> Option<String>;
+    #[swift_bridge(swift_name = "resolvedDomain")]
+    fn resolved_domain(self: &CzReference) -> Option<String>;
+    fn path(self: &CzReference) -> String;
+    fn tag(self: &CzReference) -> Option<String>;
+    fn digest(self: &CzReference) -> Option<String>;
+    fn name(self: &CzReference) -> String;
+    fn description(self: &CzReference) -> String;
+    #[swift_bridge(swift_name = "withTag")]
+    fn with_tag(self: &CzReference, tag: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "withDigest")]
+    fn with_digest(self: &CzReference, digest: &str) -> CzOutcome;
+    fn normalize(self: &CzReference);
+
+    // `ParsedDigest`, as its `encoded`.
+    #[swift_bridge(swift_name = "parsedDigestEncoded")]
+    fn parsed_digest_encoded(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "parseDigest")]
+    fn cz_parsed_digest_parse(digest: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "parseDigestPathComponent")]
+    fn cz_parsed_digest_parse_path_component(component: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "digestIsValid")]
+    fn cz_parsed_digest_is_valid(digest: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "digestDescription")]
+    fn cz_parsed_digest_description(encoded: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "digestPath")]
+    fn cz_parsed_digest_path(encoded: &str, root: &str) -> CzOutcome;
+    // For a test that compares Rust's copy with it.
+    #[swift_bridge(swift_name = "digestAlgorithm")]
+    fn cz_parsed_digest_algorithm() -> String;
+
     #[swift_bridge(swift_name = "currentPlatform")]
     fn cz_platform_current() -> CzOutcome;
     #[swift_bridge(swift_name = "parsePlatform")]

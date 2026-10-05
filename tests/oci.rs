@@ -145,6 +145,100 @@ fn fails_for_a_platform_the_image_lacks() {
 }
 
 #[test]
+fn parses_and_normalizes_a_reference() {
+  let mut reference = oci::Reference::parse("docker.io/alpine").expect("a valid reference");
+
+  assert_eq!(reference.domain().as_deref(), Some("docker.io"));
+  assert_eq!(reference.resolved_domain().as_deref(), Some("registry-1.docker.io"));
+  assert_eq!(reference.path(), "alpine");
+  assert_eq!(reference.tag(), None);
+
+  reference.normalize();
+  assert_eq!(reference.path(), "library/alpine");
+  assert_eq!(reference.tag().as_deref(), Some("latest"));
+  assert_eq!(reference.description(), "docker.io/library/alpine:latest");
+
+  let digest = format!("sha256:{}", "a".repeat(64));
+  let pinned = reference
+    .with_digest(&digest)
+    .expect("a reference by digest");
+  assert_eq!(pinned.digest(), Some(digest.clone()));
+  assert_eq!(pinned.tag(), None);
+  assert_eq!(pinned.description(), format!("docker.io/library/alpine@{digest}"));
+  assert_eq!(
+    pinned.with_tag("3").expect("a tagged reference").name(),
+    "docker.io/library/alpine"
+  );
+}
+
+#[test]
+fn makes_a_reference_from_its_parts() {
+  let reference = oci::Reference::new(
+    "library/alpine",
+    oci::reference::NewOptions {
+      domain: Some("ghcr.io".to_string()),
+      tag: Some("3".to_string()),
+      ..Default::default()
+    },
+  )
+  .expect("a reference");
+
+  assert_eq!(reference.description(), "ghcr.io/library/alpine:3");
+  assert_eq!(
+    oci::Reference::resolve_domain("docker.io").expect("a domain"),
+    "registry-1.docker.io"
+  );
+}
+
+#[test]
+fn rejects_a_malformed_reference() {
+  let error = oci::Reference::parse("Alpine")
+    .err()
+    .expect("an uppercase path");
+  assert!(error.is_code(cfw::containerization_error::Code::InvalidArgument));
+  assert!(
+    oci::Reference::parse("alpine")
+      .expect("a reference")
+      .with_tag("")
+      .is_err()
+  );
+}
+
+#[test]
+fn parses_a_digest() {
+  let encoded = "0123456789abcdef".repeat(4);
+  let digest = oci::ParsedDigest::parse(&format!("sha256:{encoded}")).expect("a valid digest");
+
+  assert_eq!(digest.encoded(), encoded);
+  assert_eq!(
+    digest.description().expect("a description"),
+    format!("sha256:{encoded}")
+  );
+  assert_eq!(
+    oci::ParsedDigest::parse_path_component(&encoded).expect("the hex digits alone"),
+    digest
+  );
+  assert!(oci::ParsedDigest::parse(&encoded).is_err(), "parse needs the prefix");
+  assert!(oci::ParsedDigest::is_valid(&encoded).expect("an answer"));
+  assert!(
+    !oci::ParsedDigest::is_valid(&encoded.to_uppercase()).expect("an answer"),
+    "uppercase hex is rejected"
+  );
+}
+
+#[test]
+fn finds_a_digests_path_in_a_directory() {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  // Not canonicalized: Swift's `resolvingSymlinksInPath` drops macOS's
+  // `/private` prefix, which `canonicalize` adds.
+  let root = directory.path();
+  let encoded = "f".repeat(64);
+  let digest = oci::ParsedDigest::parse_path_component(&encoded).expect("a valid digest");
+
+  assert_eq!(digest.path(&root).expect("a path"), root.join(&encoded));
+}
+
+#[test]
 fn makes_values_with_swifts_defaults() {
   let config = oci::Descriptor::new(oci::MediaTypes::IMAGE_CONFIG, "sha256:00", 2);
 
