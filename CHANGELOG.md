@@ -17,6 +17,11 @@ options struct whose `Default` matches Swift, such as
   `Dns::resolv_conf` and `Hosts::hosts_file`. `Signal` can be parsed from a
   name or number, and every Linux and Darwin signal is a constant in
   `signal::linux` and `signal::darwin`.
+- `LinuxContainer` exposes what it was made with, such as its `config`,
+  `rootfs` and `vm`. It can exec a process through a closure with
+  `exec_with`, report `ContainerStatistics`, freeze, thaw or trim a
+  filesystem, copy files in and out, and dial a vsock port. `LinuxProcess`
+  exposes its `owning_container`.
 - `containerization_oci` adds the image types, including `Index`, `Manifest`,
   `Reference` and `ParsedDigest`, and the runtime spec, including `Spec`,
   `State` and `Bundle`. `containerization_oci::Image` is an image's config,

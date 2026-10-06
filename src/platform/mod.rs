@@ -55,21 +55,30 @@ pub(crate) type ConfigureContainer = Configure<linux_container::Configuration>;
 /// An `(inout LinuxProcessConfiguration) -> Void`.
 pub(crate) type ConfigureProcess = Configure<containerization::LinuxProcessConfiguration>;
 
-/// The process configuration a Swift call filled and handed to the closure
-/// `call` passes it.
+/// What `call` returned, and the value its Swift call filled and handed to
+/// the closure `call` passes it, if it did.
+pub(crate) fn filled<T: Default + Send + 'static, R>(call: impl FnOnce(Configure<T>) -> R) -> (R, Option<T>) {
+  let filled = Arc::new(Mutex::new(None));
+  let slot = Arc::clone(&filled);
+  let receive = Configure::new(move |value| {
+    *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(std::mem::take(value));
+  });
+
+  let returned = call(receive);
+  let value = filled.lock().unwrap_or_else(PoisonError::into_inner).take();
+
+  (returned, value)
+}
+
+/// The process configuration a throwing Swift call filled and handed to the
+/// closure `call` passes it.
 pub(crate) fn filled_process(
   call: impl FnOnce(ConfigureProcess) -> ffi::CzOutcome,
   action: impl Into<String>,
 ) -> Result<containerization::LinuxProcessConfiguration, Error> {
-  let filled = Arc::new(Mutex::new(None));
-  let slot = Arc::clone(&filled);
-  let receive = ConfigureProcess::new(move |process| {
-    *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(std::mem::take(process));
-  });
+  let (returned, process) = filled(call);
 
-  outcome(call(receive), action)?;
-
-  let process = filled.lock().unwrap_or_else(PoisonError::into_inner).take();
+  outcome(returned, action)?;
   Ok(process.expect("Swift hands back the configuration it fills"))
 }
 

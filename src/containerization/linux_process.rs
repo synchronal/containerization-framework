@@ -20,6 +20,11 @@ impl LinuxProcess {
     self.handle.id()
   }
 
+  /// `LinuxProcess.owningContainer`.
+  pub fn owning_container(&self) -> Option<String> {
+    self.handle.owning_container()
+  }
+
   /// `LinuxProcess.pid`.
   pub fn pid(&self) -> i32 {
     self.handle.pid()

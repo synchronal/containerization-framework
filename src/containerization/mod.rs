@@ -7,9 +7,11 @@
 
 mod boot_log;
 pub mod container_manager;
+pub mod container_statistics;
 mod dns;
 mod exit_status;
 mod ext4_unpacker;
+mod filesystem_operation;
 pub mod hosts;
 pub mod image;
 pub mod image_store;
@@ -24,15 +26,18 @@ pub mod linux_rlimit;
 pub mod mount;
 mod nat_interface;
 pub mod signal;
+mod stat_category;
 pub mod system_platform;
 pub mod unix_socket_configuration;
 mod vm_resources;
 
 pub use self::boot_log::BootLog;
 pub use self::container_manager::ContainerManager;
+pub use self::container_statistics::ContainerStatistics;
 pub use self::dns::Dns;
 pub use self::exit_status::ExitStatus;
 pub use self::ext4_unpacker::Ext4Unpacker;
+pub use self::filesystem_operation::FilesystemOperation;
 pub use self::hosts::Hosts;
 pub use self::image::Image;
 pub use self::image_store::ImageStore;
@@ -47,6 +52,7 @@ pub use self::linux_rlimit::LinuxRLimit;
 pub use self::mount::Mount;
 pub use self::nat_interface::NatInterface;
 pub use self::signal::Signal;
+pub use self::stat_category::StatCategory;
 pub use self::system_platform::SystemPlatform;
 pub use self::unix_socket_configuration::UnixSocketConfiguration;
 pub use self::vm_resources::VmResources;

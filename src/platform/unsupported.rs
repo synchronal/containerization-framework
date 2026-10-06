@@ -69,6 +69,23 @@ pub(crate) enum HostsEntryName {
   Ipv6AllRouters,
 }
 
+/// `FilesystemOperation`.
+pub(crate) enum FilesystemOperationKind {
+  Freeze,
+  Thaw,
+  Trim,
+}
+
+impl From<containerization::FilesystemOperation> for FilesystemOperationKind {
+  fn from(operation: containerization::FilesystemOperation) -> Self {
+    match operation {
+      containerization::FilesystemOperation::Freeze => Self::Freeze,
+      containerization::FilesystemOperation::Thaw => Self::Thaw,
+      containerization::FilesystemOperation::Trim => Self::Trim,
+    }
+  }
+}
+
 /// Always a failure, so nothing is taken from it.
 pub(crate) struct CzOutcome;
 
@@ -158,6 +175,8 @@ taken!(
   runtime_spec_version -> containerization_oci::RuntimeSpecVersion,
   optional_text -> Option<String>,
   mount -> containerization::Mount,
+  optional_mount -> Option<containerization::Mount>,
+  container_statistics -> containerization::ContainerStatistics,
   exit_code -> i32,
   exited_at -> f64,
   number -> u64,
@@ -1334,6 +1353,68 @@ impl CzLinuxContainer {
     match self.0 {}
   }
 
+  pub(crate) fn rootfs(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn writable_layer(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn config(&self, _seed: linux_container::Configuration, _receive: ConfigureContainer) {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_cpus(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn exec_with(
+    &self,
+    _id: &str,
+    _seed: containerization::LinuxProcessConfiguration,
+    _configuration: ConfigureProcess,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn dial_vsock(&self, _port: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn statistics(&self, _categories: i64) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn filesystem_operation(&self, _operation: FilesystemOperationKind, _path: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn copy_in(
+    &self,
+    _source: &str,
+    _destination: &str,
+    _mode: u32,
+    _create_parents: bool,
+    _chunk_size: usize,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn copy_out(
+    &self,
+    _source: &str,
+    _destination: &str,
+    _create_parents: bool,
+    _chunk_size: usize,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
   pub(crate) fn create(&self) -> CzOutcome {
     match self.0 {}
   }
@@ -1369,6 +1450,10 @@ impl CzLinuxContainer {
 
 impl CzLinuxProcess {
   pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn owning_container(&self) -> Option<String> {
     match self.0 {}
   }
 

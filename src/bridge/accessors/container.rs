@@ -3,6 +3,7 @@
 use super::entry_at;
 use crate::bridge::ffi;
 use crate::containerization;
+use crate::containerization::container_statistics;
 use crate::containerization::hosts;
 use crate::containerization::kernel;
 use crate::containerization::linux_container;
@@ -34,6 +35,160 @@ impl ffi::CzOutcome {
       destination: self.mount_destination(),
       options: self.mount_options(),
       runtime_options: runtime_options_of(self.mount_runtime_kind(), self.mount_runtime_options()),
+    }
+  }
+
+  /// The `Mount?` an outcome holds.
+  pub(crate) fn optional_mount(&self) -> Option<containerization::Mount> {
+    self.optional(Self::mount)
+  }
+
+  /// The `ContainerStatistics` an outcome holds, each part read through the
+  /// category that reports it.
+  pub(crate) fn container_statistics(&self) -> containerization::ContainerStatistics {
+    let part = |category: containerization::StatCategory| self.statistics_category(category.raw_value);
+
+    containerization::ContainerStatistics {
+      id: self.statistics_name(),
+      process: part(containerization::StatCategory::PROCESS).optional(|process| {
+        let [current, limit] = process.statistics_fields();
+        container_statistics::ProcessStatistics { current, limit }
+      }),
+      memory: part(containerization::StatCategory::MEMORY).optional(|memory| {
+        let [
+          usage_bytes,
+          limit_bytes,
+          swap_usage_bytes,
+          swap_limit_bytes,
+          cache_bytes,
+          kernel_stack_bytes,
+          slab_bytes,
+          page_faults,
+          major_page_faults,
+          inactive_file,
+          anon,
+          workingset_refault_anon,
+          workingset_refault_file,
+          pgsteal_kswapd,
+          pgsteal_direct,
+          pgsteal_khugepaged,
+        ] = memory.statistics_fields();
+        container_statistics::MemoryStatistics {
+          usage_bytes,
+          limit_bytes,
+          swap_usage_bytes,
+          swap_limit_bytes,
+          cache_bytes,
+          kernel_stack_bytes,
+          slab_bytes,
+          page_faults,
+          major_page_faults,
+          inactive_file,
+          anon,
+          workingset_refault_anon,
+          workingset_refault_file,
+          pgsteal_kswapd,
+          pgsteal_direct,
+          pgsteal_khugepaged,
+        }
+      }),
+      cpu: part(containerization::StatCategory::CPU).optional(|cpu| {
+        let [
+          usage_usec,
+          user_usec,
+          system_usec,
+          throttling_periods,
+          throttled_periods,
+          throttled_time_usec,
+        ] = cpu.statistics_fields();
+        container_statistics::CpuStatistics {
+          usage_usec,
+          user_usec,
+          system_usec,
+          throttling_periods,
+          throttled_periods,
+          throttled_time_usec,
+        }
+      }),
+      block_io: part(containerization::StatCategory::BLOCK_IO).optional(|devices| {
+        container_statistics::BlockIoStatistics {
+          devices: devices.list(|device| {
+            let [major, minor, read_bytes, write_bytes, read_operations, write_operations] = device.statistics_fields();
+            container_statistics::BlockIoDevice {
+              major,
+              minor,
+              read_bytes,
+              write_bytes,
+              read_operations,
+              write_operations,
+            }
+          }),
+        }
+      }),
+      networks: part(containerization::StatCategory::NETWORK).optional(|networks| {
+        networks.list(|network| {
+          let [
+            received_packets,
+            transmitted_packets,
+            received_bytes,
+            transmitted_bytes,
+            received_errors,
+            transmitted_errors,
+          ] = network.statistics_fields();
+          container_statistics::NetworkStatistics {
+            interface: network.statistics_name(),
+            received_packets,
+            transmitted_packets,
+            received_bytes,
+            transmitted_bytes,
+            received_errors,
+            transmitted_errors,
+          }
+        })
+      }),
+      memory_events: part(containerization::StatCategory::MEMORY_EVENTS).optional(|events| {
+        let [low, high, max, oom, oom_kill] = events.statistics_fields();
+        container_statistics::MemoryEventStatistics {
+          low,
+          high,
+          max,
+          oom,
+          oom_kill,
+        }
+      }),
+      filesystem: part(containerization::StatCategory::FILESYSTEM).optional(|filesystems| {
+        filesystems.list(|filesystem| {
+          let [block_size, blocks, free_blocks, inodes, free_inodes] = filesystem.statistics_fields();
+          container_statistics::FilesystemStatistics {
+            mount_point: filesystem.statistics_name(),
+            block_size,
+            blocks,
+            free_blocks,
+            inodes,
+            free_inodes,
+          }
+        })
+      }),
+    }
+  }
+
+  /// The `UInt64` fields of the statistics held, which number `N`.
+  fn statistics_fields<const N: usize>(&self) -> [u64; N] {
+    let fields = self.statistics_numbers();
+    let count = fields.len();
+
+    fields
+      .try_into()
+      .unwrap_or_else(|_| panic!("Swift's statistics have {count} numbers, not {N}"))
+  }
+}
+
+impl From<containerization::FilesystemOperation> for ffi::FilesystemOperationKind {
+  fn from(operation: containerization::FilesystemOperation) -> Self {
+    match operation {
+      containerization::FilesystemOperation::Freeze => Self::Freeze,
+      containerization::FilesystemOperation::Thaw => Self::Thaw,
+      containerization::FilesystemOperation::Trim => Self::Trim,
     }
   }
 }
@@ -1010,6 +1165,21 @@ mod tests {
     assert_eq!(
       ffi::cz_system_platform_raw_values(),
       os.chain(architectures).collect::<Vec<_>>()
+    );
+  }
+
+  #[test]
+  fn copies_swifts_container_defaults() {
+    assert_eq!(
+      ffi::cz_linux_container_default_mounts().list(|mounts| mounts.list(ffi::CzOutcome::mount)),
+      [
+        containerization::LinuxContainer::default_mounts(),
+        containerization::LinuxContainer::default_oci_mounts(),
+      ]
+    );
+    assert_eq!(
+      ffi::cz_linux_container_default_copy_chunk_size(),
+      containerization::LinuxContainer::DEFAULT_COPY_CHUNK_SIZE
     );
   }
 

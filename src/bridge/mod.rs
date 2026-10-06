@@ -195,6 +195,13 @@ pub(crate) mod ffi {
     Ipv6AllRouters,
   }
 
+  // `FilesystemOperation`.
+  enum FilesystemOperationKind {
+    Freeze,
+    Thaw,
+    Trim,
+  }
+
   extern "Rust" {
     // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
     // with the configuration it seeded.
@@ -2435,6 +2442,23 @@ pub(crate) mod ffi {
     fn cz_signal_darwin_values() -> Vec<i32>;
     #[swift_bridge(swift_name = "systemPlatformRawValues")]
     fn cz_system_platform_raw_values() -> Vec<String>;
+    // For unit tests: `LinuxContainer.defaultMounts()` and
+    // `defaultOCIMounts()`, as a list of the two, and `defaultCopyChunkSize`.
+    #[swift_bridge(swift_name = "linuxContainerDefaultMounts")]
+    fn cz_linux_container_default_mounts() -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxContainerDefaultCopyChunkSize")]
+    fn cz_linux_container_default_copy_chunk_size() -> usize;
+
+    // `ContainerStatistics`, which `LinuxContainer.statistics` returns: the
+    // `id`, `interface` or `mountPoint` of the statistics held, their `UInt64`
+    // fields in Swift's order, and the part a `StatCategory` reports, or
+    // `Absent`. Block I/O's part is its `devices`.
+    #[swift_bridge(swift_name = "statisticsName")]
+    fn statistics_name(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "statisticsNumbers")]
+    fn statistics_numbers(self: &CzOutcome) -> Vec<u64>;
+    #[swift_bridge(swift_name = "statisticsCategory")]
+    fn statistics_category(self: &CzOutcome, category: i64) -> CzOutcome;
 
     type CzLocalContentStore;
     #[swift_bridge(swift_name = "openLocalContentStore")]
@@ -2759,8 +2783,20 @@ pub(crate) mod ffi {
     ) -> CzOutcome;
     fn delete(self: &CzContainerManager, id: &str) -> CzOutcome;
 
+    // The getters' outcomes hold a `Mount` or `Absent`. `config` fills `seed`
+    // with the container's configuration and hands it to `receive`, and
+    // `execWith` takes a `seed` for `configuration` to change, as the
+    // manager's `create` does.
     type CzLinuxContainer;
     fn id(self: &CzLinuxContainer) -> String;
+    fn rootfs(self: &CzLinuxContainer) -> CzOutcome;
+    #[swift_bridge(swift_name = "writableLayer")]
+    fn writable_layer(self: &CzLinuxContainer) -> CzOutcome;
+    fn config(self: &CzLinuxContainer, seed: RustLinuxContainerConfiguration, receive: RustConfigure);
+    #[swift_bridge(swift_name = "vmCpus")]
+    fn vm_cpus(self: &CzLinuxContainer) -> u32;
+    #[swift_bridge(swift_name = "vmMemoryInBytes")]
+    fn vm_memory_in_bytes(self: &CzLinuxContainer) -> u64;
     fn create(self: &CzLinuxContainer) -> CzOutcome;
     fn start(self: &CzLinuxContainer) -> CzOutcome;
     fn stop(self: &CzLinuxContainer) -> CzOutcome;
@@ -2771,11 +2807,44 @@ pub(crate) mod ffi {
     ) -> CzOutcome;
     fn resize(self: &CzLinuxContainer, width: u16, height: u16) -> CzOutcome;
     fn exec(self: &CzLinuxContainer, id: &str, configuration: RustLinuxProcessConfiguration) -> CzOutcome;
+    #[swift_bridge(swift_name = "execWith")]
+    fn exec_with(
+      self: &CzLinuxContainer,
+      id: &str,
+      seed: RustLinuxProcessConfiguration,
+      configuration: RustConfigureProcess,
+    ) -> CzOutcome;
+    // The outcome holds the connection's descriptor, which Rust then owns.
+    #[swift_bridge(swift_name = "dialVsock")]
+    fn dial_vsock(self: &CzLinuxContainer, port: u32) -> CzOutcome;
     #[swift_bridge(swift_name = "closeStdin")]
     fn close_stdin(self: &CzLinuxContainer) -> CzOutcome;
+    // `categories` is a `StatCategory`'s raw value.
+    fn statistics(self: &CzLinuxContainer, categories: i64) -> CzOutcome;
+    #[swift_bridge(swift_name = "filesystemOperation")]
+    fn filesystem_operation(self: &CzLinuxContainer, operation: FilesystemOperationKind, path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "copyIn")]
+    fn copy_in(
+      self: &CzLinuxContainer,
+      source: &str,
+      destination: &str,
+      mode: u32,
+      #[swift_bridge(label = "createParents")] create_parents: bool,
+      #[swift_bridge(label = "chunkSize")] chunk_size: usize,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "copyOut")]
+    fn copy_out(
+      self: &CzLinuxContainer,
+      source: &str,
+      destination: &str,
+      #[swift_bridge(label = "createParents")] create_parents: bool,
+      #[swift_bridge(label = "chunkSize")] chunk_size: usize,
+    ) -> CzOutcome;
 
     type CzLinuxProcess;
     fn id(self: &CzLinuxProcess) -> String;
+    #[swift_bridge(swift_name = "owningContainer")]
+    fn owning_container(self: &CzLinuxProcess) -> Option<String>;
     fn pid(self: &CzLinuxProcess) -> i32;
     fn start(self: &CzLinuxProcess) -> CzOutcome;
     fn kill(self: &CzLinuxProcess, signal: i32) -> CzOutcome;

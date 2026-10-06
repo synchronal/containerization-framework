@@ -16,8 +16,8 @@ pub mod store;
 use containerization_framework as cfw;
 
 /// Enough to run a shell; `.config/nextest.toml` caps how many run at once.
-const TEST_CPUS: u32 = 1;
-const TEST_MEMORY_IN_BYTES: u64 = 512 * 1024 * 1024;
+pub const TEST_CPUS: u32 = 1;
+pub const TEST_MEMORY_IN_BYTES: u64 = 512 * 1024 * 1024;
 
 /// The rootfs ceiling, against Containerization's 8 GiB default: nothing here
 /// writes more than a marker file.
