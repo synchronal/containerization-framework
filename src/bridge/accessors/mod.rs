@@ -16,6 +16,7 @@ mod addresses;
 mod archive;
 mod container;
 mod images;
+mod os;
 mod registry;
 mod spec;
 

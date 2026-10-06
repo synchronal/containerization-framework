@@ -32,6 +32,8 @@ options struct whose `Default` matches Swift, such as
 - Archives can be written, read and extracted through the new
   `containerization_archive` module, and `Ext4Unpacker::unpack_archive`
   unpacks one into an ext4 filesystem.
+- `containerization_os` adds `Terminal`, `CapabilityName`, `CapabilitySet`,
+  `KeychainQuery`, `Stat`, `sysctl::by_name` and `file::info`.
 
 ### Breaking
 

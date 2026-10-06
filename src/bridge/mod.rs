@@ -1988,6 +1988,139 @@ pub(crate) mod ffi {
     type CzArchiveEntryReader;
     fn read(self: &CzArchiveEntryReader, #[swift_bridge(label = "maxLength")] max_length: usize) -> CzOutcome;
 
+    // ContainerizationOS. `CapabilityName` and `CapabilitySet` cross as their
+    // `description`s. For unit tests: `CapabilityName.allCases`' descriptions
+    // and `capValue`s, and each `CapabilitySet`'s description in the order of
+    // Rust's `ALL`.
+    #[swift_bridge(swift_name = "capabilityNameDescriptions")]
+    fn cz_capability_name_descriptions() -> Vec<String>;
+    #[swift_bridge(swift_name = "capabilityNameCapValues")]
+    fn cz_capability_name_cap_values() -> Vec<u32>;
+    #[swift_bridge(swift_name = "capabilitySetDescriptions")]
+    fn cz_capability_set_descriptions() -> Vec<String>;
+    #[swift_bridge(swift_name = "parseCapabilityName")]
+    fn cz_capability_name_parse(#[swift_bridge(label = "rawValue")] raw_value: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "parseCapabilitySet")]
+    fn cz_capability_set_parse(#[swift_bridge(label = "rawValue")] raw_value: &str) -> CzOutcome;
+
+    // A `Terminal`. A `Terminal.Size?` crosses as a flag and its width and
+    // height, and a `Terminal` argument as a `duplicate()`.
+    type CzTerminal;
+    #[swift_bridge(swift_name = "newTerminal")]
+    fn cz_terminal_new(descriptor: i32, #[swift_bridge(label = "setInitState")] set_init_state: bool) -> CzOutcome;
+    #[swift_bridge(swift_name = "currentTerminal")]
+    fn cz_terminal_current() -> CzOutcome;
+    #[swift_bridge(swift_name = "createTerminal")]
+    fn cz_terminal_create(
+      #[swift_bridge(label = "hasInitialSize")] has_initial_size: bool,
+      width: u16,
+      height: u16,
+    ) -> CzOutcome;
+    fn terminal(self: &CzOutcome) -> CzTerminal;
+    #[swift_bridge(swift_name = "parentTerminal")]
+    fn parent_terminal(self: &CzOutcome) -> CzTerminal;
+    #[swift_bridge(swift_name = "childTerminal")]
+    fn child_terminal(self: &CzOutcome) -> CzTerminal;
+    #[swift_bridge(swift_name = "terminalSizeWidth")]
+    fn terminal_size_width(self: &CzOutcome) -> u16;
+    #[swift_bridge(swift_name = "terminalSizeHeight")]
+    fn terminal_size_height(self: &CzOutcome) -> u16;
+    fn duplicate(self: &CzTerminal) -> CzTerminal;
+    fn handle(self: &CzTerminal) -> i32;
+    fn write(self: &CzTerminal, data: Vec<u8>) -> CzOutcome;
+    fn size(self: &CzTerminal) -> CzOutcome;
+    #[swift_bridge(swift_name = "resizeFrom")]
+    fn resize_from(self: &CzTerminal, pty: CzTerminal) -> CzOutcome;
+    // `resize(size:)`, with the size's width and height.
+    #[swift_bridge(swift_name = "resizeSize")]
+    fn resize_size(self: &CzTerminal, width: u16, height: u16) -> CzOutcome;
+    fn resize(self: &CzTerminal, width: u16, height: u16) -> CzOutcome;
+    fn setraw(self: &CzTerminal) -> CzOutcome;
+    #[swift_bridge(swift_name = "enableEcho")]
+    fn enable_echo(self: &CzTerminal) -> CzOutcome;
+    #[swift_bridge(swift_name = "disableEcho")]
+    fn disable_echo(self: &CzTerminal) -> CzOutcome;
+    fn close(self: &CzTerminal) -> CzOutcome;
+    fn reset(self: &CzTerminal) -> CzOutcome;
+    #[swift_bridge(swift_name = "tryReset")]
+    fn try_reset(self: &CzTerminal);
+
+    // `KeychainQuery`. `get`'s outcome holds a `KeychainQueryResult?`, and
+    // `list`'s a `[RegistryInfo]`, their dates as seconds since 1970.
+    #[swift_bridge(swift_name = "keychainQuerySave")]
+    fn cz_keychain_query_save(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+      username: &str,
+      password: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainQueryDelete")]
+    fn cz_keychain_query_delete(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainQueryGet")]
+    fn cz_keychain_query_get(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainQueryList")]
+    fn cz_keychain_query_list(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainQueryExists")]
+    fn cz_keychain_query_exists(
+      #[swift_bridge(label = "securityDomain")] security_domain: &str,
+      #[swift_bridge(label = "accessGroup")] access_group: Option<String>,
+      hostname: &str,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "keychainQueryResultUsername")]
+    fn keychain_query_result_username(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "keychainQueryResultPassword")]
+    fn keychain_query_result_password(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "keychainQueryResultModifiedDate")]
+    fn keychain_query_result_modified_date(self: &CzOutcome) -> f64;
+    #[swift_bridge(swift_name = "keychainQueryResultCreatedDate")]
+    fn keychain_query_result_created_date(self: &CzOutcome) -> f64;
+
+    // `Sysctl.byName(_:)`, whose outcome holds an `Int64`.
+    #[swift_bridge(swift_name = "sysctlByName")]
+    fn cz_sysctl_by_name(name: &str) -> CzOutcome;
+    fn integer(self: &CzOutcome) -> i64;
+
+    // `File.info(_:)`, and the `FileInfo` it returns. Swift's `Int`s cross as
+    // `Int64`s.
+    type CzFileInfo;
+    #[swift_bridge(swift_name = "fileInfoAt")]
+    fn cz_file_info(path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "fileInfo")]
+    fn file_info(self: &CzOutcome) -> CzFileInfo;
+    fn mode(self: &CzFileInfo) -> u16;
+    fn uid(self: &CzFileInfo) -> i64;
+    fn gid(self: &CzFileInfo) -> i64;
+    fn dev(self: &CzFileInfo) -> i64;
+    fn ino(self: &CzFileInfo) -> i64;
+    fn size(self: &CzFileInfo) -> i64;
+    fn path(self: &CzFileInfo) -> String;
+    #[swift_bridge(swift_name = "isDirectory")]
+    fn is_directory(self: &CzFileInfo) -> bool;
+    #[swift_bridge(swift_name = "isPipe")]
+    fn is_pipe(self: &CzFileInfo) -> bool;
+    #[swift_bridge(swift_name = "isSocket")]
+    fn is_socket(self: &CzFileInfo) -> bool;
+    #[swift_bridge(swift_name = "isLink")]
+    fn is_link(self: &CzFileInfo) -> bool;
+    #[swift_bridge(swift_name = "isRegularFile")]
+    fn is_regular_file(self: &CzFileInfo) -> bool;
+    #[swift_bridge(swift_name = "isBlock")]
+    fn is_block(self: &CzFileInfo) -> bool;
+    #[swift_bridge(swift_name = "isChar")]
+    fn is_char(self: &CzFileInfo) -> bool;
+
     // `EXT4Unpacker.unpack(_:for:at:progress:)`, with the image as a
     // `duplicate()`.
     #[swift_bridge(swift_name = "unpackExt4")]

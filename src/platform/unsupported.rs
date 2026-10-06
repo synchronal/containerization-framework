@@ -68,6 +68,14 @@ taken!(
   entry_data -> Vec<u8>,
   archive_entry_reader -> CzArchiveEntryReader,
   data_map_keys -> Vec<String>,
+  terminal -> CzTerminal,
+  parent_terminal -> CzTerminal,
+  child_terminal -> CzTerminal,
+  terminal_size_width -> u16,
+  terminal_size_height -> u16,
+  keychain_query_result -> containerization_os::KeychainQueryResult,
+  integer -> i64,
+  file_info -> CzFileInfo,
   reference -> CzReference,
   authentication -> CzAuthentication,
   registry_infos -> Vec<containerization_os::RegistryInfo>,
@@ -139,6 +147,8 @@ handles!(
   CzArchiveIterator,
   CzStreamingIterator,
   CzArchiveEntryReader,
+  CzTerminal,
+  CzFileInfo,
 );
 
 impl CzOutcome {
@@ -352,6 +362,18 @@ failing!(
   cz_mac_address_is_multicast(u64),
   cz_mac_address_ipv6_address(u64, IPv6Address),
   cz_mac_address_less_than(u64, u64),
+  cz_capability_name_parse(&str),
+  cz_capability_set_parse(&str),
+  cz_terminal_new(i32, bool),
+  cz_terminal_current(),
+  cz_terminal_create(bool, u16, u16),
+  cz_keychain_query_save(&str, Option<String>, &str, &str, &str),
+  cz_keychain_query_delete(&str, Option<String>, &str),
+  cz_keychain_query_get(&str, Option<String>, &str),
+  cz_keychain_query_list(&str, Option<String>),
+  cz_keychain_query_exists(&str, Option<String>, &str),
+  cz_sysctl_by_name(&str),
+  cz_file_info(&str),
 );
 
 pub(crate) fn cz_ext4_unpack(
@@ -684,6 +706,118 @@ impl CzStreamingIterator {
 
 impl CzArchiveEntryReader {
   pub(crate) fn read(&self, _max_length: usize) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzTerminal {
+  pub(crate) fn duplicate(&self) -> CzTerminal {
+    match self.0 {}
+  }
+
+  pub(crate) fn handle(&self) -> i32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn write(&self, _data: Vec<u8>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn size(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize_from(&self, _pty: CzTerminal) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize_size(&self, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize(&self, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn setraw(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn enable_echo(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn disable_echo(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn reset(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn try_reset(&self) {
+    match self.0 {}
+  }
+}
+
+impl CzFileInfo {
+  pub(crate) fn mode(&self) -> u16 {
+    match self.0 {}
+  }
+
+  pub(crate) fn uid(&self) -> i64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn gid(&self) -> i64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn dev(&self) -> i64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn ino(&self) -> i64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn size(&self) -> i64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn path(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_directory(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_pipe(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_socket(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_link(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_regular_file(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_block(&self) -> bool {
+    match self.0 {}
+  }
+
+  pub(crate) fn is_char(&self) -> bool {
     match self.0 {}
   }
 }
