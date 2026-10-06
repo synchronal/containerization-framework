@@ -7,10 +7,10 @@ use super::ExitStatus;
 use super::FilesystemOperation;
 use super::GIB;
 use super::Hosts;
+use super::Interface;
 use super::LinuxProcess;
 use super::LinuxProcessConfiguration;
 use super::Mount;
-use super::NatInterface;
 use super::Signal;
 use super::StatCategory;
 use super::UnixSocketConfiguration;
@@ -45,8 +45,7 @@ pub struct Configuration {
   pub memory_in_bytes: u64,
   pub hostname: Option<String>,
   pub sysctl: BTreeMap<String, String>,
-  /// Swift's `[any Interface]`, of which the bridge carries `NATInterface`.
-  pub interfaces: Vec<NatInterface>,
+  pub interfaces: Vec<Interface>,
   pub sockets: Vec<UnixSocketConfiguration>,
   pub mounts: Vec<Mount>,
   pub masked_paths: Vec<String>,
@@ -180,7 +179,7 @@ impl LinuxContainer {
   }
 
   /// `LinuxContainer.interfaces`: the configuration's.
-  pub fn interfaces(&self) -> Vec<NatInterface> {
+  pub fn interfaces(&self) -> Vec<Interface> {
     self.config().interfaces
   }
 

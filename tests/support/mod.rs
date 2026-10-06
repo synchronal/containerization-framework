@@ -21,7 +21,7 @@ pub const TEST_MEMORY_IN_BYTES: u64 = 512 * 1024 * 1024;
 
 /// The rootfs ceiling, against Containerization's 8 GiB default: nothing here
 /// writes more than a marker file.
-const TEST_ROOTFS_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
+pub const TEST_ROOTFS_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// A VM for the test limits plus guest overhead.
 pub fn vm() -> cfw::containerization::VmResources {

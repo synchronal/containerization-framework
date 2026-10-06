@@ -11,6 +11,7 @@ use crate::containerization::linux_rlimit;
 use crate::containerization::mount;
 use crate::containerization::system_platform;
 use crate::containerization::unix_socket_configuration;
+use crate::containerization::vmnet_network;
 use crate::containerization_extras;
 use crate::containerization_oci;
 use crate::containerization_os;
@@ -41,6 +42,13 @@ impl ffi::CzOutcome {
   /// The `Mount?` an outcome holds.
   pub(crate) fn optional_mount(&self) -> Option<containerization::Mount> {
     self.optional(Self::mount)
+  }
+
+  /// The `VmnetNetwork.Interface?` an outcome holds.
+  pub(crate) fn optional_vmnet_interface(&self) -> Option<vmnet_network::Interface> {
+    self.optional(|interface| vmnet_network::Interface {
+      handle: interface.vmnet_interface(),
+    })
   }
 
   /// The `ContainerStatistics` an outcome holds, each part read through the
@@ -189,6 +197,16 @@ impl From<containerization::FilesystemOperation> for ffi::FilesystemOperationKin
       containerization::FilesystemOperation::Freeze => Self::Freeze,
       containerization::FilesystemOperation::Thaw => Self::Thaw,
       containerization::FilesystemOperation::Trim => Self::Trim,
+    }
+  }
+}
+
+impl From<vmnet_network::Mode> for ffi::VmnetMode {
+  fn from(mode: vmnet_network::Mode) -> Self {
+    match mode {
+      vmnet_network::Mode::Shared => Self::Shared,
+      vmnet_network::Mode::Host => Self::Host,
+      vmnet_network::Mode::Bridged => Self::Bridged,
     }
   }
 }
@@ -769,17 +787,27 @@ impl linux_container::Configuration {
     mac_address: Option<u64>,
     mtu: u32,
   ) {
-    self.interfaces.push(containerization::NatInterface {
-      ipv4_address: containerization_extras::CIDRv4 {
-        address: containerization_extras::IPv4Address::new(ipv4_address),
-        prefix: containerization_extras::Prefix { length: ipv4_prefix },
-      },
-      ipv4_gateway: ipv4_gateway.map(containerization_extras::IPv4Address::new),
-      ipv6_address: None,
-      ipv6_gateway: None,
-      mac_address: mac_address.map(|value| containerization_extras::MACAddress { value }),
-      mtu,
-    });
+    self
+      .interfaces
+      .push(containerization::Interface::Nat(containerization::NatInterface {
+        ipv4_address: containerization_extras::CIDRv4 {
+          address: containerization_extras::IPv4Address::new(ipv4_address),
+          prefix: containerization_extras::Prefix { length: ipv4_prefix },
+        },
+        ipv4_gateway: ipv4_gateway.map(containerization_extras::IPv4Address::new),
+        ipv6_address: None,
+        ipv6_gateway: None,
+        mac_address: mac_address.map(|value| containerization_extras::MACAddress { value }),
+        mtu,
+      }));
+  }
+
+  pub(crate) fn push_vmnet_interface(&mut self, interface: ffi::CzVmnetInterface) {
+    self
+      .interfaces
+      .push(containerization::Interface::Vmnet(vmnet_network::Interface {
+        handle: interface,
+      }));
   }
 
   /// Only after [`Self::push_interface`], for the interface it pushed.
@@ -796,10 +824,10 @@ impl linux_container::Configuration {
   }
 
   fn last_interface(&mut self) -> &mut containerization::NatInterface {
-    self
-      .interfaces
-      .last_mut()
-      .expect("Swift sets an interface's IPv6 addresses only after push_interface")
+    match self.interfaces.last_mut() {
+      Some(containerization::Interface::Nat(interface)) => interface,
+      _ => unreachable!("Swift sets an interface's IPv6 addresses only after push_interface"),
+    }
   }
 
   pub(crate) fn push_socket(
@@ -928,8 +956,28 @@ impl linux_container::Configuration {
     self.interfaces.len()
   }
 
-  pub(crate) fn interfaces_at(&self, index: usize) -> &containerization::NatInterface {
-    &self.interfaces[index]
+  pub(crate) fn interface_kind_at(&self, index: usize) -> ffi::InterfaceKind {
+    match self.interfaces[index] {
+      containerization::Interface::Nat(_) => ffi::InterfaceKind::Nat,
+      containerization::Interface::Vmnet(_) => ffi::InterfaceKind::Vmnet,
+    }
+  }
+
+  /// Only when [`Self::interface_kind_at`] is `Nat`.
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::NatInterface {
+    match &self.interfaces[index] {
+      containerization::Interface::Nat(interface) => interface,
+      containerization::Interface::Vmnet(_) => unreachable!("Swift asks for a NAT interface only of its kind"),
+    }
+  }
+
+  /// Only when [`Self::interface_kind_at`] is `Vmnet`: a handle on it for
+  /// Swift to keep.
+  pub(crate) fn vmnet_interface_at(&self, index: usize) -> ffi::CzVmnetInterface {
+    match &self.interfaces[index] {
+      containerization::Interface::Vmnet(interface) => interface.handle.duplicate(),
+      containerization::Interface::Nat(_) => unreachable!("Swift asks for a vmnet interface only of its kind"),
+    }
   }
 
   pub(crate) fn sockets_len(&self) -> usize {
@@ -1280,7 +1328,8 @@ mod tests {
       configuration.mounts_at(0).runtime_kind(),
       ffi::RuntimeKind::Shared
     ));
-    let interface = configuration.interfaces_at(0);
+    assert!(matches!(configuration.interface_kind_at(0), ffi::InterfaceKind::Nat));
+    let interface = configuration.nat_interface_at(0);
     assert_eq!(interface.ipv4_address_value(), 0xc0a8_4002);
     assert_eq!(interface.ipv4_prefix(), 24);
     assert_eq!(interface.ipv4_gateway(), Some(0xc0a8_4001));

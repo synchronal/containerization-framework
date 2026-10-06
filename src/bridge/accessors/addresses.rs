@@ -94,6 +94,26 @@ impl ffi::CzOutcome {
     }
   }
 
+  /// The `IPv4Address?` an outcome holds.
+  pub(crate) fn optional_ipv4_address(&self) -> Option<containerization_extras::IPv4Address> {
+    self.optional(Self::ipv4_address)
+  }
+
+  /// The `IPv6Address?` an outcome holds.
+  pub(crate) fn optional_ipv6_address(&self) -> Option<containerization_extras::IPv6Address> {
+    self.optional(Self::ipv6_address)
+  }
+
+  /// The `CIDRv6?` an outcome holds.
+  pub(crate) fn optional_cidr_v6(&self) -> Option<containerization_extras::CIDRv6> {
+    self.optional(Self::cidr_v6)
+  }
+
+  /// The `MACAddress?` an outcome holds.
+  pub(crate) fn optional_mac_address(&self) -> Option<containerization_extras::MACAddress> {
+    self.optional(Self::mac_address)
+  }
+
   pub(crate) fn uint128(&self) -> u128 {
     u128::from(self.wide_high()) << 64 | u128::from(self.wide_low())
   }

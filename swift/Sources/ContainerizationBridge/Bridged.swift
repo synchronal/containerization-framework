@@ -79,6 +79,8 @@ public final class CzOutcome: @unchecked Sendable {
   func initImage() -> CzInitImage { taken() }
   func containerManager() -> CzContainerManager { taken() }
   func linuxContainer() -> CzLinuxContainer { taken() }
+  func vmnetNetwork() -> CzVmnetNetwork { taken() }
+  func vmnetInterface() -> CzVmnetInterface { taken() }
   func linuxProcess() -> CzLinuxProcess { taken() }
   func contentWriter() -> CzContentWriter { taken() }
   func ext4Reader() -> CzExt4Reader { taken() }

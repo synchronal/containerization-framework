@@ -22,6 +22,10 @@ options struct whose `Default` matches Swift, such as
   `exec_with`, report `ContainerStatistics`, freeze, thaw or trim a
   filesystem, copy files in and out, and dial a vsock port. `LinuxProcess`
   exposes its `owning_container`.
+- A `ContainerManager` given a `VmnetNetwork` gives each container it creates
+  an interface on it. The manager can also open a store at a root directory,
+  create a container from an image reference, report unpacking progress, and
+  release a container's network.
 - `containerization_oci` adds the image types, including `Index`, `Manifest`,
   `Reference` and `ParsedDigest`, and the runtime spec, including `Spec`,
   `State` and `Bundle`. `containerization_oci::Image` is an image's config,
@@ -55,9 +59,11 @@ options struct whose `Default` matches Swift, such as
   to keep the old behavior.
 - `Mount::share`, `Mount::block` and `Mount::any` take a `runtime_options`
   argument after `options`. Pass `&[]` to keep the old behavior.
-- `NatInterface` holds parsed address types instead of strings, so a malformed
-  address fails when you parse it rather than when the container is created.
-  Its IPv4 gateway is now optional, as it is in Swift.
+- `linux_container::Configuration::interfaces` holds `Interface`s, so wrap a
+  `NatInterface` in `Interface::Nat`. `NatInterface` holds parsed address
+  types instead of strings, so a malformed address fails when you parse it
+  rather than when the container is created, and its IPv4 gateway is optional,
+  as it is in Swift.
 - `SeccompProfile::Profile` holds a `LinuxSeccomp` instead of JSON. Read the
   JSON with `LinuxSeccomp::decode`.
 - `Error::Failed` has a new `code` field, so a pattern that names its fields
@@ -65,6 +71,11 @@ options struct whose `Default` matches Swift, such as
 - `LinuxCapabilities`' sets hold `CapabilityName`s instead of strings, so a
   misspelled capability is a compile error and `to_oci` can no longer fail
   because of one.
+- `ContainerManager::new` and `ContainerManager::with_initfs_reference` take
+  a `ManagerOptions` in place of `rosetta` and `nested_virtualization`. Pass
+  `Default::default()` to keep the old behavior. `CreateOptions` holds an
+  optional `ProgressHandler`, so it is no longer `Copy`, `Clone`, `Debug` or
+  `PartialEq`.
 
 ## v0.3.0
 

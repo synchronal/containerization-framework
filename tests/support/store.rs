@@ -80,9 +80,22 @@ pub fn kernel() -> cfw::containerization::Kernel {
 /// A manager booting [`kernel`] and [`INITFS_REFERENCE`]. The first one unpacks
 /// the init image into the store, so the lock keeps two from doing it at once.
 pub fn manager(store: &cfw::containerization::ImageStore) -> cfw::containerization::ContainerManager {
-  let kernel = kernel();
-  let _lock = Lock::take(root().join(INITFS_LOCK));
+  manager_with(store, Default::default())
+}
 
-  cfw::containerization::ContainerManager::with_initfs_reference(&kernel, INITFS_REFERENCE, store, false, false)
+/// The same, made with `options`.
+pub fn manager_with(
+  store: &cfw::containerization::ImageStore,
+  options: cfw::containerization::container_manager::ManagerOptions,
+) -> cfw::containerization::ContainerManager {
+  let kernel = kernel();
+  let _lock = initfs_lock();
+
+  cfw::containerization::ContainerManager::with_initfs_reference(&kernel, INITFS_REFERENCE, store, options)
     .unwrap_or_else(|error| panic!("a manager booting {INITFS_REFERENCE} should be made: {error}"))
+}
+
+/// The lock [`manager`] takes, for a test making a manager of its own.
+pub fn initfs_lock() -> Lock {
+  Lock::take(root().join(INITFS_LOCK))
 }

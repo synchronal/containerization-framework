@@ -202,6 +202,19 @@ pub(crate) mod ffi {
     Trim,
   }
 
+  // vmnet's `operating_modes_t`.
+  enum VmnetMode {
+    Shared,
+    Host,
+    Bridged,
+  }
+
+  // Which conforming type of `Interface` a configuration's holds.
+  enum InterfaceKind {
+    Nat,
+    Vmnet,
+  }
+
   extern "Rust" {
     // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
     // with the configuration it seeded.
@@ -547,6 +560,8 @@ pub(crate) mod ffi {
       low: u64,
       zone: Option<String>,
     );
+    #[swift_bridge(swift_name = "pushVmnetInterface")]
+    fn push_vmnet_interface(self: &mut RustLinuxContainerConfiguration, interface: CzVmnetInterface);
     #[swift_bridge(swift_name = "pushSocket")]
     fn push_socket(
       self: &mut RustLinuxContainerConfiguration,
@@ -601,8 +616,12 @@ pub(crate) mod ffi {
     fn sysctl_value_at(self: &RustLinuxContainerConfiguration, index: usize) -> &str;
     #[swift_bridge(swift_name = "interfacesLen")]
     fn interfaces_len(self: &RustLinuxContainerConfiguration) -> usize;
-    #[swift_bridge(swift_name = "interfacesAt")]
-    fn interfaces_at(self: &RustLinuxContainerConfiguration, index: usize) -> &RustNatInterface;
+    #[swift_bridge(swift_name = "interfaceKindAt")]
+    fn interface_kind_at(self: &RustLinuxContainerConfiguration, index: usize) -> InterfaceKind;
+    #[swift_bridge(swift_name = "natInterfaceAt")]
+    fn nat_interface_at(self: &RustLinuxContainerConfiguration, index: usize) -> &RustNatInterface;
+    #[swift_bridge(swift_name = "vmnetInterfaceAt")]
+    fn vmnet_interface_at(self: &RustLinuxContainerConfiguration, index: usize) -> CzVmnetInterface;
     #[swift_bridge(swift_name = "socketsLen")]
     fn sockets_len(self: &RustLinuxContainerConfiguration) -> usize;
     #[swift_bridge(swift_name = "socketsAt")]
@@ -1074,6 +1093,10 @@ pub(crate) mod ffi {
     fn container_manager(self: &CzOutcome) -> CzContainerManager;
     #[swift_bridge(swift_name = "linuxContainer")]
     fn linux_container(self: &CzOutcome) -> CzLinuxContainer;
+    #[swift_bridge(swift_name = "vmnetNetwork")]
+    fn vmnet_network(self: &CzOutcome) -> CzVmnetNetwork;
+    #[swift_bridge(swift_name = "vmnetInterface")]
+    fn vmnet_interface(self: &CzOutcome) -> CzVmnetInterface;
     #[swift_bridge(swift_name = "linuxProcess")]
     fn linux_process(self: &CzOutcome) -> CzLinuxProcess;
     #[swift_bridge(swift_name = "contentWriter")]
@@ -2689,13 +2712,14 @@ pub(crate) mod ffi {
       #[swift_bridge(label = "labelValues")] label_values: Vec<String>,
       #[swift_bridge(label = "contentStore")] content_store: CzLocalContentStore,
     ) -> CzOutcome;
-    // `ContainerManager`'s inits, on the store they take: swift-bridge can't
-    // pass a `&` Swift type as an argument.
+    // `ContainerManager`'s inits taking a store, on the store they take:
+    // swift-bridge can't pass a `&` Swift type as an argument.
     #[swift_bridge(swift_name = "containerManager")]
     fn container_manager(
       self: &CzImageStore,
       kernel: RustKernel,
       initfs: RustMount,
+      network: CzNetwork,
       rosetta: bool,
       #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
     ) -> CzOutcome;
@@ -2704,6 +2728,7 @@ pub(crate) mod ffi {
       self: &CzImageStore,
       kernel: RustKernel,
       #[swift_bridge(label = "initfsReference")] initfs_reference: &str,
+      network: CzNetwork,
       rosetta: bool,
       #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
     ) -> CzOutcome;
@@ -2763,11 +2788,42 @@ pub(crate) mod ffi {
     // `seed` to fill with the configuration it seeds before `configuration`
     // changes it.
     type CzContainerManager;
+    #[swift_bridge(swift_name = "containerManagerAtRoot")]
+    fn cz_container_manager_at_root(
+      kernel: RustKernel,
+      initfs: RustMount,
+      root: Option<String>,
+      network: CzNetwork,
+      rosetta: bool,
+      #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "containerManagerAtRoot")]
+    fn cz_container_manager_at_root_with_initfs_reference(
+      kernel: RustKernel,
+      #[swift_bridge(label = "initfsReference")] initfs_reference: &str,
+      root: Option<String>,
+      network: CzNetwork,
+      rosetta: bool,
+      #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "imageStore")]
+    fn image_store(self: &CzContainerManager) -> CzImageStore;
+    #[swift_bridge(swift_name = "createFromReference")]
+    fn create_from_reference(
+      self: &CzContainerManager,
+      id: &str,
+      reference: &str,
+      options: RustCreateOptions,
+      progress: RustProgressHandler,
+      seed: RustLinuxContainerConfiguration,
+      configuration: RustConfigure,
+    ) -> CzOutcome;
     fn create(
       self: &CzContainerManager,
       id: &str,
       image: CzImage,
       options: RustCreateOptions,
+      progress: RustProgressHandler,
       seed: RustLinuxContainerConfiguration,
       configuration: RustConfigure,
     ) -> CzOutcome;
@@ -2781,7 +2837,61 @@ pub(crate) mod ffi {
       seed: RustLinuxContainerConfiguration,
       configuration: RustConfigure,
     ) -> CzOutcome;
+    #[swift_bridge(swift_name = "releaseNetwork")]
+    fn release_network(self: &CzContainerManager, id: &str) -> CzOutcome;
     fn delete(self: &CzContainerManager, id: &str) -> CzOutcome;
+
+    // A `Network?`, for the manager's inits: swift-bridge 0.1.59 can't pass
+    // an `Option` of a Swift type.
+    type CzNetwork;
+    #[swift_bridge(swift_name = "noNetwork")]
+    fn cz_no_network() -> CzNetwork;
+
+    // The getters' outcomes hold an address, or `Absent` for `nil`. The
+    // `create` methods' hold a `CzVmnetInterface` or `Absent`.
+    type CzVmnetNetwork;
+    #[swift_bridge(swift_name = "asNetwork")]
+    fn as_network(self: &CzVmnetNetwork) -> CzNetwork;
+    #[swift_bridge(swift_name = "vmnetNetwork")]
+    fn cz_vmnet_network_new(
+      mode: VmnetMode,
+      #[swift_bridge(label = "subnetAddress")] subnet_address: Option<u32>,
+      #[swift_bridge(label = "subnetPrefix")] subnet_prefix: u8,
+      #[swift_bridge(label = "hasPrefixV6")] has_prefix_v6: bool,
+      #[swift_bridge(label = "prefixV6Address")] prefix_v6_address: RustIPv6Address,
+      #[swift_bridge(label = "prefixV6Length")] prefix_v6_length: u8,
+    ) -> CzOutcome;
+    fn subnet(self: &CzVmnetNetwork) -> CzOutcome;
+    #[swift_bridge(swift_name = "prefixV6")]
+    fn prefix_v6(self: &CzVmnetNetwork) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4Gateway")]
+    fn ipv4_gateway(self: &CzVmnetNetwork) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6Gateway")]
+    fn ipv6_gateway(self: &CzVmnetNetwork) -> CzOutcome;
+    #[swift_bridge(swift_name = "createInterface")]
+    fn create_interface(self: &CzVmnetNetwork, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "createInterface")]
+    fn create_interface_with_mtu(self: &CzVmnetNetwork, id: &str, mtu: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "createInterfaceWithoutGateway")]
+    fn create_interface_without_gateway(self: &CzVmnetNetwork, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "releaseInterface")]
+    fn release_interface(self: &CzVmnetNetwork, id: &str) -> CzOutcome;
+
+    // A `VmnetNetwork.Interface`. Its getters' outcomes hold an address, or
+    // `Absent` for `nil`.
+    type CzVmnetInterface;
+    fn duplicate(self: &CzVmnetInterface) -> CzVmnetInterface;
+    #[swift_bridge(swift_name = "ipv4Address")]
+    fn ipv4_address(self: &CzVmnetInterface) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv4Gateway")]
+    fn ipv4_gateway(self: &CzVmnetInterface) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6Address")]
+    fn ipv6_address(self: &CzVmnetInterface) -> CzOutcome;
+    #[swift_bridge(swift_name = "ipv6Gateway")]
+    fn ipv6_gateway(self: &CzVmnetInterface) -> CzOutcome;
+    #[swift_bridge(swift_name = "macAddress")]
+    fn mac_address(self: &CzVmnetInterface) -> CzOutcome;
+    fn mtu(self: &CzVmnetInterface) -> u32;
 
     // The getters' outcomes hold a `Mount` or `Absent`. `config` fills `seed`
     // with the container's configuration and hands it to `receive`, and

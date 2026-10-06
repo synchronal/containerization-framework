@@ -86,6 +86,30 @@ impl From<containerization::FilesystemOperation> for FilesystemOperationKind {
   }
 }
 
+/// vmnet's `operating_modes_t`.
+pub(crate) enum VmnetMode {
+  Shared,
+  Host,
+  Bridged,
+}
+
+impl From<containerization::vmnet_network::Mode> for VmnetMode {
+  fn from(mode: containerization::vmnet_network::Mode) -> Self {
+    match mode {
+      containerization::vmnet_network::Mode::Shared => Self::Shared,
+      containerization::vmnet_network::Mode::Host => Self::Host,
+      containerization::vmnet_network::Mode::Bridged => Self::Bridged,
+    }
+  }
+}
+
+/// A `Network?`, which is only ever `nil` here.
+pub(crate) struct CzNetwork;
+
+pub(crate) fn cz_no_network() -> CzNetwork {
+  CzNetwork
+}
+
 /// Always a failure, so nothing is taken from it.
 pub(crate) struct CzOutcome;
 
@@ -114,6 +138,8 @@ taken!(
   init_image -> CzInitImage,
   container_manager -> CzContainerManager,
   linux_container -> CzLinuxContainer,
+  vmnet_network -> CzVmnetNetwork,
+  optional_vmnet_interface -> Option<containerization::vmnet_network::Interface>,
   linux_process -> CzLinuxProcess,
   content_writer -> CzContentWriter,
   written_size -> i64,
@@ -161,6 +187,10 @@ taken!(
   cidr_v6 -> containerization_extras::CIDRv6,
   cidr -> containerization_extras::Cidr,
   mac_address -> containerization_extras::MACAddress,
+  optional_ipv4_address -> Option<containerization_extras::IPv4Address>,
+  optional_ipv6_address -> Option<containerization_extras::IPv6Address>,
+  optional_cidr_v6 -> Option<containerization_extras::CIDRv6>,
+  optional_mac_address -> Option<containerization_extras::MACAddress>,
   uint128 -> u128,
   platform -> containerization_oci::Platform,
   descriptor -> containerization_oci::Descriptor,
@@ -205,6 +235,8 @@ handles!(
   CzImage,
   CzInitImage,
   CzContainerManager,
+  CzVmnetNetwork,
+  CzVmnetInterface,
   CzLinuxContainer,
   CzLinuxProcess,
   CzContentWriter,
@@ -328,6 +360,23 @@ failing!(
   cz_ext4_extended_attribute_decompress_name(isize, &str),
   cz_ext4_formatter_new(&str, ext4::formatter::FormatterOptions),
   cz_ext4_formatter_scan_archive_headers(&str, &str, &str),
+  cz_vmnet_network_new(VmnetMode, Option<u32>, u8, bool, IPv6Address, u8),
+  cz_container_manager_at_root(
+    containerization::Kernel,
+    containerization::Mount,
+    Option<String>,
+    CzNetwork,
+    bool,
+    bool,
+  ),
+  cz_container_manager_at_root_with_initfs_reference(
+    containerization::Kernel,
+    &str,
+    Option<String>,
+    CzNetwork,
+    bool,
+    bool,
+  ),
   cz_read_stream_new(),
   cz_read_stream_with_url(&str, usize),
   cz_read_stream_with_data(Vec<u8>, usize),
@@ -1218,6 +1267,7 @@ impl CzImageStore {
     &self,
     _kernel: containerization::Kernel,
     _initfs: containerization::Mount,
+    _network: CzNetwork,
     _rosetta: bool,
     _nested_virtualization: bool,
   ) -> CzOutcome {
@@ -1228,6 +1278,7 @@ impl CzImageStore {
     &self,
     _kernel: containerization::Kernel,
     _initfs_reference: &str,
+    _network: CzNetwork,
     _rosetta: bool,
     _nested_virtualization: bool,
   ) -> CzOutcome {
@@ -1320,11 +1371,28 @@ impl CzInitImage {
 }
 
 impl CzContainerManager {
+  pub(crate) fn image_store(&self) -> CzImageStore {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_from_reference(
+    &self,
+    _id: &str,
+    _reference: &str,
+    _options: container_manager::CreateOptions,
+    _progress: Progress,
+    _seed: linux_container::Configuration,
+    _configuration: ConfigureContainer,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
   pub(crate) fn create(
     &self,
     _id: &str,
     _image: CzImage,
     _options: container_manager::CreateOptions,
+    _progress: Progress,
     _seed: linux_container::Configuration,
     _configuration: ConfigureContainer,
   ) -> CzOutcome {
@@ -1343,7 +1411,79 @@ impl CzContainerManager {
     match self.0 {}
   }
 
+  pub(crate) fn release_network(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
   pub(crate) fn delete(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzVmnetNetwork {
+  pub(crate) fn as_network(&self) -> CzNetwork {
+    match self.0 {}
+  }
+
+  pub(crate) fn subnet(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn prefix_v6(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn ipv4_gateway(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn ipv6_gateway(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_interface(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_interface_with_mtu(&self, _id: &str, _mtu: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_interface_without_gateway(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn release_interface(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzVmnetInterface {
+  pub(crate) fn duplicate(&self) -> CzVmnetInterface {
+    match self.0 {}
+  }
+
+  pub(crate) fn ipv4_address(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn ipv4_gateway(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn ipv6_address(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn ipv6_gateway(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn mac_address(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn mtu(&self) -> u32 {
     match self.0 {}
   }
 }

@@ -88,7 +88,9 @@ fn addresses_its_interface_as_configured() {
     cfw::containerization_extras::CIDRv6::parse("fd00:cf::2/64").expect("Swift parses an IPv6 CIDR block");
 
   let container = Container::boot_with("cfw-test-config-interface", move |configuration| {
-    let interface = &mut configuration.interfaces[0];
+    let cfw::containerization::Interface::Nat(interface) = &mut configuration.interfaces[0] else {
+      panic!("the suite gives each container a NAT interface");
+    };
 
     interface.mac_address = Some(mac_address);
     interface.ipv6_address = Some(ipv6_address);

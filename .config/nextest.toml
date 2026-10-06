@@ -6,7 +6,7 @@ command = { command-line = "bin/dev/prepare-integration", relative-to = "workspa
 slow-timeout = { period = "120s", terminate-after = 5 }
 
 [[profile.default.scripts]]
-filter = 'binary(linux_container) | binary(configuration)'
+filter = 'binary(linux_container) | binary(configuration) | binary(container_manager)'
 setup = 'prepare-integration'
 
 # A VM per test: a dozen at once leaves the host swapping, and a starved guest
@@ -17,7 +17,7 @@ containers = { max-threads = 4 }
 # Each container unpacks its image, and a cold store first pulls the image and
 # the init image.
 [[profile.default.overrides]]
-filter = 'binary(linux_container) | binary(configuration)'
+filter = 'binary(linux_container) | binary(configuration) | binary(container_manager)'
 test-group = 'containers'
 slow-timeout = { period = "300s", terminate-after = 4 }
 

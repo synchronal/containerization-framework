@@ -22,8 +22,7 @@
 //!   &kernel,
 //!   "ghcr.io/apple/containerization/vminit:0.48.0",
 //!   &store,
-//!   false,
-//!   false,
+//!   Default::default(),
 //! )?;
 //! let image = store.get("docker.io/library/alpine:3", true)?;
 //! let options = cz::container_manager::CreateOptions {

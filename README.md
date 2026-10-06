@@ -20,8 +20,7 @@ let mut manager = cz::ContainerManager::with_initfs_reference(
     &kernel,
     "ghcr.io/apple/containerization/vminit:0.48.0",
     &store,
-    false,
-    false,
+    Default::default(),
 )?;
 
 let image = store.get("docker.io/library/alpine:3", true)?;
@@ -30,7 +29,7 @@ let gateway = cz_extras::IPv4Address::parse("192.168.64.1")?;
 let options = cz::container_manager::CreateOptions { networking: false, ..Default::default() };
 let container = manager.create("example", &image, options, move |config| {
     config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
-    config.interfaces = vec![cz::NatInterface::new(address, Some(gateway))];
+    config.interfaces = vec![cz::Interface::Nat(cz::NatInterface::new(address, Some(gateway)))];
     config.dns = Some(cz::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
 })?;
 container.create()?;
@@ -100,7 +99,7 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 ## Shape
 
 - `containerization`: `ImageStore`, `Image`, `image::Description`,
-  `InitImage`, `Ext4Unpacker`, `Kernel`, `ContainerManager`,
+  `InitImage`, `Ext4Unpacker`, `Kernel`, `ContainerManager`, `VmnetNetwork`,
   `LinuxContainer`, `LinuxProcess`, and the configuration types they take
   (`linux_container::Configuration`, `LinuxProcessConfiguration`, `Mount`,
   `Dns`, `Hosts`, `Signal`, ...). Their defaults match Containerization's.

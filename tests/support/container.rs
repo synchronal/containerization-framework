@@ -59,6 +59,34 @@ impl Container {
     Self::start(manager, container)
   }
 
+  /// Creates and starts [`store::IMAGE`] on `network`, which gives the
+  /// container its interface and resolver in place of the suite's.
+  pub fn boot_on(name: &str, network: cfw::containerization::VmnetNetwork) -> Self {
+    let image_store = store::image_store();
+    let image = store::image(&image_store);
+    let mut manager = store::manager_with(
+      &image_store,
+      cfw::containerization::container_manager::ManagerOptions {
+        network: Some(network),
+        ..Default::default()
+      },
+    );
+
+    // Left by a run that died before dropping its container.
+    let _ = manager.delete(name);
+
+    let options = cfw::containerization::container_manager::CreateOptions {
+      rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
+      vm: super::vm(),
+      ..Default::default()
+    };
+
+    manager
+      .create(name, &image, options, keep_alive)
+      .and_then(|container| Self::start(manager, container))
+      .unwrap_or_else(|error| panic!("{name} should boot: {error}"))
+  }
+
   /// Creates and starts [`store::IMAGE`] from `rootfs`, a block the test
   /// unpacked, rather than one the manager unpacks.
   ///
@@ -183,14 +211,19 @@ fn suite_configuration(
   let interface = network::interface(name);
 
   move |configuration| {
-    configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
-    configuration.cpus = super::TEST_CPUS;
-    configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;
-    configuration.interfaces = vec![interface];
+    keep_alive(configuration);
+    configuration.interfaces = vec![cfw::containerization::Interface::Nat(interface)];
     configuration.dns = Some(network::gateway_dns());
 
     configure(configuration);
   }
+}
+
+/// A process that holds the container open, in the suite's limits.
+fn keep_alive(configuration: &mut cfw::containerization::linux_container::Configuration) {
+  configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
+  configuration.cpus = super::TEST_CPUS;
+  configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;
 }
 
 /// Everything already in the pipe, stopping where a read would block.

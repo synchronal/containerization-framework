@@ -202,7 +202,12 @@ extension LinuxContainer.Configuration {
     memoryInBytes = configuration.memoryInBytes()
     hostname = configuration.hostname()?.toString()
     sysctl = dictionary(configuration.sysctlLen(), configuration.sysctlKeyAt, configuration.sysctlValueAt)
-    interfaces = try list(configuration.interfacesLen()) { try NATInterface(configuration.interfacesAt($0)) }
+    interfaces = try list(configuration.interfacesLen()) { index -> any Interface in
+      switch configuration.interfaceKindAt(index) {
+      case .Nat: try NATInterface(configuration.natInterfaceAt(index))
+      case .Vmnet: configuration.vmnetInterfaceAt(index).interface
+      }
+    }
     sockets = try list(configuration.socketsLen()) { try UnixSocketConfiguration(configuration.socketsAt($0)) }
     mounts = list(configuration.mountsLen()) { Containerization.Mount(configuration.mountsAt($0)) }
     maskedPaths = strings(configuration.maskedPathsLen(), configuration.maskedPathsAt)
@@ -321,7 +326,13 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
     built.insertSysctl(rust(key), rust(value))
   }
 
+  // Any other conforming type crosses as a `NATInterface` of its fields.
   for interface in configuration.interfaces {
+    if let interface = interface as? VmnetNetwork.Interface {
+      built.pushVmnetInterface(CzVmnetInterface(interface))
+      continue
+    }
+
     built.pushInterface(
       interface.ipv4Address.address.value,
       interface.ipv4Address.prefix.length,
