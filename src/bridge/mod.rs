@@ -36,6 +36,7 @@ use crate::containerization::hosts::Entry as RustHostsEntry;
 use crate::containerization::image::Description as RustImageDescription;
 use crate::containerization::linux_container::Configuration as RustLinuxContainerConfiguration;
 use crate::containerization_archive::ArchiveWriterConfiguration as RustArchiveWriterConfiguration;
+use crate::containerization_ext4::ext4::formatter::FormatterOptions as RustFormatterOptions;
 use crate::containerization_extras::IPv6Address as RustIPv6Address;
 use crate::containerization_extras::IpAddress as RustIpAddress;
 use crate::containerization_oci::Descriptor as RustDescriptor;
@@ -252,6 +253,20 @@ pub(crate) mod ffi {
     fn has_journal_mode(self: &RustExt4Unpacker) -> bool;
     #[swift_bridge(swift_name = "journalMode")]
     fn journal_mode(self: &RustExt4Unpacker) -> JournalModeKind;
+
+    type RustFormatterOptions;
+    #[swift_bridge(swift_name = "blockSize")]
+    fn block_size(self: &RustFormatterOptions) -> u32;
+    #[swift_bridge(swift_name = "minDiskSize")]
+    fn min_disk_size(self: &RustFormatterOptions) -> u64;
+    #[swift_bridge(swift_name = "hasJournal")]
+    fn has_journal(self: &RustFormatterOptions) -> bool;
+    #[swift_bridge(swift_name = "journalSize")]
+    fn journal_size(self: &RustFormatterOptions) -> Option<u64>;
+    #[swift_bridge(swift_name = "hasJournalMode")]
+    fn has_journal_mode(self: &RustFormatterOptions) -> bool;
+    #[swift_bridge(swift_name = "journalMode")]
+    fn journal_mode(self: &RustFormatterOptions) -> JournalModeKind;
 
     // Its enums are their `rawValue`s. An option's level and format are
     // read only for the kinds that have them.
@@ -1816,10 +1831,145 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "macAddressLessThan")]
     fn cz_mac_address_less_than(lhs: u64, rhs: u64) -> CzOutcome;
 
+    // ContainerizationEXT4. A `SuperBlock` or an `Inode` crosses as its bytes,
+    // and an archive's format and filter as their `rawValue`s.
     type CzExt4Reader;
     #[swift_bridge(swift_name = "openExt4Reader")]
     fn cz_ext4_reader_new(#[swift_bridge(label = "blockDevice")] block_device: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "superBlock")]
+    fn super_block(self: &CzExt4Reader) -> Vec<u8>;
+    fn exists(self: &CzExt4Reader, path: &str, #[swift_bridge(label = "followSymlinks")] follow_symlinks: bool)
+    -> bool;
+    // The outcome holds the inode's number and the inode.
+    fn stat(
+      self: &CzExt4Reader,
+      path: &str,
+      #[swift_bridge(label = "followSymlinks")] follow_symlinks: bool,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "listDirectory")]
+    fn list_directory(self: &CzExt4Reader, path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "readFile")]
+    fn read_file(
+      self: &CzExt4Reader,
+      at: &str,
+      offset: u64,
+      count: Option<usize>,
+      #[swift_bridge(label = "followSymlinks")] follow_symlinks: bool,
+    ) -> CzOutcome;
     fn export(self: &CzExt4Reader, archive: &str) -> CzOutcome;
+    // Each outcome holds the attributes, which Rust only counts.
+    #[swift_bridge(swift_name = "readInlineExtendedAttributes")]
+    fn cz_ext4_reader_read_inline_extended_attributes(buffer: Vec<u8>) -> CzOutcome;
+    #[swift_bridge(swift_name = "readBlockExtendedAttributes")]
+    fn cz_ext4_reader_read_block_extended_attributes(buffer: Vec<u8>) -> CzOutcome;
+    #[swift_bridge(swift_name = "inodeNumber")]
+    fn inode_number(self: &CzOutcome) -> u32;
+    #[swift_bridge(swift_name = "inodeBytes")]
+    fn inode_bytes(self: &CzOutcome) -> Vec<u8>;
+    #[swift_bridge(swift_name = "rootInode")]
+    fn cz_ext4_inode_root() -> CzOutcome;
+
+    // `compressName`'s outcome holds the prefix id and the rest of the name.
+    #[swift_bridge(swift_name = "compressExtendedAttributeName")]
+    fn cz_ext4_extended_attribute_compress_name(name: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "compressedNameId")]
+    fn compressed_name_id(self: &CzOutcome) -> u8;
+    #[swift_bridge(swift_name = "compressedNameStr")]
+    fn compressed_name_str(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "decompressExtendedAttributeName")]
+    fn cz_ext4_extended_attribute_decompress_name(id: isize, suffix: &str) -> CzOutcome;
+
+    // `create`'s timestamps cross as seconds since 1970, `buf` stands for
+    // `nil` when `has_buf` is false, and so do the xattrs when `has_xattrs`
+    // is. Their values are joined into one, with each one's length.
+    type CzExt4Formatter;
+    #[swift_bridge(swift_name = "newExt4Formatter")]
+    fn cz_ext4_formatter_new(
+      #[swift_bridge(label = "devicePath")] device_path: &str,
+      options: RustFormatterOptions,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "ext4Formatter")]
+    fn ext4_formatter(self: &CzOutcome) -> CzExt4Formatter;
+    fn link(self: &CzExt4Formatter, link: &str, target: &str) -> CzOutcome;
+    fn unlink(
+      self: &CzExt4Formatter,
+      path: &str,
+      #[swift_bridge(label = "directoryWhiteout")] directory_whiteout: bool,
+    ) -> CzOutcome;
+    fn create(
+      self: &CzExt4Formatter,
+      path: &str,
+      link: Option<String>,
+      mode: u16,
+      access: f64,
+      modification: f64,
+      creation: f64,
+      now: f64,
+      #[swift_bridge(label = "hasBuf")] has_buf: bool,
+      buf: Vec<u8>,
+      uid: Option<u32>,
+      gid: Option<u32>,
+      #[swift_bridge(label = "hasXattrs")] has_xattrs: bool,
+      #[swift_bridge(label = "xattrNames")] xattr_names: Vec<String>,
+      #[swift_bridge(label = "xattrLengths")] xattr_lengths: Vec<u64>,
+      #[swift_bridge(label = "xattrValues")] xattr_values: Vec<u8>,
+      recursion: bool,
+    ) -> CzOutcome;
+    fn close(self: &CzExt4Formatter) -> CzOutcome;
+    fn unpack(
+      self: &CzExt4Formatter,
+      source: &str,
+      format: &str,
+      compression: &str,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
+    // `unpack(reader:progress:)`, with the reader as a `duplicate()`.
+    #[swift_bridge(swift_name = "unpackReader")]
+    fn unpack_reader(self: &CzExt4Formatter, reader: CzArchiveReader, progress: RustProgressHandler) -> CzOutcome;
+    // The outcome holds the size and the number of items.
+    #[swift_bridge(swift_name = "scanArchiveHeaders")]
+    fn cz_ext4_formatter_scan_archive_headers(format: &str, filter: &str, file: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "scannedSize")]
+    fn scanned_size(self: &CzOutcome) -> i64;
+    #[swift_bridge(swift_name = "scannedItems")]
+    fn scanned_items(self: &CzOutcome) -> isize;
+
+    // For unit tests: each `FileModeFlag` as `Inode.Mode(flag, 0)`, in the
+    // order of Rust's `ALL`; `ExtendedAttribute.prefixMap`, sorted by key;
+    // `SuperBlockMagic`; the sizes of `SuperBlock` and `Inode` and the
+    // offsets of their last fields; and a `FileTimestamps`' `accessLo` and
+    // `accessHi` for a date.
+    #[swift_bridge(swift_name = "ext4FileModeFlags")]
+    fn cz_ext4_file_mode_flags() -> Vec<u16>;
+    #[swift_bridge(swift_name = "ext4PrefixMapKeys")]
+    fn cz_ext4_prefix_map_keys() -> Vec<isize>;
+    #[swift_bridge(swift_name = "ext4PrefixMapValues")]
+    fn cz_ext4_prefix_map_values() -> Vec<String>;
+    #[swift_bridge(swift_name = "ext4SuperBlockMagic")]
+    fn cz_ext4_super_block_magic() -> u16;
+    #[swift_bridge(swift_name = "ext4Layout")]
+    fn cz_ext4_layout() -> Vec<u64>;
+    #[swift_bridge(swift_name = "fileTimestampsAccess")]
+    fn cz_file_timestamps_access(seconds: f64) -> Vec<u32>;
+
+    // ContainerizationIO. `next`'s outcome holds the next chunk, or `Absent`.
+    type CzReadStream;
+    #[swift_bridge(swift_name = "newReadStream")]
+    fn cz_read_stream_new() -> CzOutcome;
+    #[swift_bridge(swift_name = "readStreamWithURL")]
+    fn cz_read_stream_with_url(url: &str, #[swift_bridge(label = "bufferSize")] buffer_size: usize) -> CzOutcome;
+    #[swift_bridge(swift_name = "readStreamWithData")]
+    fn cz_read_stream_with_data(data: Vec<u8>, #[swift_bridge(label = "bufferSize")] buffer_size: usize) -> CzOutcome;
+    #[swift_bridge(swift_name = "readStream")]
+    fn read_stream(self: &CzOutcome) -> CzReadStream;
+    fn reset(self: &CzReadStream) -> CzOutcome;
+    #[swift_bridge(swift_name = "dataStream")]
+    fn data_stream(self: &CzReadStream) -> CzDataStream;
+    type CzDataStream;
+    fn next(self: &CzDataStream) -> CzOutcome;
+    // For a unit test: `ReadStream.bufferSize`.
+    #[swift_bridge(swift_name = "readStreamBufferSize")]
+    fn cz_read_stream_buffer_size() -> isize;
 
     // `EXT4Unpacker.unpack(archive:compression:at:)`, with the filter as its
     // `rawValue`.
@@ -1964,6 +2114,7 @@ pub(crate) mod ffi {
       bundle: Vec<u8>,
       #[swift_bridge(label = "tempDirectoryBaseName")] temp_directory_base_name: Option<String>,
     ) -> CzOutcome;
+    fn duplicate(self: &CzArchiveReader) -> CzArchiveReader;
     #[swift_bridge(swift_name = "makeIterator")]
     fn make_iterator(self: &CzArchiveReader) -> CzArchiveIterator;
     #[swift_bridge(swift_name = "makeStreamingIterator")]

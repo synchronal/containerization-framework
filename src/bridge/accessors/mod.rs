@@ -15,6 +15,7 @@
 mod addresses;
 mod archive;
 mod container;
+mod ext4;
 mod images;
 mod os;
 mod registry;

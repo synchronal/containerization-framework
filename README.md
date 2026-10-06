@@ -106,10 +106,13 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
   `Dns`, `Hosts`, ...). Their defaults match Containerization's.
 - `containerization_oci`: `LocalContentStore`, `Content`, `ContentWriter`,
   `Descriptor`, `Platform`, `User`.
-- `containerization_ext4`: `ext4::Ext4Reader`, `ext4::JournalConfig`.
+- `containerization_ext4`: `ext4::Formatter`, `ext4::Ext4Reader`,
+  `ext4::SuperBlock`, `ext4::Inode`, `ext4::JournalConfig`,
+  `FileTimestamps`.
 - `containerization_extras`: `IPv4Address`, `IPv6Address`, `IpAddress`,
   `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr`, `MACAddress`, `ProgressEvent`,
   `ProgressHandler`.
+- `containerization_io`: `ReadStream`.
 - `containerization_os`: `terminal::Size`.
 
 A few things work differently because Rust can't express them the way Swift

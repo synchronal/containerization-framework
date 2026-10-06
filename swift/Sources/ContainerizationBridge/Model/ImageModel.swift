@@ -48,19 +48,22 @@ extension EXT4Unpacker {
   init(_ unpacker: RustExt4Unpacker) {
     var journal: EXT4.JournalConfig?
     if unpacker.hasJournal() {
-      var mode: EXT4.JournalConfig.JournalMode?
-      if unpacker.hasJournalMode() {
-        mode =
-          switch unpacker.journalMode() {
-          case .Writeback: .writeback
-          case .Ordered: .ordered
-          case .Journal: .journal
-          }
-      }
+      let mode = unpacker.hasJournalMode() ? EXT4.JournalConfig.JournalMode(unpacker.journalMode()) : nil
       journal = EXT4.JournalConfig(size: unpacker.journalSize(), defaultMode: mode)
     }
 
     self.init(capacityInBytes: unpacker.capacityInBytes(), journal: journal)
+  }
+}
+
+extension EXT4.JournalConfig.JournalMode {
+  init(_ kind: JournalModeKind) {
+    self =
+      switch kind {
+      case .Writeback: .writeback
+      case .Ordered: .ordered
+      case .Journal: .journal
+      }
   }
 }
 

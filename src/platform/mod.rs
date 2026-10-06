@@ -79,6 +79,28 @@ pub(crate) fn system_time(seconds: f64) -> SystemTime {
   }
 }
 
+/// A struct Swift sends as its bytes, laid out as Swift's is.
+///
+/// # Safety
+///
+/// It is `repr(C)`, and any bytes of its size make a valid one.
+pub(crate) unsafe trait Plain: Copy {}
+
+/// A value from the bytes Swift sent for it. It panics if Swift's size isn't
+/// Rust's.
+pub(crate) fn from_bytes<T: Plain>(bytes: &[u8]) -> T {
+  assert_eq!(
+    bytes.len(),
+    std::mem::size_of::<T>(),
+    "Swift's {} is a different size from Rust's",
+    std::any::type_name::<T>()
+  );
+
+  // SAFETY: `Plain` makes any bytes of its size valid, and the read doesn't
+  // assume the bytes are aligned.
+  unsafe { bytes.as_ptr().cast::<T>().read_unaligned() }
+}
+
 /// A `SystemTime` as a Swift `Date`'s seconds since 1970.
 pub(crate) fn seconds(time: SystemTime) -> f64 {
   match time.duration_since(SystemTime::UNIX_EPOCH) {

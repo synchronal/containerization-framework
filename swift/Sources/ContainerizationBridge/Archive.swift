@@ -68,14 +68,14 @@ func archiveDefaultLocales() -> RustVec<RustString> {
   rustStrings(ArchiveWriterConfiguration.defaultLocales)
 }
 
-private func archiveFormat(_ rawValue: String) throws -> Format {
+func archiveFormat(_ rawValue: String) throws -> Format {
   guard let format = Format(rawValue: rawValue) else {
     throw BridgeError.malformed("archive format", rawValue)
   }
   return format
 }
 
-private func archiveFilter(_ rawValue: String) throws -> Filter {
+func archiveFilter(_ rawValue: String) throws -> Filter {
   guard let filter = Filter(rawValue: rawValue) else {
     throw BridgeError.malformed("archive filter", rawValue)
   }
@@ -267,16 +267,22 @@ final class CzWriteEntry: @unchecked Sendable {
 
   /// `values` is every value joined, each `lengths` long in turn.
   func setXattrs(names: RustVec<RustString>, lengths: RustVec<UInt64>, values: RustVec<UInt8>) {
-    let values = Data(values)
-    var xattrs: [String: Data] = [:]
-    var offset = values.startIndex
-    for (name, length) in zip(strings(names), lengths) {
-      let end = offset + Int(length)
-      xattrs[name] = values.subdata(in: offset..<end)
-      offset = end
-    }
-    entry.xattrs = xattrs
+    entry.xattrs = dataMap(names: names, lengths: lengths, values: values)
   }
+}
+
+/// A `[String: Data]`, crossing as its keys and its values joined into one,
+/// with each one's length.
+func dataMap(names: RustVec<RustString>, lengths: RustVec<UInt64>, values: RustVec<UInt8>) -> [String: Data] {
+  let values = Data(values)
+  var map: [String: Data] = [:]
+  var offset = values.startIndex
+  for (name, length) in zip(strings(names), lengths) {
+    let end = offset + Int(length)
+    map[name] = values.subdata(in: offset..<end)
+    offset = end
+  }
+  return map
 }
 
 func newArchiveWriter(configuration: RustArchiveWriterConfiguration) -> CzOutcome {
@@ -430,6 +436,11 @@ final class CzArchiveReader: @unchecked Sendable {
 
   init(_ reader: ArchiveReader) {
     self.reader = reader
+  }
+
+  /// Another handle on the same reader, for a formatter to take.
+  func duplicate() -> CzArchiveReader {
+    CzArchiveReader(reader)
   }
 
   func makeIterator() -> CzArchiveIterator {

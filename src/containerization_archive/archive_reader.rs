@@ -15,7 +15,7 @@ use std::path::Path;
 /// `ArchiveReader`. Swift's `Sequence` conformance is
 /// `IntoIterator for &ArchiveReader`.
 pub struct ArchiveReader {
-  handle: ffi::CzArchiveReader,
+  pub(crate) handle: ffi::CzArchiveReader,
 }
 
 // Swift's `ArchiveReader` is a class that isn't `Sendable`; Rust's isn't

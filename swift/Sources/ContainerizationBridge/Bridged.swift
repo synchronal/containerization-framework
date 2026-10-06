@@ -59,6 +59,11 @@ public final class CzOutcome: @unchecked Sendable {
     cast(value)
   }
 
+  /// The value, if it is a `T`, for a getter that reads more than one shape.
+  func held<T>(_: T.Type) -> T? {
+    value as? T
+  }
+
   func cast<T>(_ held: Any?) -> T {
     guard let held = held as? T else {
       preconditionFailure("Rust took a \(T.self) from an outcome holding \(String(describing: held))")

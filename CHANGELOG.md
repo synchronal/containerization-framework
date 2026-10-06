@@ -34,6 +34,12 @@ options struct whose `Default` matches Swift, such as
   unpacks one into an ext4 filesystem.
 - `containerization_os` adds `Terminal`, `CapabilityName`, `CapabilitySet`,
   `KeychainQuery`, `Stat`, `sysctl::by_name` and `file::info`.
+- `ext4::Formatter` builds an ext4 filesystem file by file, or unpacks an
+  archive into one. `Ext4Reader` can now read the superblock, stat paths,
+  list directories and read files. `SuperBlock`, `Inode`, `FileModeFlag`,
+  `FileTimestamps` and `ExtendedAttribute` come with them.
+- The new `containerization_io` module adds `ReadStream`. Its `data_stream`
+  is an iterator over the chunks it reads.
 
 ### Breaking
 
