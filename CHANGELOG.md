@@ -58,6 +58,8 @@ options struct whose `Default` matches Swift, such as
   is an iterator over the chunks it reads.
 - `Error::Failed` carries the code of a thrown `ContainerizationError`, which
   `Error::is_code` checks.
+- `LocalContentStore::ingest` no longer intermittently crashes after its
+  closure returns.
 
 ### Breaking
 
