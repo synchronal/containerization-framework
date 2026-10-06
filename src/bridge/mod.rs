@@ -59,7 +59,8 @@ use crate::containerization_oci::Platform as RustPlatform;
 use crate::containerization_oci::Process as RustProcess;
 use crate::containerization_oci::Spec as RustSpec;
 use crate::containerization_oci::User as RustUser;
-use crate::platform::Configure as RustConfigure;
+use crate::platform::ConfigureContainer as RustConfigure;
+use crate::platform::ConfigureProcess as RustConfigureProcess;
 use crate::platform::Progress as RustProgressHandler;
 
 #[swift_bridge::bridge]
@@ -173,11 +174,37 @@ pub(crate) mod ffi {
     WriteIops,
   }
 
+  // swift-log's `Logger.Level`.
+  enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Notice,
+    Warning,
+    Error,
+    Critical,
+  }
+
+  // `Hosts.Entry`'s static constructors.
+  enum HostsEntryName {
+    LocalHostIpv4,
+    LocalHostIpv6,
+    Ipv6LocalNet,
+    Ipv6MulticastPrefix,
+    Ipv6AllNodes,
+    Ipv6AllRouters,
+  }
+
   extern "Rust" {
     // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
     // with the configuration it seeded.
     type RustConfigure;
     fn call(self: &RustConfigure, configuration: &mut RustLinuxContainerConfiguration);
+
+    // A `(inout LinuxProcessConfiguration) -> Void`: Swift calls it once,
+    // with the configuration it filled.
+    type RustConfigureProcess;
+    fn call(self: &RustConfigureProcess, process: &mut RustLinuxProcessConfiguration);
 
     // A `ProgressHandler?`. Swift asks `is_some` before calling it.
     type RustProgressHandler;
@@ -2304,6 +2331,110 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "hasBytes")]
     fn has_bytes(self: &CzOutcome) -> bool;
     fn bytes(self: &CzOutcome) -> Vec<u8>;
+    fn int32(self: &CzOutcome) -> i32;
+
+    // Containerization's value types. Each crosses whole, and Swift does the
+    // work: the outcomes hold what Swift returns.
+    //
+    // A `Kernel.CommandLine` crosses as its two lists, and each edit's outcome
+    // holds the edited command line.
+    #[swift_bridge(swift_name = "kernelCommandLineAddDebug")]
+    fn cz_kernel_command_line_add_debug(
+      #[swift_bridge(label = "kernelArgs")] kernel_args: Vec<String>,
+      #[swift_bridge(label = "initArgs")] init_args: Vec<String>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "kernelCommandLineAddPanic")]
+    fn cz_kernel_command_line_add_panic(
+      #[swift_bridge(label = "kernelArgs")] kernel_args: Vec<String>,
+      #[swift_bridge(label = "initArgs")] init_args: Vec<String>,
+      level: i64,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "kernelCommandLineSetAgentLogLevel")]
+    fn cz_kernel_command_line_set_agent_log_level(
+      #[swift_bridge(label = "kernelArgs")] kernel_args: Vec<String>,
+      #[swift_bridge(label = "initArgs")] init_args: Vec<String>,
+      level: LogLevel,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "commandLineKernelArgs")]
+    fn command_line_kernel_args(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "commandLineInitArgs")]
+    fn command_line_init_args(self: &CzOutcome) -> Vec<String>;
+    // `clone(to:)`'s outcome holds a `Mount`, and `tagHash`'s a string.
+    #[swift_bridge(swift_name = "cloneMount")]
+    fn cz_mount_clone(mount: RustMount, to: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "mountTagHash")]
+    fn cz_mount_tag_hash(mount: RustMount) -> CzOutcome;
+    #[swift_bridge(swift_name = "validateDNS")]
+    fn cz_dns_validate(dns: RustDns) -> CzOutcome;
+    #[swift_bridge(swift_name = "dnsResolvConf")]
+    fn cz_dns_resolv_conf(dns: RustDns) -> CzOutcome;
+    #[swift_bridge(swift_name = "hostsFile")]
+    fn cz_hosts_file(hosts: RustHosts) -> CzOutcome;
+    #[swift_bridge(swift_name = "hostsEntryRendered")]
+    fn cz_hosts_entry_rendered(entry: RustHostsEntry) -> CzOutcome;
+    // The outcome holds a `Hosts.Entry`.
+    #[swift_bridge(swift_name = "namedHostsEntry")]
+    fn cz_hosts_entry_named(name: HostsEntryName, comment: Option<String>) -> CzOutcome;
+    #[swift_bridge(swift_name = "hostsEntryIpAddress")]
+    fn hosts_entry_ip_address(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "hostsEntryHostnames")]
+    fn hosts_entry_hostnames(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "hostsEntryComment")]
+    fn hosts_entry_comment(self: &CzOutcome) -> Option<String>;
+    // The outcome holds an `ExitStatus`.
+    #[swift_bridge(swift_name = "newExitStatus")]
+    fn cz_exit_status_new(#[swift_bridge(label = "exitCode")] exit_code: i32) -> CzOutcome;
+    // The outcome holds the kind's `description`.
+    #[swift_bridge(swift_name = "parseLinuxRLimitKind")]
+    fn cz_linux_rlimit_kind_parse(string: &str) -> CzOutcome;
+    // Swift fills `seed` with the configuration it makes, and hands it to
+    // `receive`.
+    #[swift_bridge(swift_name = "linuxProcessConfigurationFromImageConfig")]
+    fn cz_linux_process_configuration_from_image_config(
+      config: RustImageConfig,
+      seed: RustLinuxProcessConfiguration,
+      receive: RustConfigureProcess,
+    ) -> CzOutcome;
+    // Swift reads `process`, sets its terminal, fills `process` back in, and
+    // hands it to `receive`.
+    #[swift_bridge(swift_name = "linuxProcessConfigurationSetTerminalIO")]
+    fn cz_linux_process_configuration_set_terminal_io(
+      process: RustLinuxProcessConfiguration,
+      terminal: CzTerminal,
+      receive: RustConfigureProcess,
+    ) -> CzOutcome;
+    // `Signal`. Parsing's outcome holds a raw value, the maps' a
+    // `[String: Int32]`, `platformName`'s a name or `Absent`, and
+    // `linuxSignal`'s a raw value or `Absent`.
+    #[swift_bridge(swift_name = "parseSignal")]
+    fn cz_signal_parse(name: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "parseSignalFrom")]
+    fn cz_signal_parse_from(name: &str, names: Vec<String>, values: Vec<i32>) -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxSignals")]
+    fn cz_signal_linux() -> CzOutcome;
+    #[swift_bridge(swift_name = "platformSignals")]
+    fn cz_signal_platform() -> CzOutcome;
+    #[swift_bridge(swift_name = "signalPlatformName")]
+    fn cz_signal_platform_name(signal: i32) -> CzOutcome;
+    #[swift_bridge(swift_name = "signalLinuxSignal")]
+    fn cz_signal_linux_signal(signal: i32) -> CzOutcome;
+
+    // For unit tests: `LinuxRLimit.Kind`'s descriptions in Swift's order;
+    // `LinuxCapabilities.allCapabilities` and `defaultOCICapabilities`, as
+    // their `toOCI()`; the raw values of `Signal.Linux`'s and
+    // `Signal.Darwin`'s signals, in Swift's order, with `rtmin()` last in
+    // Linux's; and the raw values of `SystemPlatform.OS.allCases` and then
+    // `Architecture.allCases`.
+    #[swift_bridge(swift_name = "linuxRLimitKindDescriptions")]
+    fn cz_linux_rlimit_kind_descriptions() -> Vec<String>;
+    #[swift_bridge(swift_name = "linuxCapabilitiesPresets")]
+    fn cz_linux_capabilities_presets() -> CzOutcome;
+    #[swift_bridge(swift_name = "linuxSignalValues")]
+    fn cz_signal_linux_values() -> Vec<i32>;
+    #[swift_bridge(swift_name = "darwinSignalValues")]
+    fn cz_signal_darwin_values() -> Vec<i32>;
+    #[swift_bridge(swift_name = "systemPlatformRawValues")]
+    fn cz_system_platform_raw_values() -> Vec<String>;
 
     type CzLocalContentStore;
     #[swift_bridge(swift_name = "openLocalContentStore")]

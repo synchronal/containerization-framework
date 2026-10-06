@@ -17,7 +17,7 @@ impl ffi::CzOutcome {
   }
 
   /// A held `[String: T]`, each value read by `read`.
-  fn map_of<T>(&self, read: impl Fn(&Self) -> T) -> BTreeMap<String, T> {
+  pub(super) fn map_of<T>(&self, read: impl Fn(&Self) -> T) -> BTreeMap<String, T> {
     self
       .entry_keys()
       .into_iter()

@@ -23,7 +23,7 @@ mod linux_process_configuration;
 pub mod linux_rlimit;
 pub mod mount;
 mod nat_interface;
-mod signal;
+pub mod signal;
 pub mod system_platform;
 pub mod unix_socket_configuration;
 mod vm_resources;

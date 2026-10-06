@@ -89,16 +89,20 @@ extension DNS {
   }
 }
 
+extension Hosts.Entry {
+  init(_ entry: RustHostsEntryRef) {
+    self.init(
+      ipAddress: entry.ipAddress().toString(),
+      hostnames: strings(entry.hostnamesLen(), entry.hostnamesAt),
+      comment: entry.comment()?.toString()
+    )
+  }
+}
+
 extension Hosts {
   init(_ hosts: RustHostsRef) {
     self.init(
-      entries: list(hosts.entriesLen(), hosts.entriesAt).map { entry in
-        Hosts.Entry(
-          ipAddress: entry.ipAddress().toString(),
-          hostnames: strings(entry.hostnamesLen(), entry.hostnamesAt),
-          comment: entry.comment()?.toString()
-        )
-      },
+      entries: list(hosts.entriesLen(), hosts.entriesAt).map(Hosts.Entry.init),
       comment: hosts.comment()?.toString()
     )
   }

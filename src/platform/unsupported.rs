@@ -5,11 +5,14 @@
 //! Nothing can make a Swift object here: every constructor's outcome is a
 //! failure, and every handle is uninhabited, so its methods never run.
 
-use super::Configure;
+use super::ConfigureContainer;
+use super::ConfigureProcess;
 use super::Progress;
 use crate::containerization;
 use crate::containerization::container_manager;
+use crate::containerization::hosts;
 use crate::containerization::image;
+use crate::containerization::kernel;
 use crate::containerization::linux_container;
 use crate::containerization_archive;
 use crate::containerization_ext4::ext4;
@@ -18,6 +21,7 @@ use crate::containerization_extras::IPv6Address;
 use crate::containerization_extras::IpAddress;
 use crate::containerization_oci;
 use crate::containerization_os;
+use std::collections::BTreeMap;
 use std::convert::Infallible;
 
 const MACOS_ONLY: &str = "Containerization.framework is macOS only";
@@ -28,6 +32,41 @@ pub(crate) enum ProgressKind {
   TotalItems,
   Size,
   TotalSize,
+}
+
+/// swift-log's `Logger.Level`.
+pub(crate) enum LogLevel {
+  Trace,
+  Debug,
+  Info,
+  Notice,
+  Warning,
+  Error,
+  Critical,
+}
+
+impl From<kernel::LogLevel> for LogLevel {
+  fn from(level: kernel::LogLevel) -> Self {
+    match level {
+      kernel::LogLevel::Trace => Self::Trace,
+      kernel::LogLevel::Debug => Self::Debug,
+      kernel::LogLevel::Info => Self::Info,
+      kernel::LogLevel::Notice => Self::Notice,
+      kernel::LogLevel::Warning => Self::Warning,
+      kernel::LogLevel::Error => Self::Error,
+      kernel::LogLevel::Critical => Self::Critical,
+    }
+  }
+}
+
+/// `Hosts.Entry`'s static constructors.
+pub(crate) enum HostsEntryName {
+  LocalHostIpv4,
+  LocalHostIpv6,
+  Ipv6LocalNet,
+  Ipv6MulticastPrefix,
+  Ipv6AllNodes,
+  Ipv6AllRouters,
 }
 
 /// Always a failure, so nothing is taken from it.
@@ -126,6 +165,11 @@ taken!(
   strings -> Vec<String>,
   has_bytes -> bool,
   bytes -> Vec<u8>,
+  int32 -> i32,
+  int32_map -> BTreeMap<String, i32>,
+  command_line_kernel_args -> Vec<String>,
+  command_line_init_args -> Vec<String>,
+  hosts_entry -> hosts::Entry,
 );
 
 macro_rules! handles {
@@ -302,6 +346,34 @@ failing!(
   cz_runtime_spec_version_current(),
   cz_linux_rlimit_to_oci(containerization::LinuxRLimit),
   cz_linux_capabilities_to_oci(containerization::LinuxCapabilities),
+  cz_kernel_command_line_add_debug(Vec<String>, Vec<String>),
+  cz_kernel_command_line_add_panic(Vec<String>, Vec<String>, i64),
+  cz_kernel_command_line_set_agent_log_level(Vec<String>, Vec<String>, LogLevel),
+  cz_mount_clone(containerization::Mount, &str),
+  cz_mount_tag_hash(containerization::Mount),
+  cz_dns_validate(containerization::Dns),
+  cz_dns_resolv_conf(containerization::Dns),
+  cz_hosts_file(containerization::Hosts),
+  cz_hosts_entry_rendered(hosts::Entry),
+  cz_hosts_entry_named(HostsEntryName, Option<String>),
+  cz_exit_status_new(i32),
+  cz_linux_rlimit_kind_parse(&str),
+  cz_linux_process_configuration_from_image_config(
+    containerization_oci::ImageConfig,
+    containerization::LinuxProcessConfiguration,
+    ConfigureProcess,
+  ),
+  cz_linux_process_configuration_set_terminal_io(
+    containerization::LinuxProcessConfiguration,
+    CzTerminal,
+    ConfigureProcess,
+  ),
+  cz_signal_parse(&str),
+  cz_signal_parse_from(&str, Vec<String>, Vec<i32>),
+  cz_signal_linux(),
+  cz_signal_platform(),
+  cz_signal_platform_name(i32),
+  cz_signal_linux_signal(i32),
   cz_system_platform_oci_platform(containerization::SystemPlatform),
   cz_bundle_create(&str, containerization_oci::Spec),
   cz_bundle_create_from_data(&str, Vec<u8>),
@@ -1235,7 +1307,7 @@ impl CzContainerManager {
     _image: CzImage,
     _options: container_manager::CreateOptions,
     _seed: linux_container::Configuration,
-    _configuration: Configure,
+    _configuration: ConfigureContainer,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -1247,7 +1319,7 @@ impl CzContainerManager {
     _rootfs: containerization::Mount,
     _options: container_manager::RootfsCreateOptions,
     _seed: linux_container::Configuration,
-    _configuration: Configure,
+    _configuration: ConfigureContainer,
   ) -> CzOutcome {
     match self.0 {}
   }

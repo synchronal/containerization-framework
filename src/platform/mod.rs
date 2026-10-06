@@ -19,23 +19,58 @@ use crate::containerization::linux_container;
 use crate::containerization_error;
 use crate::containerization_extras::ProgressHandler;
 use crate::error::Error;
+use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::PoisonError;
 use std::time::Duration;
 use std::time::SystemTime;
 
 /// A `ProgressHandler?`, as it crosses to Swift.
 pub(crate) struct Progress(pub(crate) Option<ProgressHandler>);
 
-type ConfigureContainer = Box<dyn FnOnce(&mut linux_container::Configuration) + Send>;
+type Configuring<T> = Box<dyn FnOnce(&mut T) + Send>;
 
-/// A `(inout LinuxContainer.Configuration) -> Void` closure, as it crosses to
-/// Swift. Swift calls it once, with the configuration it seeded.
-pub(crate) struct Configure(pub(crate) Mutex<Option<ConfigureContainer>>);
+/// An `(inout T) -> Void` closure, as it crosses to Swift. Swift calls it
+/// once, with the value it filled.
+pub(crate) struct Configure<T>(Mutex<Option<Configuring<T>>>);
 
-impl Configure {
-  pub(crate) fn new(configure: impl FnOnce(&mut linux_container::Configuration) + Send + 'static) -> Self {
+impl<T> Configure<T> {
+  pub(crate) fn new(configure: impl FnOnce(&mut T) + Send + 'static) -> Self {
     Self(Mutex::new(Some(Box::new(configure))))
   }
+
+  /// Runs the closure on the value Swift filled, the first time only.
+  pub(crate) fn call(&self, value: &mut T) {
+    let configure = self.0.lock().unwrap_or_else(PoisonError::into_inner).take();
+
+    if let Some(configure) = configure {
+      configure(value);
+    }
+  }
+}
+
+/// The manager's `(inout LinuxContainer.Configuration) -> Void`.
+pub(crate) type ConfigureContainer = Configure<linux_container::Configuration>;
+
+/// An `(inout LinuxProcessConfiguration) -> Void`.
+pub(crate) type ConfigureProcess = Configure<containerization::LinuxProcessConfiguration>;
+
+/// The process configuration a Swift call filled and handed to the closure
+/// `call` passes it.
+pub(crate) fn filled_process(
+  call: impl FnOnce(ConfigureProcess) -> ffi::CzOutcome,
+  action: impl Into<String>,
+) -> Result<containerization::LinuxProcessConfiguration, Error> {
+  let filled = Arc::new(Mutex::new(None));
+  let slot = Arc::clone(&filled);
+  let receive = ConfigureProcess::new(move |process| {
+    *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(std::mem::take(process));
+  });
+
+  outcome(call(receive), action)?;
+
+  let process = filled.lock().unwrap_or_else(PoisonError::into_inner).take();
+  Ok(process.expect("Swift hands back the configuration it fills"))
 }
 
 /// What a throwing Swift call returned, or what it threw as a failure of

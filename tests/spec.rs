@@ -350,7 +350,7 @@ fn converts_containerizations_types_to_ocis() {
   );
 
   let capabilities = cfw::containerization::LinuxCapabilities {
-    bounding: strings(&["CAP_CHOWN"]),
+    bounding: vec![cfw::containerization_os::CapabilityName::Chown],
     ..Default::default()
   };
   assert_eq!(
@@ -361,12 +361,6 @@ fn converts_containerizations_types_to_ocis() {
     },
     "empty sets are left out"
   );
-
-  let unknown = cfw::containerization::LinuxCapabilities {
-    bounding: strings(&["CAP_NOT_ONE"]),
-    ..Default::default()
-  };
-  assert!(unknown.to_oci().is_err());
 
   assert_eq!(
     cfw::containerization::SystemPlatform::LINUX_ARM

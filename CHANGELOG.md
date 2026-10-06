@@ -6,40 +6,42 @@ Where a Swift method has defaulted arguments, the Rust method takes them in an
 options struct whose `Default` matches Swift, such as
 `image_store::PullOptions`.
 
-- Added the address types from `ContainerizationExtras`, such as
-  `IPv4Address`, `CIDRv4` and `MACAddress`, along with
-  `proxy_utils::proxy_from_environment`. Swift does all the parsing, so these
-  calls return a `Result`.
-- `Error::Failed` now carries the code of a thrown `ContainerizationError`,
-  which you can check with `Error::is_code`.
-- Added the OCI image types, including `Index`, `Manifest`, `Reference` and
-  `ParsedDigest`. `containerization_oci::Image` is an image's config, and is a
-  different type from `containerization::Image`.
-- `Platform` can be parsed, printed and matched, and its `==` now follows
-  Swift's: an `arm64` platform with no variant equals `arm64/v8`, and the OS
-  version and features are ignored. Off macOS, every field must match.
-- Added the OCI runtime spec, including `Spec`, `State` and `Bundle`, and
-  conversions into it such as `Process::from_image_config`. Seccomp profiles
-  are read with `LinuxSeccomp::decode`, which rejects Docker's profile format
-  instead of silently turning its conditional rules into unconditional allows.
 - Images can be pushed to registries and saved to disk through `ImageStore`.
+  `Image` exposes its descriptor, index, manifest and config, and `Image`,
+  `InitImage` and the new `KernelImage` can be created directly.
   `RegistryClient`, `Authentication` and `KeychainHelper` are also available,
   although `RegistryClient` can't take Swift's TLS configuration or logger.
-- `Image` exposes its descriptor, index, manifest and config. `Image`,
-  `InitImage` and the new `KernelImage` can be created directly.
-- `LocalContentStore` supports ingest sessions, and `ProgressEvent` exposes its
-  event and value.
-- Archives can be written, read and extracted through the new
-  `containerization_archive` module, and `Ext4Unpacker::unpack_archive`
-  unpacks one into an ext4 filesystem.
+  `LocalContentStore` supports ingest sessions.
+- Containerization's configuration types have the rest of their Swift API,
+  such as `LinuxProcessConfiguration::from_image_config`, `Mount::tag_hash`,
+  `Dns::resolv_conf` and `Hosts::hosts_file`. `Signal` can be parsed from a
+  name or number, and every Linux and Darwin signal is a constant in
+  `signal::linux` and `signal::darwin`.
+- `containerization_oci` adds the image types, including `Index`, `Manifest`,
+  `Reference` and `ParsedDigest`, and the runtime spec, including `Spec`,
+  `State` and `Bundle`. `containerization_oci::Image` is an image's config,
+  not `containerization::Image`. `LinuxSeccomp::decode` rejects Docker's
+  profile format instead of turning its conditional rules into unconditional
+  allows.
+- `Platform` can be parsed, printed and matched, and its `==` follows Swift's:
+  an `arm64` platform with no variant equals `arm64/v8`, and the OS version
+  and features are ignored. Off macOS, every field must match.
+- `containerization_extras` adds the address types, such as `IPv4Address`,
+  `CIDRv4` and `MACAddress`, and `proxy_utils::proxy_from_environment`. Swift
+  does the parsing, so these calls return a `Result`. `ProgressEvent` exposes
+  its event and value.
 - `containerization_os` adds `Terminal`, `CapabilityName`, `CapabilitySet`,
   `KeychainQuery`, `Stat`, `sysctl::by_name` and `file::info`.
 - `ext4::Formatter` builds an ext4 filesystem file by file, or unpacks an
-  archive into one. `Ext4Reader` can now read the superblock, stat paths,
-  list directories and read files. `SuperBlock`, `Inode`, `FileModeFlag`,
-  `FileTimestamps` and `ExtendedAttribute` come with them.
-- The new `containerization_io` module adds `ReadStream`. Its `data_stream`
+  archive into one. `Ext4Reader` can read the superblock, stat paths, list
+  directories and read files.
+- The new `containerization_archive` module writes, reads and extracts
+  archives, and `Ext4Unpacker::unpack_archive` unpacks one into an ext4
+  filesystem.
+- The new `containerization_io` module adds `ReadStream`, whose `data_stream`
   is an iterator over the chunks it reads.
+- `Error::Failed` carries the code of a thrown `ContainerizationError`, which
+  `Error::is_code` checks.
 
 ### Breaking
 
@@ -55,6 +57,9 @@ options struct whose `Default` matches Swift, such as
   JSON with `LinuxSeccomp::decode`.
 - `Error::Failed` has a new `code` field, so a pattern that names its fields
   needs `..`.
+- `LinuxCapabilities`' sets hold `CapabilityName`s instead of strings, so a
+  misspelled capability is a compile error and `to_oci` can no longer fail
+  because of one.
 
 ## v0.3.0
 

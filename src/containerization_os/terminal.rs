@@ -15,7 +15,7 @@ pub struct Size {
 /// `Terminal`. Like Swift's, it never closes its descriptor by itself:
 /// [`Terminal::close`] does.
 pub struct Terminal {
-  handle: ffi::CzTerminal,
+  pub(crate) handle: ffi::CzTerminal,
 }
 
 // Swift's `Terminal` is `Sendable`.

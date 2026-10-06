@@ -1,6 +1,9 @@
 //! `Mount`, and its nested `Mount.RuntimeOptions`.
 
 use super::strings;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
 
 /// `Mount.RuntimeOptions`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -70,6 +73,38 @@ impl Mount {
       options: strings(options),
       runtime_options: RuntimeOptions::Any(strings(runtime_options)),
     }
+  }
+
+  /// `Mount.sharedMount(name:destination:options:)`.
+  pub fn shared_mount(name: impl Into<String>, destination: impl Into<String>, options: &[&str]) -> Self {
+    Self {
+      r#type: "none".to_string(),
+      source: name.into(),
+      destination: destination.into(),
+      options: strings(options),
+      runtime_options: RuntimeOptions::Shared,
+    }
+  }
+
+  /// `Mount.clone(to:)`: copies the source to `to`, and returns this mount
+  /// with `to` as its source. `clone` itself is `Clone`'s.
+  pub fn clone_to(&self, to: &str) -> Result<Self, Error> {
+    platform::outcome(
+      ffi::cz_mount_clone(self.clone(), to),
+      format!("copy {} to {to}", self.source),
+    )
+    .map(|outcome| outcome.mount())
+  }
+
+  /// `Mount.isBlock`.
+  pub fn is_block(&self) -> bool {
+    matches!(self.runtime_options, RuntimeOptions::Virtioblk(_))
+  }
+
+  /// `Mount.tagHash`: a hash of the source, with symlinks resolved.
+  pub fn tag_hash(&self) -> Result<String, Error> {
+    platform::outcome(ffi::cz_mount_tag_hash(self.clone()), format!("hash {}", self.source))
+      .map(|outcome| outcome.text())
   }
 }
 

@@ -2,6 +2,10 @@ use super::LinuxCapabilities;
 use super::LinuxRLimit;
 use super::strings;
 use crate::containerization_oci;
+use crate::containerization_os::terminal::Terminal;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
 use std::os::fd::RawFd;
 
 /// `LinuxProcessConfiguration`.
@@ -35,6 +39,33 @@ impl LinuxProcessConfiguration {
       arguments: strings(arguments),
       ..Self::default()
     }
+  }
+
+  /// `LinuxProcessConfiguration(from:)`: the process an image's
+  /// configuration describes.
+  pub fn from_image_config(config: &containerization_oci::ImageConfig) -> Result<Self, Error> {
+    platform::filled_process(
+      |receive| ffi::cz_linux_process_configuration_from_image_config(config.clone(), Self::default(), receive),
+      "make a process configuration from an image's",
+    )
+  }
+
+  /// `LinuxProcessConfiguration.setTerminalIO(terminal:)`: sets what a pty
+  /// needs, and `terminal` as stdin and stdout. Where Swift keeps the
+  /// terminal, `stdin` and `stdout` hold its descriptor.
+  pub fn set_terminal_io(&mut self, terminal: &Terminal) -> Result<(), Error> {
+    let process = platform::filled_process(
+      |receive| ffi::cz_linux_process_configuration_set_terminal_io(self.clone(), terminal.handle.duplicate(), receive),
+      "set a process configuration's terminal",
+    )?;
+
+    *self = Self {
+      stdin: Some(terminal.handle()),
+      stdout: Some(terminal.handle()),
+      ..process
+    };
+
+    Ok(())
   }
 }
 

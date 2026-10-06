@@ -4,6 +4,7 @@ use super::entry_at;
 use crate::bridge::ffi;
 use crate::containerization;
 use crate::containerization::hosts;
+use crate::containerization::kernel;
 use crate::containerization::linux_container;
 use crate::containerization::linux_rlimit;
 use crate::containerization::mount;
@@ -11,9 +12,9 @@ use crate::containerization::system_platform;
 use crate::containerization::unix_socket_configuration;
 use crate::containerization_extras;
 use crate::containerization_oci;
-use crate::platform::Configure;
+use crate::containerization_os;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::PoisonError;
 
 fn runtime_options_of(kind: ffi::RuntimeKind, options: Vec<String>) -> mount::RuntimeOptions {
   match kind {
@@ -37,14 +38,33 @@ impl ffi::CzOutcome {
   }
 }
 
-impl Configure {
-  /// Runs the closure on the configuration Swift seeded, the first time only.
-  pub(crate) fn call(&self, configuration: &mut linux_container::Configuration) {
-    let configure = self.0.lock().unwrap_or_else(PoisonError::into_inner).take();
-
-    if let Some(configure) = configure {
-      configure(configuration);
+impl From<kernel::LogLevel> for ffi::LogLevel {
+  fn from(level: kernel::LogLevel) -> Self {
+    match level {
+      kernel::LogLevel::Trace => Self::Trace,
+      kernel::LogLevel::Debug => Self::Debug,
+      kernel::LogLevel::Info => Self::Info,
+      kernel::LogLevel::Notice => Self::Notice,
+      kernel::LogLevel::Warning => Self::Warning,
+      kernel::LogLevel::Error => Self::Error,
+      kernel::LogLevel::Critical => Self::Critical,
     }
+  }
+}
+
+impl ffi::CzOutcome {
+  /// The `Hosts.Entry` an outcome holds, read field by field.
+  pub(crate) fn hosts_entry(&self) -> hosts::Entry {
+    hosts::Entry {
+      ip_address: self.hosts_entry_ip_address(),
+      hostnames: self.hosts_entry_hostnames(),
+      comment: self.hosts_entry_comment(),
+    }
+  }
+
+  /// A held `[String: Int32]`.
+  pub(crate) fn int32_map(&self) -> BTreeMap<String, i32> {
+    self.map_of(Self::int32)
   }
 }
 
@@ -322,10 +342,10 @@ impl containerization::LinuxCapabilities {
   }
 
   pub(crate) fn set_at(&self, set: ffi::CapabilitySet, index: usize) -> &str {
-    &self.set(set)[index]
+    self.set(set)[index].description()
   }
 
-  fn set(&self, set: ffi::CapabilitySet) -> &[String] {
+  fn set(&self, set: ffi::CapabilitySet) -> &[containerization_os::CapabilityName] {
     match set {
       ffi::CapabilitySet::Bounding => &self.bounding,
       ffi::CapabilitySet::Effective => &self.effective,
@@ -420,12 +440,19 @@ impl containerization::LinuxProcessConfiguration {
     permitted: Vec<String>,
     ambient: Vec<String>,
   ) {
+    let names = |set: Vec<String>| {
+      set
+        .iter()
+        .map(|description| containerization_os::CapabilityName::from_description(description))
+        .collect()
+    };
+
     self.capabilities = containerization::LinuxCapabilities {
-      bounding,
-      effective,
-      inheritable,
-      permitted,
-      ambient,
+      bounding: names(bounding),
+      effective: names(effective),
+      inheritable: names(inheritable),
+      permitted: names(permitted),
+      ambient: names(ambient),
     };
   }
 
@@ -909,8 +936,82 @@ mod tests {
   use crate::bridge::ffi;
   use crate::containerization;
   use crate::containerization::linux_container;
+  use crate::containerization::linux_rlimit;
   use crate::containerization::mount;
+  use crate::containerization::signal;
+  use crate::containerization::system_platform;
   use crate::containerization_oci;
+  use crate::containerization_os;
+
+  #[test]
+  fn copies_swifts_rlimit_kinds() {
+    assert_eq!(
+      ffi::cz_linux_rlimit_kind_descriptions(),
+      linux_rlimit::Kind::ALL
+        .iter()
+        .map(|kind| kind.description())
+        .collect::<Vec<_>>()
+    );
+  }
+
+  #[test]
+  fn copies_swifts_capability_presets() {
+    let oci = |capabilities: containerization::LinuxCapabilities| {
+      let set = |set: Vec<containerization_os::CapabilityName>| {
+        (!set.is_empty()).then(|| {
+          set
+            .iter()
+            .map(|name| name.description().to_string())
+            .collect()
+        })
+      };
+
+      containerization_oci::LinuxCapabilities {
+        bounding: set(capabilities.bounding),
+        effective: set(capabilities.effective),
+        inheritable: set(capabilities.inheritable),
+        permitted: set(capabilities.permitted),
+        ambient: set(capabilities.ambient),
+      }
+    };
+
+    assert_eq!(
+      ffi::cz_linux_capabilities_presets().list(ffi::CzOutcome::oci_linux_capabilities),
+      [
+        oci(containerization::LinuxCapabilities::all_capabilities()),
+        oci(containerization::LinuxCapabilities::default_oci_capabilities()),
+      ]
+    );
+  }
+
+  #[test]
+  fn copies_swifts_signals() {
+    let raw_values = |signals: &[containerization::Signal]| {
+      signals
+        .iter()
+        .map(|signal| signal.raw_value)
+        .collect::<Vec<_>>()
+    };
+
+    let mut linux = raw_values(signal::linux::ALL);
+    linux.push(signal::linux::rtmin(0).raw_value);
+
+    assert_eq!(ffi::cz_signal_linux_values(), linux);
+    assert_eq!(ffi::cz_signal_darwin_values(), raw_values(signal::darwin::ALL));
+  }
+
+  #[test]
+  fn copies_swifts_system_platform_raw_values() {
+    let os = system_platform::Os::ALL_CASES.iter().map(|os| os.as_str());
+    let architectures = system_platform::Architecture::ALL_CASES
+      .iter()
+      .map(|architecture| architecture.as_str());
+
+    assert_eq!(
+      ffi::cz_system_platform_raw_values(),
+      os.chain(architectures).collect::<Vec<_>>()
+    );
+  }
 
   #[test]
   fn reads_an_absent_option_as_absent() {

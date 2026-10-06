@@ -1,51 +1,67 @@
-use super::strings;
 use crate::containerization_oci;
+use crate::containerization_os::CapabilityName;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 
-/// `LinuxCapabilities`. Each set holds `CapabilityName`s by name, e.g.
-/// `CAP_CHOWN`.
+/// `LinuxCapabilities`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LinuxCapabilities {
-  pub bounding: Vec<String>,
-  pub effective: Vec<String>,
-  pub inheritable: Vec<String>,
-  pub permitted: Vec<String>,
-  pub ambient: Vec<String>,
+  pub bounding: Vec<CapabilityName>,
+  pub effective: Vec<CapabilityName>,
+  pub inheritable: Vec<CapabilityName>,
+  pub permitted: Vec<CapabilityName>,
+  pub ambient: Vec<CapabilityName>,
 }
 
 impl LinuxCapabilities {
-  /// `LinuxCapabilities.defaultOCICapabilities`.
-  pub fn default_oci_capabilities() -> Self {
-    let defaults = strings(&[
-      "CAP_CHOWN",
-      "CAP_DAC_OVERRIDE",
-      "CAP_FSETID",
-      "CAP_FOWNER",
-      "CAP_MKNOD",
-      "CAP_NET_RAW",
-      "CAP_SETGID",
-      "CAP_SETUID",
-      "CAP_SETFCAP",
-      "CAP_SETPCAP",
-      "CAP_NET_BIND_SERVICE",
-      "CAP_SYS_CHROOT",
-      "CAP_KILL",
-      "CAP_AUDIT_WRITE",
-    ]);
+  /// `LinuxCapabilities.allCapabilities`, which holds every capability in
+  /// every set.
+  pub fn all_capabilities() -> Self {
+    let all = CapabilityName::ALL_CASES.to_vec();
 
     Self {
-      bounding: defaults.clone(),
-      effective: defaults.clone(),
+      bounding: all.clone(),
+      effective: all.clone(),
+      inheritable: all.clone(),
+      permitted: all.clone(),
+      ambient: all,
+    }
+  }
+
+  /// `LinuxCapabilities.defaultOCICapabilities`.
+  pub fn default_oci_capabilities() -> Self {
+    Self::with(vec![
+      CapabilityName::Chown,
+      CapabilityName::DacOverride,
+      CapabilityName::Fsetid,
+      CapabilityName::Fowner,
+      CapabilityName::Mknod,
+      CapabilityName::NetRaw,
+      CapabilityName::Setgid,
+      CapabilityName::Setuid,
+      CapabilityName::Setfcap,
+      CapabilityName::Setpcap,
+      CapabilityName::NetBindService,
+      CapabilityName::SysChroot,
+      CapabilityName::Kill,
+      CapabilityName::AuditWrite,
+    ])
+  }
+
+  /// `LinuxCapabilities(capabilities:)`, which puts the capabilities in the
+  /// bounding, effective and permitted sets, and leaves the others empty.
+  pub fn with(capabilities: Vec<CapabilityName>) -> Self {
+    Self {
+      bounding: capabilities.clone(),
+      effective: capabilities.clone(),
       inheritable: Vec::new(),
-      permitted: defaults,
+      permitted: capabilities,
       ambient: Vec::new(),
     }
   }
 
-  /// `LinuxCapabilities.toOCI()`, which leaves out empty sets. It fails on a
-  /// name Swift doesn't know.
+  /// `LinuxCapabilities.toOCI()`, which leaves out empty sets.
   pub fn to_oci(&self) -> Result<containerization_oci::LinuxCapabilities, Error> {
     platform::outcome(
       ffi::cz_linux_capabilities_to_oci(self.clone()),

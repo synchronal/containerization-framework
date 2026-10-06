@@ -1,4 +1,7 @@
 use super::strings;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
 
 /// `DNS`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -13,6 +16,17 @@ impl Dns {
   /// `DNS.defaultNameservers`.
   pub fn default_nameservers() -> Vec<String> {
     strings(&["1.1.1.1"])
+  }
+
+  /// `DNS.validate()`, which fails on a nameserver that isn't an IPv4 or IPv6
+  /// address.
+  pub fn validate(&self) -> Result<(), Error> {
+    platform::outcome(ffi::cz_dns_validate(self.clone()), "validate DNS").map(|_| ())
+  }
+
+  /// `DNS.resolvConf`: the configuration as `/etc/resolv.conf` text.
+  pub fn resolv_conf(&self) -> Result<String, Error> {
+    platform::outcome(ffi::cz_dns_resolv_conf(self.clone()), "render resolv.conf").map(|outcome| outcome.text())
   }
 }
 

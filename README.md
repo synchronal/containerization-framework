@@ -103,7 +103,7 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
   `InitImage`, `Ext4Unpacker`, `Kernel`, `ContainerManager`,
   `LinuxContainer`, `LinuxProcess`, and the configuration types they take
   (`linux_container::Configuration`, `LinuxProcessConfiguration`, `Mount`,
-  `Dns`, `Hosts`, ...). Their defaults match Containerization's.
+  `Dns`, `Hosts`, `Signal`, ...). Their defaults match Containerization's.
 - `containerization_oci`: `LocalContentStore`, `Content`, `ContentWriter`,
   `Descriptor`, `Platform`, `User`.
 - `containerization_ext4`: `ext4::Formatter`, `ext4::Ext4Reader`,

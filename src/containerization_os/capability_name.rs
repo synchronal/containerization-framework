@@ -87,7 +87,7 @@ impl CapabilityName {
   }
 
   /// The case Swift described. It panics if Swift has a case Rust lacks.
-  fn from_description(description: &str) -> Self {
+  pub(crate) fn from_description(description: &str) -> Self {
     Self::ALL_CASES
       .iter()
       .copied()

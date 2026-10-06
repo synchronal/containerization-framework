@@ -2,7 +2,23 @@
 
 use super::SystemPlatform;
 use super::strings;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
 use std::path::PathBuf;
+
+/// swift-log's `Logger.Level`, which `CommandLine::set_agent_log_level`
+/// takes. Like Swift's, it orders from `Trace` to `Critical`.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum LogLevel {
+  Trace,
+  Debug,
+  Info,
+  Notice,
+  Warning,
+  Error,
+  Critical,
+}
 
 /// `Kernel.CommandLine`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,6 +45,43 @@ impl CommandLine {
 
     Self { kernel_args, init_args }
   }
+
+  /// `Kernel.CommandLine.addDebug()`.
+  pub fn add_debug(&mut self) -> Result<(), Error> {
+    self.edit(
+      ffi::cz_kernel_command_line_add_debug(self.kernel_args.clone(), self.init_args.clone()),
+      "add debug to a kernel command line",
+    )
+  }
+
+  /// `Kernel.CommandLine.addPanic(level:)`.
+  pub fn add_panic(&mut self, level: i64) -> Result<(), Error> {
+    self.edit(
+      ffi::cz_kernel_command_line_add_panic(self.kernel_args.clone(), self.init_args.clone(), level),
+      "add a panic level to a kernel command line",
+    )
+  }
+
+  /// `Kernel.CommandLine.setAgentLogLevel(level:)`.
+  pub fn set_agent_log_level(&mut self, level: LogLevel) -> Result<(), Error> {
+    self.edit(
+      ffi::cz_kernel_command_line_set_agent_log_level(
+        self.kernel_args.clone(),
+        self.init_args.clone(),
+        ffi::LogLevel::from(level),
+      ),
+      "set the agent's log level on a kernel command line",
+    )
+  }
+
+  /// Takes the command line Swift changed.
+  fn edit(&mut self, outcome: ffi::CzOutcome, action: &str) -> Result<(), Error> {
+    let outcome = platform::outcome(outcome, action)?;
+    self.kernel_args = outcome.command_line_kernel_args();
+    self.init_args = outcome.command_line_init_args();
+
+    Ok(())
+  }
 }
 
 /// `Kernel`.
@@ -47,6 +100,16 @@ impl Kernel {
       platform,
       command_line: CommandLine::new(false, 0, Vec::new()),
     }
+  }
+
+  /// `Kernel.kernelArgs`, its command line's.
+  pub fn kernel_args(&self) -> &[String] {
+    &self.command_line.kernel_args
+  }
+
+  /// `Kernel.initArgs`, its command line's.
+  pub fn init_args(&self) -> &[String] {
+    &self.command_line.init_args
   }
 }
 

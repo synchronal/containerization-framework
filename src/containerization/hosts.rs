@@ -1,6 +1,9 @@
 //! `Hosts`, and its nested `Hosts.Entry`.
 
 use super::strings;
+use crate::error::Error;
+use crate::platform;
+use crate::platform::ffi;
 
 /// `Hosts.Entry`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -19,6 +22,50 @@ impl Entry {
       comment: None,
     }
   }
+
+  /// `Hosts.Entry.rendered`: the entry as a line of `/etc/hosts`.
+  pub fn rendered(&self) -> Result<String, Error> {
+    platform::outcome(ffi::cz_hosts_entry_rendered(self.clone()), "render a hosts entry").map(|outcome| outcome.text())
+  }
+
+  /// `Hosts.Entry.localHostIPV4(comment:)`.
+  pub fn local_host_ipv4(comment: Option<&str>) -> Result<Self, Error> {
+    Self::named(ffi::HostsEntryName::LocalHostIpv4, comment)
+  }
+
+  /// `Hosts.Entry.localHostIPV6(comment:)`.
+  pub fn local_host_ipv6(comment: Option<&str>) -> Result<Self, Error> {
+    Self::named(ffi::HostsEntryName::LocalHostIpv6, comment)
+  }
+
+  /// `Hosts.Entry.ipv6LocalNet(comment:)`.
+  pub fn ipv6_local_net(comment: Option<&str>) -> Result<Self, Error> {
+    Self::named(ffi::HostsEntryName::Ipv6LocalNet, comment)
+  }
+
+  /// `Hosts.Entry.ipv6MulticastPrefix(comment:)`.
+  pub fn ipv6_multicast_prefix(comment: Option<&str>) -> Result<Self, Error> {
+    Self::named(ffi::HostsEntryName::Ipv6MulticastPrefix, comment)
+  }
+
+  /// `Hosts.Entry.ipv6AllNodes(comment:)`.
+  pub fn ipv6_all_nodes(comment: Option<&str>) -> Result<Self, Error> {
+    Self::named(ffi::HostsEntryName::Ipv6AllNodes, comment)
+  }
+
+  /// `Hosts.Entry.ipv6AllRouters(comment:)`.
+  pub fn ipv6_all_routers(comment: Option<&str>) -> Result<Self, Error> {
+    Self::named(ffi::HostsEntryName::Ipv6AllRouters, comment)
+  }
+
+  /// The entry one of Swift's static constructors makes.
+  fn named(name: ffi::HostsEntryName, comment: Option<&str>) -> Result<Self, Error> {
+    platform::outcome(
+      ffi::cz_hosts_entry_named(name, comment.map(str::to_string)),
+      "make a hosts entry",
+    )
+    .map(|outcome| outcome.hosts_entry())
+  }
 }
 
 /// `Hosts`.
@@ -26,6 +73,13 @@ impl Entry {
 pub struct Hosts {
   pub entries: Vec<Entry>,
   pub comment: Option<String>,
+}
+
+impl Hosts {
+  /// `Hosts.hostsFile`: the entries as `/etc/hosts` text.
+  pub fn hosts_file(&self) -> Result<String, Error> {
+    platform::outcome(ffi::cz_hosts_file(self.clone()), "render a hosts file").map(|outcome| outcome.text())
+  }
 }
 
 /// `Hosts.default`.
