@@ -95,6 +95,24 @@ pub fn manager_with(
     .unwrap_or_else(|error| panic!("a manager booting {INITFS_REFERENCE} should be made: {error}"))
 }
 
+/// A VM manager booting [`kernel`] and the init block a container manager
+/// unpacks into the store from [`INITFS_REFERENCE`].
+pub fn vmm() -> cfw::containerization::VzVirtualMachineManager {
+  // Unpacks the init block, if no manager has yet.
+  drop(manager(&image_store()));
+
+  let initfs = cfw::containerization::Mount::block(
+    "ext4",
+    root().join("initfs.ext4").display().to_string(),
+    "/",
+    &["ro"],
+    &[],
+  );
+
+  cfw::containerization::VzVirtualMachineManager::new(&kernel(), &initfs, Default::default())
+    .unwrap_or_else(|error| panic!("a VM manager should be made: {error}"))
+}
+
 /// The lock [`manager`] takes, for a test making a manager of its own.
 pub fn initfs_lock() -> Lock {
   Lock::take(root().join(INITFS_LOCK))

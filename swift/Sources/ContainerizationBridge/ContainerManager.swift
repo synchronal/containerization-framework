@@ -119,6 +119,13 @@ func containerManagerAtRoot(
   }
 }
 
+func containerManager(vmm: CzVirtualMachineManager, network: CzNetwork) -> CzOutcome {
+  let vmm = vmm.manager
+  let network = network.network
+
+  return CzOutcome { CzContainerManager(try ContainerManager(vmm: vmm, network: network)) }
+}
+
 /// The manager's configuration closure: fills `seed` with what the manager
 /// seeded, lets Rust's closure change it, and takes it back.
 private func configured(

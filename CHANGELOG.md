@@ -26,6 +26,13 @@ options struct whose `Default` matches Swift, such as
   an interface on it. The manager can also open a store at a root directory,
   create a container from an image reference, report unpacking progress, and
   release a container's network.
+- `VzVirtualMachineManager` boots VMs without a container manager, and the
+  `VzVirtualMachineInstance` it creates can be started, paused, dialed over
+  vsock and listened on. A `LinuxContainer` can be made directly on a VM
+  manager, and its VM can be reached with `with_virtual_machine_instance`.
+  `ContainerManager::with_vmm` makes a manager on one.
+- The new `LinuxPod` runs several containers in one VM, and they can share
+  the pod's volumes.
 - `containerization_oci` adds the image types, including `Index`, `Manifest`,
   `Reference` and `ParsedDigest`, and the runtime spec, including `Spec`,
   `State` and `Bundle`. `containerization_oci::Image` is an image's config,

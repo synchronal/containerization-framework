@@ -44,6 +44,26 @@ impl ffi::CzOutcome {
     self.optional(Self::mount)
   }
 
+  /// The `AttachedFilesystem` an outcome holds, read field by field.
+  pub(crate) fn attached_filesystem(&self) -> containerization::AttachedFilesystem {
+    containerization::AttachedFilesystem {
+      r#type: self.attached_filesystem_type(),
+      source: self.attached_filesystem_source(),
+      destination: self.attached_filesystem_destination(),
+      options: self.attached_filesystem_options(),
+    }
+  }
+
+  /// A held `[String: [AttachedFilesystem]]`.
+  pub(crate) fn attached_filesystems_by_id(&self) -> BTreeMap<String, Vec<containerization::AttachedFilesystem>> {
+    self.map_of(|filesystems| filesystems.list(Self::attached_filesystem))
+  }
+
+  /// The `Int32?` an outcome holds.
+  pub(crate) fn optional_int32(&self) -> Option<i32> {
+    self.optional(Self::int32)
+  }
+
   /// The `VmnetNetwork.Interface?` an outcome holds.
   pub(crate) fn optional_vmnet_interface(&self) -> Option<vmnet_network::Interface> {
     self.optional(|interface| vmnet_network::Interface {
@@ -180,6 +200,11 @@ impl ffi::CzOutcome {
     }
   }
 
+  /// A held `[ContainerStatistics]`.
+  pub(crate) fn container_statistics_list(&self) -> Vec<containerization::ContainerStatistics> {
+    self.list(Self::container_statistics)
+  }
+
   /// The `UInt64` fields of the statistics held, which number `N`.
   fn statistics_fields<const N: usize>(&self) -> [u64; N] {
     let fields = self.statistics_numbers();
@@ -207,6 +232,27 @@ impl From<vmnet_network::Mode> for ffi::VmnetMode {
       vmnet_network::Mode::Shared => Self::Shared,
       vmnet_network::Mode::Host => Self::Host,
       vmnet_network::Mode::Bridged => Self::Bridged,
+    }
+  }
+}
+
+impl From<ffi::InstanceState> for containerization::VirtualMachineInstanceState {
+  fn from(state: ffi::InstanceState) -> Self {
+    match state {
+      ffi::InstanceState::Starting => Self::Starting,
+      ffi::InstanceState::Running => Self::Running,
+      ffi::InstanceState::Stopped => Self::Stopped,
+      ffi::InstanceState::Stopping => Self::Stopping,
+      ffi::InstanceState::Unknown => Self::Unknown,
+    }
+  }
+}
+
+impl From<ffi::VirtiofsLayoutKind> for containerization::VirtiofsLayout {
+  fn from(layout: ffi::VirtiofsLayoutKind) -> Self {
+    match layout {
+      ffi::VirtiofsLayoutKind::Unified => Self::Unified,
+      ffi::VirtiofsLayoutKind::PerTag => Self::PerTag,
     }
   }
 }
@@ -789,45 +835,21 @@ impl linux_container::Configuration {
   ) {
     self
       .interfaces
-      .push(containerization::Interface::Nat(containerization::NatInterface {
-        ipv4_address: containerization_extras::CIDRv4 {
-          address: containerization_extras::IPv4Address::new(ipv4_address),
-          prefix: containerization_extras::Prefix { length: ipv4_prefix },
-        },
-        ipv4_gateway: ipv4_gateway.map(containerization_extras::IPv4Address::new),
-        ipv6_address: None,
-        ipv6_gateway: None,
-        mac_address: mac_address.map(|value| containerization_extras::MACAddress { value }),
-        mtu,
-      }));
+      .push(nat(ipv4_address, ipv4_prefix, ipv4_gateway, mac_address, mtu));
   }
 
   pub(crate) fn push_vmnet_interface(&mut self, interface: ffi::CzVmnetInterface) {
-    self
-      .interfaces
-      .push(containerization::Interface::Vmnet(vmnet_network::Interface {
-        handle: interface,
-      }));
+    self.interfaces.push(vmnet(interface));
   }
 
   /// Only after [`Self::push_interface`], for the interface it pushed.
   pub(crate) fn set_interface_ipv6_address(&mut self, high: u64, low: u64, zone: Option<String>, prefix: u8) {
-    self.last_interface().ipv6_address = Some(containerization_extras::CIDRv6 {
-      address: containerization_extras::IPv6Address::from_halves(high, low, zone),
-      prefix: containerization_extras::Prefix { length: prefix },
-    });
+    set_ipv6_address(&mut self.interfaces, high, low, zone, prefix);
   }
 
   /// Only after [`Self::push_interface`], for the interface it pushed.
   pub(crate) fn set_interface_ipv6_gateway(&mut self, high: u64, low: u64, zone: Option<String>) {
-    self.last_interface().ipv6_gateway = Some(containerization_extras::IPv6Address::from_halves(high, low, zone));
-  }
-
-  fn last_interface(&mut self) -> &mut containerization::NatInterface {
-    match self.interfaces.last_mut() {
-      Some(containerization::Interface::Nat(interface)) => interface,
-      _ => unreachable!("Swift sets an interface's IPv6 addresses only after push_interface"),
-    }
+    set_ipv6_gateway(&mut self.interfaces, high, low, zone);
   }
 
   pub(crate) fn push_socket(
@@ -875,40 +897,20 @@ impl linux_container::Configuration {
     search_domains: Vec<String>,
     options: Vec<String>,
   ) {
-    self.dns = Some(containerization::Dns {
-      nameservers,
-      domain,
-      search_domains,
-      options,
-    });
+    self.dns = Some(dns(nameservers, domain, search_domains, options));
   }
 
   pub(crate) fn set_hosts(&mut self, comment: Option<String>) {
-    self.hosts = Some(containerization::Hosts {
-      entries: Vec::new(),
-      comment,
-    });
+    self.hosts = Some(hosts(comment));
   }
 
   /// Only after [`Self::set_hosts`].
   pub(crate) fn push_hosts_entry(&mut self, ip_address: String, hostnames: Vec<String>, comment: Option<String>) {
-    self
-      .hosts
-      .as_mut()
-      .expect("Swift adds a hosts entry only after set_hosts")
-      .entries
-      .push(hosts::Entry {
-        ip_address,
-        hostnames,
-        comment,
-      });
+    push_hosts_entry(&mut self.hosts, ip_address, hostnames, comment);
   }
 
   pub(crate) fn set_boot_log_file(&mut self, path: String, append: bool) {
-    self.boot_log = Some(containerization::BootLog::File {
-      path: PathBuf::from(path),
-      append,
-    });
+    self.boot_log = Some(boot_log_file(path, append));
   }
 
   pub(crate) fn set_boot_log_file_handle(&mut self, descriptor: i32) {
@@ -917,11 +919,7 @@ impl linux_container::Configuration {
 
   /// `profile` holds the `LinuxSeccomp` of a `Profile`, or `Absent`.
   pub(crate) fn set_seccomp_profile(&mut self, mode: ffi::SeccompMode, profile: ffi::CzOutcome) {
-    self.seccomp_profile = match mode {
-      ffi::SeccompMode::Unconfined => linux_container::SeccompProfile::Unconfined,
-      ffi::SeccompMode::Default => linux_container::SeccompProfile::Default,
-      ffi::SeccompMode::Profile => linux_container::SeccompProfile::Profile(profile.seccomp()),
-    };
+    self.seccomp_profile = seccomp_profile(mode, profile);
   }
 
   pub(crate) fn process(&self) -> &containerization::LinuxProcessConfiguration {
@@ -957,27 +955,17 @@ impl linux_container::Configuration {
   }
 
   pub(crate) fn interface_kind_at(&self, index: usize) -> ffi::InterfaceKind {
-    match self.interfaces[index] {
-      containerization::Interface::Nat(_) => ffi::InterfaceKind::Nat,
-      containerization::Interface::Vmnet(_) => ffi::InterfaceKind::Vmnet,
-    }
+    interface_kind(&self.interfaces[index])
   }
 
   /// Only when [`Self::interface_kind_at`] is `Nat`.
   pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::NatInterface {
-    match &self.interfaces[index] {
-      containerization::Interface::Nat(interface) => interface,
-      containerization::Interface::Vmnet(_) => unreachable!("Swift asks for a NAT interface only of its kind"),
-    }
+    nat_interface(&self.interfaces[index])
   }
 
-  /// Only when [`Self::interface_kind_at`] is `Vmnet`: a handle on it for
-  /// Swift to keep.
+  /// Only when [`Self::interface_kind_at`] is `Vmnet`.
   pub(crate) fn vmnet_interface_at(&self, index: usize) -> ffi::CzVmnetInterface {
-    match &self.interfaces[index] {
-      containerization::Interface::Vmnet(interface) => interface.handle.duplicate(),
-      containerization::Interface::Nat(_) => unreachable!("Swift asks for a vmnet interface only of its kind"),
-    }
+    vmnet_interface(&self.interfaces[index])
   }
 
   pub(crate) fn sockets_len(&self) -> usize {
@@ -1057,24 +1045,258 @@ impl linux_container::Configuration {
   }
 
   pub(crate) fn seccomp_mode(&self) -> ffi::SeccompMode {
-    match self.seccomp_profile {
-      linux_container::SeccompProfile::Unconfined => ffi::SeccompMode::Unconfined,
-      linux_container::SeccompProfile::Default => ffi::SeccompMode::Default,
-      linux_container::SeccompProfile::Profile(_) => ffi::SeccompMode::Profile,
-    }
+    seccomp_mode(&self.seccomp_profile)
   }
 
   /// The custom profile. Swift asks only when [`Self::seccomp_mode`] is
   /// `Profile`.
   pub(crate) fn seccomp_profile(&self) -> &containerization_oci::LinuxSeccomp {
-    match &self.seccomp_profile {
-      linux_container::SeccompProfile::Profile(profile) => profile,
-      _ => panic!("Swift asks for the profile only when the mode is `Profile`"),
-    }
+    custom_seccomp(&self.seccomp_profile)
   }
 
   pub(crate) fn use_init(&self) -> bool {
     self.use_init
+  }
+}
+
+// What the container, pod and VM configurations share, read and filled the
+// same way.
+
+pub(super) fn interface_kind(interface: &containerization::Interface) -> ffi::InterfaceKind {
+  match interface {
+    containerization::Interface::Nat(_) => ffi::InterfaceKind::Nat,
+    containerization::Interface::Vmnet(_) => ffi::InterfaceKind::Vmnet,
+  }
+}
+
+pub(super) fn nat_interface(interface: &containerization::Interface) -> &containerization::NatInterface {
+  match interface {
+    containerization::Interface::Nat(interface) => interface,
+    containerization::Interface::Vmnet(_) => unreachable!("Swift asks for a NAT interface only of its kind"),
+  }
+}
+
+/// A handle on a vmnet interface for Swift to keep.
+pub(super) fn vmnet_interface(interface: &containerization::Interface) -> ffi::CzVmnetInterface {
+  match interface {
+    containerization::Interface::Vmnet(interface) => interface.handle.duplicate(),
+    containerization::Interface::Nat(_) => unreachable!("Swift asks for a vmnet interface only of its kind"),
+  }
+}
+
+/// A `NATInterface` of its IPv4 fields: Swift sets its IPv6 ones after.
+pub(super) fn nat(
+  ipv4_address: u32,
+  ipv4_prefix: u8,
+  ipv4_gateway: Option<u32>,
+  mac_address: Option<u64>,
+  mtu: u32,
+) -> containerization::Interface {
+  containerization::Interface::Nat(containerization::NatInterface {
+    ipv4_address: containerization_extras::CIDRv4 {
+      address: containerization_extras::IPv4Address::new(ipv4_address),
+      prefix: containerization_extras::Prefix { length: ipv4_prefix },
+    },
+    ipv4_gateway: ipv4_gateway.map(containerization_extras::IPv4Address::new),
+    ipv6_address: None,
+    ipv6_gateway: None,
+    mac_address: mac_address.map(|value| containerization_extras::MACAddress { value }),
+    mtu,
+  })
+}
+
+pub(super) fn vmnet(interface: ffi::CzVmnetInterface) -> containerization::Interface {
+  containerization::Interface::Vmnet(vmnet_network::Interface { handle: interface })
+}
+
+pub(super) fn set_ipv6_address(
+  interfaces: &mut [containerization::Interface],
+  high: u64,
+  low: u64,
+  zone: Option<String>,
+  prefix: u8,
+) {
+  last_nat(interfaces).ipv6_address = Some(containerization_extras::CIDRv6 {
+    address: containerization_extras::IPv6Address::from_halves(high, low, zone),
+    prefix: containerization_extras::Prefix { length: prefix },
+  });
+}
+
+pub(super) fn set_ipv6_gateway(
+  interfaces: &mut [containerization::Interface],
+  high: u64,
+  low: u64,
+  zone: Option<String>,
+) {
+  last_nat(interfaces).ipv6_gateway = Some(containerization_extras::IPv6Address::from_halves(high, low, zone));
+}
+
+fn last_nat(interfaces: &mut [containerization::Interface]) -> &mut containerization::NatInterface {
+  match interfaces.last_mut() {
+    Some(containerization::Interface::Nat(interface)) => interface,
+    _ => unreachable!("Swift sets an interface's IPv6 addresses only after push_interface"),
+  }
+}
+
+pub(super) fn dns(
+  nameservers: Vec<String>,
+  domain: Option<String>,
+  search_domains: Vec<String>,
+  options: Vec<String>,
+) -> containerization::Dns {
+  containerization::Dns {
+    nameservers,
+    domain,
+    search_domains,
+    options,
+  }
+}
+
+pub(super) fn hosts(comment: Option<String>) -> containerization::Hosts {
+  containerization::Hosts {
+    entries: Vec::new(),
+    comment,
+  }
+}
+
+/// Only after `set_hosts`.
+pub(super) fn push_hosts_entry(
+  hosts: &mut Option<containerization::Hosts>,
+  ip_address: String,
+  hostnames: Vec<String>,
+  comment: Option<String>,
+) {
+  hosts
+    .as_mut()
+    .expect("Swift adds a hosts entry only after set_hosts")
+    .entries
+    .push(hosts::Entry {
+      ip_address,
+      hostnames,
+      comment,
+    });
+}
+
+pub(super) fn boot_log_file(path: String, append: bool) -> containerization::BootLog {
+  containerization::BootLog::File {
+    path: PathBuf::from(path),
+    append,
+  }
+}
+
+/// `profile` holds the `LinuxSeccomp` of a `Profile`, or `Absent`.
+pub(super) fn seccomp_profile(mode: ffi::SeccompMode, profile: ffi::CzOutcome) -> linux_container::SeccompProfile {
+  match mode {
+    ffi::SeccompMode::Unconfined => linux_container::SeccompProfile::Unconfined,
+    ffi::SeccompMode::Default => linux_container::SeccompProfile::Default,
+    ffi::SeccompMode::Profile => linux_container::SeccompProfile::Profile(profile.seccomp()),
+  }
+}
+
+pub(super) fn seccomp_mode(profile: &linux_container::SeccompProfile) -> ffi::SeccompMode {
+  match profile {
+    linux_container::SeccompProfile::Unconfined => ffi::SeccompMode::Unconfined,
+    linux_container::SeccompProfile::Default => ffi::SeccompMode::Default,
+    linux_container::SeccompProfile::Profile(_) => ffi::SeccompMode::Profile,
+  }
+}
+
+/// Only when the mode is `Profile`.
+pub(super) fn custom_seccomp(profile: &linux_container::SeccompProfile) -> &containerization_oci::LinuxSeccomp {
+  match profile {
+    linux_container::SeccompProfile::Profile(profile) => profile,
+    _ => panic!("Swift asks for the profile only when the mode is `Profile`"),
+  }
+}
+
+impl containerization::VmConfiguration {
+  pub(crate) fn cpus(&self) -> u32 {
+    self.cpus
+  }
+
+  pub(crate) fn memory_in_bytes(&self) -> u64 {
+    self.memory_in_bytes
+  }
+
+  pub(crate) fn interfaces_len(&self) -> usize {
+    self.interfaces.len()
+  }
+
+  pub(crate) fn interface_kind_at(&self, index: usize) -> ffi::InterfaceKind {
+    interface_kind(&self.interfaces[index])
+  }
+
+  /// Only when [`Self::interface_kind_at`] is `Nat`.
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::NatInterface {
+    nat_interface(&self.interfaces[index])
+  }
+
+  /// Only when [`Self::interface_kind_at`] is `Vmnet`.
+  pub(crate) fn vmnet_interface_at(&self, index: usize) -> ffi::CzVmnetInterface {
+    vmnet_interface(&self.interfaces[index])
+  }
+
+  pub(crate) fn mounts_by_id_len(&self) -> usize {
+    self.mounts_by_id.len()
+  }
+
+  pub(crate) fn mounts_by_id_key_at(&self, index: usize) -> &str {
+    self.mounts_by_id_entry(index).0
+  }
+
+  pub(crate) fn mounts_by_id_mounts_len(&self, index: usize) -> usize {
+    self.mounts_by_id_entry(index).1.len()
+  }
+
+  pub(crate) fn mounts_by_id_mount_at(&self, index: usize, mount: usize) -> &containerization::Mount {
+    &self.mounts_by_id_entry(index).1[mount]
+  }
+
+  fn mounts_by_id_entry(&self, index: usize) -> (&str, &[containerization::Mount]) {
+    self
+      .mounts_by_id
+      .iter()
+      .nth(index)
+      .map(|(id, mounts)| (id.as_str(), mounts.as_slice()))
+      .expect("Swift asks for an entry only below the length")
+  }
+
+  pub(crate) fn has_boot_log(&self) -> bool {
+    self.boot_log.is_some()
+  }
+
+  /// Only when [`Self::has_boot_log`].
+  pub(crate) fn boot_log(&self) -> &containerization::BootLog {
+    self
+      .boot_log
+      .as_ref()
+      .expect("Swift asks for a boot log only after has_boot_log")
+  }
+
+  pub(crate) fn nested_virtualization(&self) -> bool {
+    self.nested_virtualization
+  }
+}
+
+impl containerization::AttachedFilesystem {
+  pub(crate) fn filesystem_type(&self) -> &str {
+    &self.r#type
+  }
+
+  pub(crate) fn source(&self) -> &str {
+    &self.source
+  }
+
+  pub(crate) fn destination(&self) -> &str {
+    &self.destination
+  }
+
+  pub(crate) fn options_len(&self) -> usize {
+    self.options.len()
+  }
+
+  pub(crate) fn options_at(&self, index: usize) -> &str {
+    &self.options[index]
   }
 }
 

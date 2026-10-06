@@ -15,6 +15,7 @@ pub(crate) use self::unsupported as ffi;
 
 use crate::containerization;
 use crate::containerization::linux_container;
+use crate::containerization::linux_pod;
 #[cfg(target_os = "macos")]
 use crate::containerization_error;
 use crate::containerization_extras::ProgressHandler;
@@ -54,6 +55,12 @@ pub(crate) type ConfigureContainer = Configure<linux_container::Configuration>;
 
 /// An `(inout LinuxProcessConfiguration) -> Void`.
 pub(crate) type ConfigureProcess = Configure<containerization::LinuxProcessConfiguration>;
+
+/// An `(inout LinuxPod.Configuration) -> Void`.
+pub(crate) type ConfigurePod = Configure<linux_pod::Configuration>;
+
+/// An `(inout LinuxPod.ContainerConfiguration) -> Void`.
+pub(crate) type ConfigurePodContainer = Configure<linux_pod::ContainerConfiguration>;
 
 /// What `call` returned, and the value its Swift call filled and handed to
 /// the closure `call` passes it, if it did.

@@ -10,6 +10,7 @@ use super::LinuxContainer;
 use super::Mount;
 use super::VmResources;
 use super::VmnetNetwork;
+use super::VzVirtualMachineManager;
 use super::linux_container;
 use crate::containerization_extras::ProgressHandler;
 use crate::error::Error;
@@ -155,6 +156,14 @@ impl ContainerManager {
         options.nested_virtualization,
       ),
       format!("make a container manager booting {initfs_reference}"),
+    )
+  }
+
+  /// `ContainerManager(vmm:network:logger:)`, on `ImageStore.default`.
+  pub fn with_vmm(vmm: &VzVirtualMachineManager, network: Option<VmnetNetwork>) -> Result<Self, Error> {
+    Self::made(
+      ffi::cz_container_manager_with_vmm(vmm.handle.duplicate(), network_crossing(network)),
+      "make a container manager",
     )
   }
 

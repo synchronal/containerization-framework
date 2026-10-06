@@ -15,6 +15,8 @@ use super::Signal;
 use super::StatCategory;
 use super::UnixSocketConfiguration;
 use super::VmResources;
+use super::VzVirtualMachineInstance;
+use super::VzVirtualMachineManager;
 use super::strings;
 use crate::containerization_oci;
 use crate::containerization_os::terminal;
@@ -121,7 +123,8 @@ impl Default for CopyOutOptions {
   }
 }
 
-/// `LinuxContainer`. Made by [`super::ContainerManager::create`].
+/// `LinuxContainer`. Made by [`super::ContainerManager::create`], or by
+/// [`Self::new`] on a VM manager of the caller's.
 pub struct LinuxContainer {
   pub(crate) handle: ffi::CzLinuxContainer,
 }
@@ -136,6 +139,52 @@ impl LinuxContainer {
 
   /// `LinuxContainer.defaultCopyChunkSize`: 1 MiB.
   pub const DEFAULT_COPY_CHUNK_SIZE: usize = 1024 * 1024;
+
+  /// `LinuxContainer(_:rootfs:writableLayer:vmm:vm:configuration:logger:)`.
+  pub fn new(
+    id: &str,
+    rootfs: Mount,
+    writable_layer: Option<Mount>,
+    vmm: &VzVirtualMachineManager,
+    vm: VmResources,
+    configuration: Configuration,
+  ) -> Result<Self, Error> {
+    let (has_writable_layer, writable_layer) = writable_layer_crossing(writable_layer);
+
+    platform::outcome(
+      ffi::cz_linux_container_new(
+        id,
+        rootfs,
+        has_writable_layer,
+        writable_layer,
+        vmm.handle.duplicate(),
+        vm.cpus,
+        vm.memory_in_bytes,
+        configuration,
+      ),
+      format!("make {id}"),
+    )
+    .map(|outcome| Self {
+      handle: outcome.linux_container(),
+    })
+  }
+
+  /// `LinuxContainer(_:rootfs:writableLayer:vmm:vm:logger:configuration:)`,
+  /// whose closure changes a `LinuxContainer.Configuration()` before
+  /// [`Self::new`] takes it, as Swift's convenience init does.
+  pub fn new_with(
+    id: &str,
+    rootfs: Mount,
+    writable_layer: Option<Mount>,
+    vmm: &VzVirtualMachineManager,
+    vm: VmResources,
+    configuration: impl FnOnce(&mut Configuration),
+  ) -> Result<Self, Error> {
+    let mut config = Configuration::default();
+    configuration(&mut config);
+
+    Self::new(id, rootfs, writable_layer, vmm, vm, config)
+  }
 
   /// `LinuxContainer.id`.
   pub fn id(&self) -> String {
@@ -255,6 +304,23 @@ impl LinuxContainer {
     // SAFETY: Swift's `FileHandle` doesn't close its descriptor, and
     // forgets it once it crosses.
     .map(|outcome| unsafe { OwnedFd::from_raw_fd(outcome.int32()) })
+  }
+
+  /// `LinuxContainer.withVirtualMachineInstance(_:)`. Swift runs its closure
+  /// on the instance it hands out, once it has checked the container is
+  /// created; `body` runs the same way, on this thread.
+  pub fn with_virtual_machine_instance<T>(
+    &self,
+    body: impl FnOnce(&VzVirtualMachineInstance) -> Result<T, Error>,
+  ) -> Result<T, Error> {
+    let instance = platform::outcome(
+      self.handle.virtual_machine_instance(),
+      format!("reach {}'s virtual machine", self.id()),
+    )?;
+
+    body(&VzVirtualMachineInstance {
+      handle: instance.virtual_machine_instance(),
+    })
   }
 
   /// `LinuxContainer.closeStdin()`.
@@ -386,6 +452,15 @@ impl LinuxContainer {
       ),
       Mount::any("cgroup2", "none", "/sys/fs/cgroup", &defaults, &[]),
     ]
+  }
+}
+
+/// A `Mount?`, as it crosses to Swift: the mount stands for `nil` when the
+/// flag is false.
+fn writable_layer_crossing(writable_layer: Option<Mount>) -> (bool, Mount) {
+  match writable_layer {
+    Some(writable_layer) => (true, writable_layer),
+    None => (false, Mount::any("", "", "", &[], &[])),
   }
 }
 

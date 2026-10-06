@@ -230,7 +230,7 @@ fn keep_alive(configuration: &mut cfw::containerization::linux_container::Config
 ///
 /// Not read to end-of-file: Swift's duplicate of the write end may outlive the
 /// process. The process has exited by now, so what it wrote is all there.
-fn drain(read: &mut std::io::PipeReader) -> String {
+pub fn drain(read: &mut std::io::PipeReader) -> String {
   // SAFETY: the read end is ours; `F_SETFL` only changes how it reads.
   unsafe { libc::fcntl(read.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) };
 

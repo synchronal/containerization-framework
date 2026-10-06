@@ -5,6 +5,7 @@
 //! `LinuxContainer.Configuration`, is in a module named after its parent:
 //! `linux_container::Configuration`.
 
+mod attached_filesystem;
 mod boot_log;
 pub mod container_manager;
 pub mod container_statistics;
@@ -21,6 +22,7 @@ pub mod kernel;
 mod kernel_image;
 mod linux_capabilities;
 pub mod linux_container;
+pub mod linux_pod;
 mod linux_process;
 mod linux_process_configuration;
 pub mod linux_rlimit;
@@ -30,9 +32,15 @@ pub mod signal;
 mod stat_category;
 pub mod system_platform;
 pub mod unix_socket_configuration;
+mod virtual_machine_instance;
+mod vm_configuration;
 mod vm_resources;
 pub mod vmnet_network;
+mod vsock_listener;
+mod vz_virtual_machine_instance;
+pub mod vz_virtual_machine_manager;
 
+pub use self::attached_filesystem::AttachedFilesystem;
 pub use self::boot_log::BootLog;
 pub use self::container_manager::ContainerManager;
 pub use self::container_statistics::ContainerStatistics;
@@ -49,6 +57,7 @@ pub use self::kernel::Kernel;
 pub use self::kernel_image::KernelImage;
 pub use self::linux_capabilities::LinuxCapabilities;
 pub use self::linux_container::LinuxContainer;
+pub use self::linux_pod::LinuxPod;
 pub use self::linux_process::LinuxProcess;
 pub use self::linux_process_configuration::LinuxProcessConfiguration;
 pub use self::linux_rlimit::LinuxRLimit;
@@ -58,8 +67,14 @@ pub use self::signal::Signal;
 pub use self::stat_category::StatCategory;
 pub use self::system_platform::SystemPlatform;
 pub use self::unix_socket_configuration::UnixSocketConfiguration;
+pub use self::virtual_machine_instance::VirtiofsLayout;
+pub use self::virtual_machine_instance::VirtualMachineInstanceState;
+pub use self::vm_configuration::VmConfiguration;
 pub use self::vm_resources::VmResources;
 pub use self::vmnet_network::VmnetNetwork;
+pub use self::vsock_listener::VsockListener;
+pub use self::vz_virtual_machine_instance::VzVirtualMachineInstance;
+pub use self::vz_virtual_machine_manager::VzVirtualMachineManager;
 
 const MIB: u64 = 1024 * 1024;
 const GIB: u64 = 1024 * MIB;

@@ -166,13 +166,13 @@ final class CzLinuxContainer: Sendable {
   }
 }
 
-/// The closure `exec` takes: fills `seed` with Swift's default configuration,
-/// lets Rust's closure change it, and takes it back.
-private func configured(
+/// The closure an `exec` takes: fills `seed` with the configuration Swift
+/// seeded, lets Rust's closure change it, and takes it back.
+func configured(
   _ seed: RustLinuxProcessConfiguration,
   by configuration: RustConfigureProcess
 ) -> @Sendable (inout LinuxProcessConfiguration) throws -> Void {
-  // Rust's: `exec` calls this once, while `blocking` waits.
+  // Rust's: an `exec` calls this once, while `blocking` waits.
   nonisolated(unsafe) let seed = seed
   nonisolated(unsafe) let configuration = configuration
 

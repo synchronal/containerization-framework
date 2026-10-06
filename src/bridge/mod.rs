@@ -18,6 +18,7 @@
 
 mod accessors;
 
+use crate::containerization::AttachedFilesystem as RustAttachedFilesystem;
 use crate::containerization::BootLog as RustBootLog;
 use crate::containerization::Dns as RustDns;
 use crate::containerization::Ext4Unpacker as RustExt4Unpacker;
@@ -30,11 +31,15 @@ use crate::containerization::Mount as RustMount;
 use crate::containerization::NatInterface as RustNatInterface;
 use crate::containerization::SystemPlatform as RustSystemPlatform;
 use crate::containerization::UnixSocketConfiguration as RustUnixSocketConfiguration;
+use crate::containerization::VmConfiguration as RustVmConfiguration;
 use crate::containerization::container_manager::CreateOptions as RustCreateOptions;
 use crate::containerization::container_manager::RootfsCreateOptions as RustRootfsCreateOptions;
 use crate::containerization::hosts::Entry as RustHostsEntry;
 use crate::containerization::image::Description as RustImageDescription;
 use crate::containerization::linux_container::Configuration as RustLinuxContainerConfiguration;
+use crate::containerization::linux_pod::Configuration as RustPodConfiguration;
+use crate::containerization::linux_pod::ContainerConfiguration as RustPodContainerConfiguration;
+use crate::containerization::linux_pod::PodVolume as RustPodVolume;
 use crate::containerization_archive::ArchiveWriterConfiguration as RustArchiveWriterConfiguration;
 use crate::containerization_ext4::ext4::formatter::FormatterOptions as RustFormatterOptions;
 use crate::containerization_extras::IPv6Address as RustIPv6Address;
@@ -60,6 +65,8 @@ use crate::containerization_oci::Process as RustProcess;
 use crate::containerization_oci::Spec as RustSpec;
 use crate::containerization_oci::User as RustUser;
 use crate::platform::ConfigureContainer as RustConfigure;
+use crate::platform::ConfigurePod as RustConfigurePod;
+use crate::platform::ConfigurePodContainer as RustConfigurePodContainer;
 use crate::platform::ConfigureProcess as RustConfigureProcess;
 use crate::platform::Progress as RustProgressHandler;
 
@@ -215,6 +222,28 @@ pub(crate) mod ffi {
     Vmnet,
   }
 
+  // `VirtualMachineInstanceState`.
+  enum InstanceState {
+    Starting,
+    Running,
+    Stopped,
+    Stopping,
+    Unknown,
+  }
+
+  // `VirtiofsLayout`.
+  enum VirtiofsLayoutKind {
+    Unified,
+    PerTag,
+  }
+
+  // `LinuxPod.PodVolume.Source`, less what it carries.
+  enum PodVolumeKind {
+    Nbd,
+    DiskImage,
+    Tmpfs,
+  }
+
   extern "Rust" {
     // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
     // with the configuration it seeded.
@@ -225,6 +254,14 @@ pub(crate) mod ffi {
     // with the configuration it filled.
     type RustConfigureProcess;
     fn call(self: &RustConfigureProcess, process: &mut RustLinuxProcessConfiguration);
+
+    // A `(inout LinuxPod.Configuration) -> Void`, which takes what Swift
+    // filled, and a `(inout LinuxPod.ContainerConfiguration) -> Void`, which
+    // Swift calls once on Rust's default, which is Swift's.
+    type RustConfigurePod;
+    fn call(self: &RustConfigurePod, configuration: &mut RustPodConfiguration);
+    type RustConfigurePodContainer;
+    fn call(self: &RustConfigurePodContainer, configuration: &mut RustPodContainerConfiguration);
 
     // A `ProgressHandler?`. Swift asks `is_some` before calling it.
     type RustProgressHandler;
@@ -657,6 +694,211 @@ pub(crate) mod ffi {
     fn seccomp_profile(self: &RustLinuxContainerConfiguration) -> &RustLinuxSeccomp;
     #[swift_bridge(swift_name = "useInit")]
     fn use_init(self: &RustLinuxContainerConfiguration) -> bool;
+
+    // Its `mountsByID` is a map of lists: the length and key at an index, and
+    // the length and mounts of the list at that index.
+    type RustVmConfiguration;
+    fn cpus(self: &RustVmConfiguration) -> u32;
+    #[swift_bridge(swift_name = "memoryInBytes")]
+    fn memory_in_bytes(self: &RustVmConfiguration) -> u64;
+    #[swift_bridge(swift_name = "interfacesLen")]
+    fn interfaces_len(self: &RustVmConfiguration) -> usize;
+    #[swift_bridge(swift_name = "interfaceKindAt")]
+    fn interface_kind_at(self: &RustVmConfiguration, index: usize) -> InterfaceKind;
+    #[swift_bridge(swift_name = "natInterfaceAt")]
+    fn nat_interface_at(self: &RustVmConfiguration, index: usize) -> &RustNatInterface;
+    #[swift_bridge(swift_name = "vmnetInterfaceAt")]
+    fn vmnet_interface_at(self: &RustVmConfiguration, index: usize) -> CzVmnetInterface;
+    #[swift_bridge(swift_name = "mountsByIdLen")]
+    fn mounts_by_id_len(self: &RustVmConfiguration) -> usize;
+    #[swift_bridge(swift_name = "mountsByIdKeyAt")]
+    fn mounts_by_id_key_at(self: &RustVmConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "mountsByIdMountsLen")]
+    fn mounts_by_id_mounts_len(self: &RustVmConfiguration, index: usize) -> usize;
+    #[swift_bridge(swift_name = "mountsByIdMountAt")]
+    fn mounts_by_id_mount_at(self: &RustVmConfiguration, index: usize, mount: usize) -> &RustMount;
+    #[swift_bridge(swift_name = "hasBootLog")]
+    fn has_boot_log(self: &RustVmConfiguration) -> bool;
+    #[swift_bridge(swift_name = "bootLog")]
+    fn boot_log(self: &RustVmConfiguration) -> &RustBootLog;
+    #[swift_bridge(swift_name = "nestedVirtualization")]
+    fn nested_virtualization(self: &RustVmConfiguration) -> bool;
+
+    // `location` is an `nbd` source's URL or a `diskImage`'s path.
+    type RustPodVolume;
+    fn name(self: &RustPodVolume) -> &str;
+    fn format(self: &RustPodVolume) -> &str;
+    #[swift_bridge(swift_name = "sourceKind")]
+    fn source_kind(self: &RustPodVolume) -> PodVolumeKind;
+    fn location(self: &RustPodVolume) -> String;
+    fn timeout(self: &RustPodVolume) -> Option<f64>;
+    #[swift_bridge(swift_name = "readOnly")]
+    fn read_only(self: &RustPodVolume) -> bool;
+    #[swift_bridge(swift_name = "sizeBytes")]
+    fn size_bytes(self: &RustPodVolume) -> Option<u64>;
+
+    // Filled as `RustLinuxContainerConfiguration` is, and read the same way.
+    type RustPodConfiguration;
+    #[swift_bridge(swift_name = "setVirtualization")]
+    fn set_virtualization(self: &mut RustPodConfiguration, virtualization: bool);
+    #[swift_bridge(swift_name = "setShareProcessNamespace")]
+    fn set_share_process_namespace(self: &mut RustPodConfiguration, share_process_namespace: bool);
+    #[swift_bridge(swift_name = "setHostname")]
+    fn set_hostname(self: &mut RustPodConfiguration, hostname: Option<String>);
+    #[swift_bridge(swift_name = "setOciRuntimePath")]
+    fn set_oci_runtime_path(self: &mut RustPodConfiguration, oci_runtime_path: Option<String>);
+    #[swift_bridge(swift_name = "clearInterfaces")]
+    fn clear_interfaces(self: &mut RustPodConfiguration);
+    #[swift_bridge(swift_name = "pushInterface")]
+    fn push_interface(
+      self: &mut RustPodConfiguration,
+      ipv4_address: u32,
+      ipv4_prefix: u8,
+      ipv4_gateway: Option<u32>,
+      mac_address: Option<u64>,
+      mtu: u32,
+    );
+    #[swift_bridge(swift_name = "setInterfaceIpv6Address")]
+    fn set_interface_ipv6_address(
+      self: &mut RustPodConfiguration,
+      high: u64,
+      low: u64,
+      zone: Option<String>,
+      prefix: u8,
+    );
+    #[swift_bridge(swift_name = "setInterfaceIpv6Gateway")]
+    fn set_interface_ipv6_gateway(self: &mut RustPodConfiguration, high: u64, low: u64, zone: Option<String>);
+    #[swift_bridge(swift_name = "pushVmnetInterface")]
+    fn push_vmnet_interface(self: &mut RustPodConfiguration, interface: CzVmnetInterface);
+    #[swift_bridge(swift_name = "clearDns")]
+    fn clear_dns(self: &mut RustPodConfiguration);
+    #[swift_bridge(swift_name = "setDns")]
+    fn set_dns(
+      self: &mut RustPodConfiguration,
+      nameservers: Vec<String>,
+      domain: Option<String>,
+      search_domains: Vec<String>,
+      options: Vec<String>,
+    );
+    #[swift_bridge(swift_name = "clearHosts")]
+    fn clear_hosts(self: &mut RustPodConfiguration);
+    #[swift_bridge(swift_name = "setHosts")]
+    fn set_hosts(self: &mut RustPodConfiguration, comment: Option<String>);
+    #[swift_bridge(swift_name = "pushHostsEntry")]
+    fn push_hosts_entry(
+      self: &mut RustPodConfiguration,
+      ip_address: String,
+      hostnames: Vec<String>,
+      comment: Option<String>,
+    );
+    #[swift_bridge(swift_name = "clearBootLog")]
+    fn clear_boot_log(self: &mut RustPodConfiguration);
+    #[swift_bridge(swift_name = "setBootLogFile")]
+    fn set_boot_log_file(self: &mut RustPodConfiguration, path: String, append: bool);
+    #[swift_bridge(swift_name = "setBootLogFileHandle")]
+    fn set_boot_log_file_handle(self: &mut RustPodConfiguration, descriptor: i32);
+    #[swift_bridge(swift_name = "setSeccompProfile")]
+    fn set_seccomp_profile(self: &mut RustPodConfiguration, mode: SeccompMode, profile: CzOutcome);
+    #[swift_bridge(swift_name = "clearVolumes")]
+    fn clear_volumes(self: &mut RustPodConfiguration);
+    #[swift_bridge(swift_name = "pushVolume")]
+    fn push_volume(
+      self: &mut RustPodConfiguration,
+      name: String,
+      format: String,
+      kind: PodVolumeKind,
+      location: String,
+      timeout: Option<f64>,
+      read_only: bool,
+      size_bytes: Option<u64>,
+    );
+    #[swift_bridge(swift_name = "interfacesLen")]
+    fn interfaces_len(self: &RustPodConfiguration) -> usize;
+    #[swift_bridge(swift_name = "interfaceKindAt")]
+    fn interface_kind_at(self: &RustPodConfiguration, index: usize) -> InterfaceKind;
+    #[swift_bridge(swift_name = "natInterfaceAt")]
+    fn nat_interface_at(self: &RustPodConfiguration, index: usize) -> &RustNatInterface;
+    #[swift_bridge(swift_name = "vmnetInterfaceAt")]
+    fn vmnet_interface_at(self: &RustPodConfiguration, index: usize) -> CzVmnetInterface;
+    fn virtualization(self: &RustPodConfiguration) -> bool;
+    #[swift_bridge(swift_name = "hasBootLog")]
+    fn has_boot_log(self: &RustPodConfiguration) -> bool;
+    #[swift_bridge(swift_name = "bootLog")]
+    fn boot_log(self: &RustPodConfiguration) -> &RustBootLog;
+    #[swift_bridge(swift_name = "shareProcessNamespace")]
+    fn share_process_namespace(self: &RustPodConfiguration) -> bool;
+    fn hostname(self: &RustPodConfiguration) -> Option<&str>;
+    #[swift_bridge(swift_name = "hasDns")]
+    fn has_dns(self: &RustPodConfiguration) -> bool;
+    fn dns(self: &RustPodConfiguration) -> &RustDns;
+    #[swift_bridge(swift_name = "hasHosts")]
+    fn has_hosts(self: &RustPodConfiguration) -> bool;
+    fn hosts(self: &RustPodConfiguration) -> &RustHosts;
+    #[swift_bridge(swift_name = "volumesLen")]
+    fn volumes_len(self: &RustPodConfiguration) -> usize;
+    #[swift_bridge(swift_name = "volumesAt")]
+    fn volumes_at(self: &RustPodConfiguration, index: usize) -> &RustPodVolume;
+    #[swift_bridge(swift_name = "ociRuntimePath")]
+    fn oci_runtime_path(self: &RustPodConfiguration) -> Option<&str>;
+    #[swift_bridge(swift_name = "seccompMode")]
+    fn seccomp_mode(self: &RustPodConfiguration) -> SeccompMode;
+    #[swift_bridge(swift_name = "seccompProfile")]
+    fn seccomp_profile(self: &RustPodConfiguration) -> &RustLinuxSeccomp;
+
+    // Read as `RustLinuxContainerConfiguration` is. Its seccomp profile is
+    // `nil` unless `has_seccomp_profile`.
+    type RustPodContainerConfiguration;
+    fn process(self: &RustPodContainerConfiguration) -> &RustLinuxProcessConfiguration;
+    fn cpus(self: &RustPodContainerConfiguration) -> u32;
+    #[swift_bridge(swift_name = "memoryInBytes")]
+    fn memory_in_bytes(self: &RustPodContainerConfiguration) -> u64;
+    fn hostname(self: &RustPodContainerConfiguration) -> Option<&str>;
+    #[swift_bridge(swift_name = "sysctlLen")]
+    fn sysctl_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "sysctlKeyAt")]
+    fn sysctl_key_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "sysctlValueAt")]
+    fn sysctl_value_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "mountsLen")]
+    fn mounts_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "mountsAt")]
+    fn mounts_at(self: &RustPodContainerConfiguration, index: usize) -> &RustMount;
+    #[swift_bridge(swift_name = "maskedPathsLen")]
+    fn masked_paths_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "maskedPathsAt")]
+    fn masked_paths_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "readonlyPathsLen")]
+    fn readonly_paths_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "readonlyPathsAt")]
+    fn readonly_paths_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "socketsLen")]
+    fn sockets_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "socketsAt")]
+    fn sockets_at(self: &RustPodContainerConfiguration, index: usize) -> &RustUnixSocketConfiguration;
+    #[swift_bridge(swift_name = "hasDns")]
+    fn has_dns(self: &RustPodContainerConfiguration) -> bool;
+    fn dns(self: &RustPodContainerConfiguration) -> &RustDns;
+    #[swift_bridge(swift_name = "hasHosts")]
+    fn has_hosts(self: &RustPodContainerConfiguration) -> bool;
+    fn hosts(self: &RustPodContainerConfiguration) -> &RustHosts;
+    #[swift_bridge(swift_name = "hasSeccompProfile")]
+    fn has_seccomp_profile(self: &RustPodContainerConfiguration) -> bool;
+    #[swift_bridge(swift_name = "seccompMode")]
+    fn seccomp_mode(self: &RustPodContainerConfiguration) -> SeccompMode;
+    #[swift_bridge(swift_name = "seccompProfile")]
+    fn seccomp_profile(self: &RustPodContainerConfiguration) -> &RustLinuxSeccomp;
+    #[swift_bridge(swift_name = "useInit")]
+    fn use_init(self: &RustPodContainerConfiguration) -> bool;
+
+    type RustAttachedFilesystem;
+    #[swift_bridge(swift_name = "filesystemType")]
+    fn filesystem_type(self: &RustAttachedFilesystem) -> &str;
+    fn source(self: &RustAttachedFilesystem) -> &str;
+    fn destination(self: &RustAttachedFilesystem) -> &str;
+    #[swift_bridge(swift_name = "optionsLen")]
+    fn options_len(self: &RustAttachedFilesystem) -> usize;
+    #[swift_bridge(swift_name = "optionsAt")]
+    fn options_at(self: &RustAttachedFilesystem, index: usize) -> &str;
 
     type RustCreateOptions;
     #[swift_bridge(swift_name = "rootfsSizeInBytes")]
@@ -1099,6 +1341,14 @@ pub(crate) mod ffi {
     fn vmnet_interface(self: &CzOutcome) -> CzVmnetInterface;
     #[swift_bridge(swift_name = "linuxProcess")]
     fn linux_process(self: &CzOutcome) -> CzLinuxProcess;
+    #[swift_bridge(swift_name = "virtualMachineManager")]
+    fn virtual_machine_manager(self: &CzOutcome) -> CzVirtualMachineManager;
+    #[swift_bridge(swift_name = "virtualMachineInstance")]
+    fn virtual_machine_instance(self: &CzOutcome) -> CzVirtualMachineInstance;
+    #[swift_bridge(swift_name = "vsockListener")]
+    fn vsock_listener(self: &CzOutcome) -> CzVsockListener;
+    #[swift_bridge(swift_name = "linuxPod")]
+    fn linux_pod(self: &CzOutcome) -> CzLinuxPod;
     #[swift_bridge(swift_name = "contentWriter")]
     fn content_writer(self: &CzOutcome) -> CzContentWriter;
     #[swift_bridge(swift_name = "writtenSize")]
@@ -2351,6 +2601,15 @@ pub(crate) mod ffi {
     fn mount_runtime_kind(self: &CzOutcome) -> RuntimeKind;
     #[swift_bridge(swift_name = "mountRuntimeOptions")]
     fn mount_runtime_options(self: &CzOutcome) -> Vec<String>;
+    // An `AttachedFilesystem`, field by field: Rust builds its own.
+    #[swift_bridge(swift_name = "attachedFilesystemType")]
+    fn attached_filesystem_type(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "attachedFilesystemSource")]
+    fn attached_filesystem_source(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "attachedFilesystemDestination")]
+    fn attached_filesystem_destination(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "attachedFilesystemOptions")]
+    fn attached_filesystem_options(self: &CzOutcome) -> Vec<String>;
     #[swift_bridge(swift_name = "exitCode")]
     fn exit_code(self: &CzOutcome) -> i32;
     #[swift_bridge(swift_name = "exitedAt")]
@@ -2837,9 +3096,60 @@ pub(crate) mod ffi {
       seed: RustLinuxContainerConfiguration,
       configuration: RustConfigure,
     ) -> CzOutcome;
+    #[swift_bridge(swift_name = "containerManager")]
+    fn cz_container_manager_with_vmm(vmm: CzVirtualMachineManager, network: CzNetwork) -> CzOutcome;
     #[swift_bridge(swift_name = "releaseNetwork")]
     fn release_network(self: &CzContainerManager, id: &str) -> CzOutcome;
     fn delete(self: &CzContainerManager, id: &str) -> CzOutcome;
+
+    // A `VZVirtualMachineManager`. Its users take it as a `duplicate()`.
+    type CzVirtualMachineManager;
+    #[swift_bridge(swift_name = "virtualMachineManager")]
+    fn cz_virtual_machine_manager_new(
+      kernel: RustKernel,
+      #[swift_bridge(label = "initialFilesystem")] initial_filesystem: RustMount,
+      rosetta: bool,
+      #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+    ) -> CzOutcome;
+    fn duplicate(self: &CzVirtualMachineManager) -> CzVirtualMachineManager;
+    fn create(self: &CzVirtualMachineManager, config: RustVmConfiguration) -> CzOutcome;
+
+    // `mounts`' outcome holds the `[String: [AttachedFilesystem]]`, and
+    // `dial`'s the connection's descriptor, which Rust then owns.
+    type CzVirtualMachineInstance;
+    fn state(self: &CzVirtualMachineInstance) -> InstanceState;
+    fn mounts(self: &CzVirtualMachineInstance) -> CzOutcome;
+    #[swift_bridge(swift_name = "virtiofsLayout")]
+    fn virtiofs_layout(self: &CzVirtualMachineInstance) -> VirtiofsLayoutKind;
+    fn start(self: &CzVirtualMachineInstance) -> CzOutcome;
+    fn stop(self: &CzVirtualMachineInstance) -> CzOutcome;
+    fn pause(self: &CzVirtualMachineInstance) -> CzOutcome;
+    fn resume(self: &CzVirtualMachineInstance) -> CzOutcome;
+    fn dial(self: &CzVirtualMachineInstance, port: u32) -> CzOutcome;
+    fn listen(self: &CzVirtualMachineInstance, port: u32) -> CzOutcome;
+    fn hotplug(self: &CzVirtualMachineInstance, block: RustMount, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "registerMounts")]
+    fn register_mounts(
+      self: &CzVirtualMachineInstance,
+      id: &str,
+      rootfs: RustAttachedFilesystem,
+      #[swift_bridge(label = "additionalMounts")] additional_mounts: Vec<RustMount>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "releaseHotplug")]
+    fn release_hotplug(self: &CzVirtualMachineInstance, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "hotplugVirtioFS")]
+    fn hotplug_virtio_fs(self: &CzVirtualMachineInstance, mounts: Vec<RustMount>, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "releaseVirtioFS")]
+    fn release_virtio_fs(self: &CzVirtualMachineInstance, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "installRosetta")]
+    fn cz_install_rosetta() -> CzOutcome;
+
+    // `next` blocks for a connection, and its outcome holds the descriptor,
+    // which Rust then owns, or `Absent` once the listener is finished.
+    type CzVsockListener;
+    fn port(self: &CzVsockListener) -> u32;
+    fn next(self: &CzVsockListener) -> CzOutcome;
+    fn finish(self: &CzVsockListener) -> CzOutcome;
 
     // A `Network?`, for the manager's inits: swift-bridge 0.1.59 can't pass
     // an `Option` of a Swift type.
@@ -2898,6 +3208,18 @@ pub(crate) mod ffi {
     // `execWith` takes a `seed` for `configuration` to change, as the
     // manager's `create` does.
     type CzLinuxContainer;
+    // `writable_layer` stands for `nil` when `has_writable_layer` is false.
+    #[swift_bridge(swift_name = "linuxContainer")]
+    fn cz_linux_container_new(
+      id: &str,
+      rootfs: RustMount,
+      #[swift_bridge(label = "hasWritableLayer")] has_writable_layer: bool,
+      #[swift_bridge(label = "writableLayer")] writable_layer: RustMount,
+      vmm: CzVirtualMachineManager,
+      #[swift_bridge(label = "vmCpus")] vm_cpus: u32,
+      #[swift_bridge(label = "vmMemoryInBytes")] vm_memory_in_bytes: u64,
+      configuration: RustLinuxContainerConfiguration,
+    ) -> CzOutcome;
     fn id(self: &CzLinuxContainer) -> String;
     fn rootfs(self: &CzLinuxContainer) -> CzOutcome;
     #[swift_bridge(swift_name = "writableLayer")]
@@ -2927,6 +3249,9 @@ pub(crate) mod ffi {
     // The outcome holds the connection's descriptor, which Rust then owns.
     #[swift_bridge(swift_name = "dialVsock")]
     fn dial_vsock(self: &CzLinuxContainer, port: u32) -> CzOutcome;
+    // The outcome holds the instance `withVirtualMachineInstance` hands out.
+    #[swift_bridge(swift_name = "virtualMachineInstance")]
+    fn virtual_machine_instance(self: &CzLinuxContainer) -> CzOutcome;
     #[swift_bridge(swift_name = "closeStdin")]
     fn close_stdin(self: &CzLinuxContainer) -> CzOutcome;
     // `categories` is a `StatCategory`'s raw value.
@@ -2950,6 +3275,77 @@ pub(crate) mod ffi {
       #[swift_bridge(label = "createParents")] create_parents: bool,
       #[swift_bridge(label = "chunkSize")] chunk_size: usize,
     ) -> CzOutcome;
+
+    // `addContainer` and `execInContainer` take a `seed` as the manager's
+    // `create` does. `config` fills `seed` and hands it to `receive`, as a
+    // container's does.
+    // `statistics` takes `container_ids` for `nil` when `has_container_ids` is
+    // false, and its outcome holds a `[ContainerStatistics]`.
+    type CzLinuxPod;
+    #[swift_bridge(swift_name = "linuxPod")]
+    fn cz_linux_pod_new(
+      id: &str,
+      vmm: CzVirtualMachineManager,
+      #[swift_bridge(label = "vmCpus")] vm_cpus: u32,
+      #[swift_bridge(label = "vmMemoryInBytes")] vm_memory_in_bytes: u64,
+      configuration: RustPodConfiguration,
+    ) -> CzOutcome;
+    fn id(self: &CzLinuxPod) -> String;
+    fn config(self: &CzLinuxPod, seed: RustPodConfiguration, receive: RustConfigurePod);
+    #[swift_bridge(swift_name = "vmCpus")]
+    fn vm_cpus(self: &CzLinuxPod) -> u32;
+    #[swift_bridge(swift_name = "vmMemoryInBytes")]
+    fn vm_memory_in_bytes(self: &CzLinuxPod) -> u64;
+    #[swift_bridge(swift_name = "addContainer")]
+    fn add_container(
+      self: &CzLinuxPod,
+      id: &str,
+      rootfs: RustMount,
+      seed: RustPodContainerConfiguration,
+      configuration: RustConfigurePodContainer,
+    ) -> CzOutcome;
+    fn create(self: &CzLinuxPod) -> CzOutcome;
+    #[swift_bridge(swift_name = "startContainer")]
+    fn start_container(self: &CzLinuxPod, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "stopContainer")]
+    fn stop_container(self: &CzLinuxPod, id: &str) -> CzOutcome;
+    fn stop(self: &CzLinuxPod) -> CzOutcome;
+    #[swift_bridge(swift_name = "killContainer")]
+    fn kill_container(self: &CzLinuxPod, id: &str, signal: i32) -> CzOutcome;
+    #[swift_bridge(swift_name = "waitContainer")]
+    fn wait_container(
+      self: &CzLinuxPod,
+      id: &str,
+      #[swift_bridge(label = "timeoutInSeconds")] timeout_in_seconds: Option<i64>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "resizeContainer")]
+    fn resize_container(self: &CzLinuxPod, id: &str, width: u16, height: u16) -> CzOutcome;
+    #[swift_bridge(swift_name = "execInContainer")]
+    fn exec_in_container(
+      self: &CzLinuxPod,
+      id: &str,
+      #[swift_bridge(label = "processID")] process_id: &str,
+      seed: RustLinuxProcessConfiguration,
+      configuration: RustConfigureProcess,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "listContainers")]
+    fn list_containers(self: &CzLinuxPod) -> Vec<String>;
+    fn statistics(
+      self: &CzLinuxPod,
+      #[swift_bridge(label = "hasContainerIDs")] has_container_ids: bool,
+      #[swift_bridge(label = "containerIDs")] container_ids: Vec<String>,
+      categories: i64,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "dialVsock")]
+    fn dial_vsock(self: &CzLinuxPod, port: u32) -> CzOutcome;
+    #[swift_bridge(swift_name = "virtualMachineInstance")]
+    fn virtual_machine_instance(self: &CzLinuxPod) -> CzOutcome;
+    #[swift_bridge(swift_name = "filesystemOperation")]
+    fn filesystem_operation(self: &CzLinuxPod, id: &str, operation: FilesystemOperationKind, path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "closeContainerStdin")]
+    fn close_container_stdin(self: &CzLinuxPod, id: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "relayUnixSocket")]
+    fn relay_unix_socket(self: &CzLinuxPod, id: &str, socket: RustUnixSocketConfiguration) -> CzOutcome;
 
     type CzLinuxProcess;
     fn id(self: &CzLinuxProcess) -> String;

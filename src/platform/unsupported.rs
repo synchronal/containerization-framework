@@ -6,6 +6,8 @@
 //! failure, and every handle is uninhabited, so its methods never run.
 
 use super::ConfigureContainer;
+use super::ConfigurePod;
+use super::ConfigurePodContainer;
 use super::ConfigureProcess;
 use super::Progress;
 use crate::containerization;
@@ -14,6 +16,7 @@ use crate::containerization::hosts;
 use crate::containerization::image;
 use crate::containerization::kernel;
 use crate::containerization::linux_container;
+use crate::containerization::linux_pod;
 use crate::containerization_archive;
 use crate::containerization_ext4::ext4;
 use crate::containerization_extras;
@@ -103,6 +106,42 @@ impl From<containerization::vmnet_network::Mode> for VmnetMode {
   }
 }
 
+/// `VirtualMachineInstanceState`.
+pub(crate) enum InstanceState {
+  Starting,
+  Running,
+  Stopped,
+  Stopping,
+  Unknown,
+}
+
+impl From<InstanceState> for containerization::VirtualMachineInstanceState {
+  fn from(state: InstanceState) -> Self {
+    match state {
+      InstanceState::Starting => Self::Starting,
+      InstanceState::Running => Self::Running,
+      InstanceState::Stopped => Self::Stopped,
+      InstanceState::Stopping => Self::Stopping,
+      InstanceState::Unknown => Self::Unknown,
+    }
+  }
+}
+
+/// `VirtiofsLayout`.
+pub(crate) enum VirtiofsLayoutKind {
+  Unified,
+  PerTag,
+}
+
+impl From<VirtiofsLayoutKind> for containerization::VirtiofsLayout {
+  fn from(layout: VirtiofsLayoutKind) -> Self {
+    match layout {
+      VirtiofsLayoutKind::Unified => Self::Unified,
+      VirtiofsLayoutKind::PerTag => Self::PerTag,
+    }
+  }
+}
+
 /// A `Network?`, which is only ever `nil` here.
 pub(crate) struct CzNetwork;
 
@@ -141,6 +180,14 @@ taken!(
   vmnet_network -> CzVmnetNetwork,
   optional_vmnet_interface -> Option<containerization::vmnet_network::Interface>,
   linux_process -> CzLinuxProcess,
+  virtual_machine_manager -> CzVirtualMachineManager,
+  virtual_machine_instance -> CzVirtualMachineInstance,
+  vsock_listener -> CzVsockListener,
+  linux_pod -> CzLinuxPod,
+  container_statistics_list -> Vec<containerization::ContainerStatistics>,
+  attached_filesystem -> containerization::AttachedFilesystem,
+  attached_filesystems_by_id -> BTreeMap<String, Vec<containerization::AttachedFilesystem>>,
+  optional_int32 -> Option<i32>,
   content_writer -> CzContentWriter,
   written_size -> i64,
   written_digest -> String,
@@ -239,6 +286,10 @@ handles!(
   CzVmnetInterface,
   CzLinuxContainer,
   CzLinuxProcess,
+  CzVirtualMachineManager,
+  CzVirtualMachineInstance,
+  CzVsockListener,
+  CzLinuxPod,
   CzContentWriter,
   CzExt4Reader,
   CzExt4Formatter,
@@ -377,6 +428,20 @@ failing!(
     bool,
     bool,
   ),
+  cz_container_manager_with_vmm(CzVirtualMachineManager, CzNetwork),
+  cz_virtual_machine_manager_new(containerization::Kernel, containerization::Mount, bool, bool),
+  cz_install_rosetta(),
+  cz_linux_container_new(
+    &str,
+    containerization::Mount,
+    bool,
+    containerization::Mount,
+    CzVirtualMachineManager,
+    u32,
+    u64,
+    linux_container::Configuration,
+  ),
+  cz_linux_pod_new(&str, CzVirtualMachineManager, u32, u64, linux_pod::Configuration),
   cz_read_stream_new(),
   cz_read_stream_with_url(&str, usize),
   cz_read_stream_with_data(Vec<u8>, usize),
@@ -1488,8 +1553,99 @@ impl CzVmnetInterface {
   }
 }
 
+impl CzVirtualMachineManager {
+  pub(crate) fn duplicate(&self) -> CzVirtualMachineManager {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(&self, _config: containerization::VmConfiguration) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzVirtualMachineInstance {
+  pub(crate) fn state(&self) -> InstanceState {
+    match self.0 {}
+  }
+
+  pub(crate) fn mounts(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn virtiofs_layout(&self) -> VirtiofsLayoutKind {
+    match self.0 {}
+  }
+
+  pub(crate) fn start(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn pause(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resume(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn dial(&self, _port: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn listen(&self, _port: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn hotplug(&self, _block: containerization::Mount, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn register_mounts(
+    &self,
+    _id: &str,
+    _rootfs: containerization::AttachedFilesystem,
+    _additional_mounts: Vec<containerization::Mount>,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn release_hotplug(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn hotplug_virtio_fs(&self, _mounts: Vec<containerization::Mount>, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn release_virtio_fs(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzVsockListener {
+  pub(crate) fn port(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn next(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn finish(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
 impl CzLinuxContainer {
   pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn virtual_machine_instance(&self) -> CzOutcome {
     match self.0 {}
   }
 
@@ -1584,6 +1740,105 @@ impl CzLinuxContainer {
   }
 
   pub(crate) fn close_stdin(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzLinuxPod {
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn config(&self, _seed: linux_pod::Configuration, _receive: ConfigurePod) {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_cpus(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn add_container(
+    &self,
+    _id: &str,
+    _rootfs: containerization::Mount,
+    _seed: linux_pod::ContainerConfiguration,
+    _configuration: ConfigurePodContainer,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn start_container(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop_container(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn kill_container(&self, _id: &str, _signal: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn wait_container(&self, _id: &str, _timeout_in_seconds: Option<i64>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize_container(&self, _id: &str, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn exec_in_container(
+    &self,
+    _id: &str,
+    _process_id: &str,
+    _seed: containerization::LinuxProcessConfiguration,
+    _configuration: ConfigureProcess,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn list_containers(&self) -> Vec<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn statistics(
+    &self,
+    _has_container_ids: bool,
+    _container_ids: Vec<String>,
+    _categories: i64,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn dial_vsock(&self, _port: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn virtual_machine_instance(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn filesystem_operation(&self, _id: &str, _operation: FilesystemOperationKind, _path: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close_container_stdin(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn relay_unix_socket(&self, _id: &str, _socket: containerization::UnixSocketConfiguration) -> CzOutcome {
     match self.0 {}
   }
 }

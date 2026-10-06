@@ -202,12 +202,12 @@ extension LinuxContainer.Configuration {
     memoryInBytes = configuration.memoryInBytes()
     hostname = configuration.hostname()?.toString()
     sysctl = dictionary(configuration.sysctlLen(), configuration.sysctlKeyAt, configuration.sysctlValueAt)
-    interfaces = try list(configuration.interfacesLen()) { index -> any Interface in
-      switch configuration.interfaceKindAt(index) {
-      case .Nat: try NATInterface(configuration.natInterfaceAt(index))
-      case .Vmnet: configuration.vmnetInterfaceAt(index).interface
-      }
-    }
+    interfaces = try lentInterfaces(
+      configuration.interfacesLen(),
+      configuration.interfaceKindAt,
+      configuration.natInterfaceAt,
+      configuration.vmnetInterfaceAt
+    )
     sockets = try list(configuration.socketsLen()) { try UnixSocketConfiguration(configuration.socketsAt($0)) }
     mounts = list(configuration.mountsLen()) { Containerization.Mount(configuration.mountsAt($0)) }
     maskedPaths = strings(configuration.maskedPathsLen(), configuration.maskedPathsAt)
@@ -217,13 +217,137 @@ extension LinuxContainer.Configuration {
     virtualization = configuration.virtualization()
     bootLog = configuration.hasBootLog() ? try BootLog.from(configuration.bootLog()) : nil
     ociRuntimePath = configuration.ociRuntimePath()?.toString()
-    seccompProfile =
-      switch configuration.seccompMode() {
-      case .Unconfined: .unconfined
-      case .Default: .default
-      case .Profile: .profile(LinuxSeccomp(configuration.seccompProfile()))
-      }
+    seccompProfile = lentSeccompProfile(configuration.seccompMode(), configuration.seccompProfile)
     useInit = configuration.useInit()
+  }
+}
+
+/// A seccomp profile Rust lends as its mode, and the custom profile when the
+/// mode is `Profile`.
+func lentSeccompProfile(
+  _ mode: SeccompMode,
+  _ profile: () -> RustLinuxSeccompRef
+) -> LinuxContainer.Configuration.SeccompProfile {
+  switch mode {
+  case .Unconfined: .unconfined
+  case .Default: .default
+  case .Profile: .profile(LinuxSeccomp(profile()))
+  }
+}
+
+extension LinuxPod.PodVolume {
+  init(_ volume: RustPodVolumeRef) throws {
+    let location = volume.location().toString()
+    let source: Source =
+      switch volume.sourceKind() {
+      case .Nbd:
+        .nbd(
+          url: try URL(string: location) ?? { throw BridgeError.malformed("volume URL", location) }(),
+          timeout: volume.timeout(),
+          readOnly: volume.readOnly()
+        )
+      case .DiskImage: .diskImage(path: URL(filePath: location), readOnly: volume.readOnly())
+      case .Tmpfs: .tmpfs(sizeBytes: volume.sizeBytes())
+      }
+
+    self.init(name: volume.name().toString(), source: source, format: volume.format().toString())
+  }
+}
+
+extension LinuxPod.Configuration {
+  init(_ configuration: RustPodConfigurationRef) throws {
+    self.init()
+
+    interfaces = try lentInterfaces(
+      configuration.interfacesLen(),
+      configuration.interfaceKindAt,
+      configuration.natInterfaceAt,
+      configuration.vmnetInterfaceAt
+    )
+    virtualization = configuration.virtualization()
+    bootLog = configuration.hasBootLog() ? try BootLog.from(configuration.bootLog()) : nil
+    shareProcessNamespace = configuration.shareProcessNamespace()
+    hostname = configuration.hostname()?.toString()
+    dns = configuration.hasDns() ? DNS(configuration.dns()) : nil
+    hosts = configuration.hasHosts() ? Hosts(configuration.hosts()) : nil
+    volumes = try list(configuration.volumesLen()) { try LinuxPod.PodVolume(configuration.volumesAt($0)) }
+    ociRuntimePath = configuration.ociRuntimePath()?.toString()
+    seccompProfile = lentSeccompProfile(configuration.seccompMode(), configuration.seccompProfile)
+  }
+}
+
+extension LinuxPod.ContainerConfiguration {
+  init(_ configuration: RustPodContainerConfigurationRef) throws {
+    self.init()
+
+    process = try LinuxProcessConfiguration(configuration.process())
+    cpus = Int(configuration.cpus())
+    memoryInBytes = configuration.memoryInBytes()
+    hostname = configuration.hostname()?.toString()
+    sysctl = dictionary(configuration.sysctlLen(), configuration.sysctlKeyAt, configuration.sysctlValueAt)
+    mounts = list(configuration.mountsLen()) { Containerization.Mount(configuration.mountsAt($0)) }
+    maskedPaths = strings(configuration.maskedPathsLen(), configuration.maskedPathsAt)
+    readonlyPaths = strings(configuration.readonlyPathsLen(), configuration.readonlyPathsAt)
+    sockets = try list(configuration.socketsLen()) { try UnixSocketConfiguration(configuration.socketsAt($0)) }
+    dns = configuration.hasDns() ? DNS(configuration.dns()) : nil
+    hosts = configuration.hasHosts() ? Hosts(configuration.hosts()) : nil
+    seccompProfile =
+      configuration.hasSeccompProfile()
+      ? lentSeccompProfile(configuration.seccompMode(), configuration.seccompProfile) : nil
+    useInit = configuration.useInit()
+  }
+}
+
+/// The interfaces Rust lends by index, each as the conforming type it is.
+func lentInterfaces(
+  _ count: UInt,
+  _ kind: (UInt) -> InterfaceKind,
+  _ nat: (UInt) -> RustNatInterfaceRef,
+  _ vmnet: (UInt) -> CzVmnetInterface
+) throws -> [any Interface] {
+  try list(count) { index -> any Interface in
+    switch kind(index) {
+    case .Nat: try NATInterface(nat(index))
+    case .Vmnet: vmnet(index).interface
+    }
+  }
+}
+
+extension VMConfiguration {
+  init(_ configuration: RustVmConfigurationRef) throws {
+    self.init(
+      cpus: Int(configuration.cpus()),
+      memoryInBytes: configuration.memoryInBytes(),
+      interfaces: try lentInterfaces(
+        configuration.interfacesLen(),
+        configuration.interfaceKindAt,
+        configuration.natInterfaceAt,
+        configuration.vmnetInterfaceAt
+      ),
+      mountsByID: Dictionary(
+        uniqueKeysWithValues: list(configuration.mountsByIdLen()) { index in
+          (
+            configuration.mountsByIdKeyAt(index).toString(),
+            list(configuration.mountsByIdMountsLen(index)) {
+              Containerization.Mount(configuration.mountsByIdMountAt(index, $0))
+            }
+          )
+        }
+      ),
+      bootLog: configuration.hasBootLog() ? try BootLog.from(configuration.bootLog()) : nil,
+      nestedVirtualization: configuration.nestedVirtualization()
+    )
+  }
+}
+
+extension AttachedFilesystem {
+  init(_ filesystem: RustAttachedFilesystemRef) {
+    self.init(
+      type: filesystem.filesystemType().toString(),
+      source: filesystem.source().toString(),
+      destination: filesystem.destination().toString(),
+      options: strings(filesystem.optionsLen(), filesystem.optionsAt)
+    )
   }
 }
 
@@ -303,6 +427,30 @@ func fill(_ built: RustLinuxProcessConfigurationRefMut, from process: LinuxProce
   }
 }
 
+/// The setters a container's and a pod's configuration share, as
+/// swift-bridge generates them, so one `fill` serves both.
+protocol FilledSandbox {
+  func clearInterfaces()
+  func pushInterface(
+    _ ipv4Address: UInt32, _ ipv4Prefix: UInt8, _ ipv4Gateway: UInt32?, _ macAddress: UInt64?, _ mtu: UInt32)
+  func setInterfaceIpv6Address<S: IntoRustString>(_ high: UInt64, _ low: UInt64, _ zone: S?, _ prefix: UInt8)
+  func setInterfaceIpv6Gateway<S: IntoRustString>(_ high: UInt64, _ low: UInt64, _ zone: S?)
+  func pushVmnetInterface(_ interface: CzVmnetInterface)
+  func clearDns()
+  func setDns<S: IntoRustString>(
+    _ nameservers: RustVec<S>, _ domain: S?, _ searchDomains: RustVec<S>, _ options: RustVec<S>)
+  func clearHosts()
+  func setHosts<S: IntoRustString>(_ comment: S?)
+  func pushHostsEntry<S: IntoRustString>(_ ipAddress: S, _ hostnames: RustVec<S>, _ comment: S?)
+  func clearBootLog()
+  func setBootLogFile<S: IntoRustString>(_ path: S, _ append: Bool)
+  func setBootLogFileHandle(_ descriptor: Int32)
+  func setSeccompProfile(_ mode: SeccompMode, _ profile: CzOutcome)
+}
+
+extension RustLinuxContainerConfigurationRefMut: FilledSandbox {}
+extension RustPodConfigurationRefMut: FilledSandbox {}
+
 /// `configuration` into Rust's, replacing whatever it held.
 func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: LinuxContainer.Configuration) {
   fill(built.processMut(), from: configuration.process)
@@ -315,19 +463,94 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
   built.setOciRuntimePath(rust(configuration.ociRuntimePath))
   built.setUseInit(configuration.useInit)
   built.clearSysctl()
-  built.clearInterfaces()
   built.clearSockets()
   built.clearMounts()
-  built.clearDns()
-  built.clearHosts()
-  built.clearBootLog()
 
   for (key, value) in configuration.sysctl.sorted(by: { $0.key < $1.key }) {
     built.insertSysctl(rust(key), rust(value))
   }
 
+  fill(
+    built,
+    interfaces: configuration.interfaces,
+    dns: configuration.dns,
+    hosts: configuration.hosts,
+    bootLog: configuration.bootLog,
+    seccompProfile: configuration.seccompProfile
+  )
+
+  for socket in configuration.sockets {
+    built.pushSocket(
+      rust(socket.source.path(percentEncoded: false)),
+      rust(socket.destination.path(percentEncoded: false)),
+      socket.permissions.map { UInt32($0.rawValue) },
+      socket.direction == .into ? .Into : .OutOf
+    )
+  }
+
+  for mount in configuration.mounts {
+    let (kind, options) = runtimeKind(mount.runtimeOptions)
+
+    built.pushMount(
+      rust(mount.type),
+      rust(mount.source),
+      rust(mount.destination),
+      rustStrings(mount.options),
+      kind,
+      rustStrings(options)
+    )
+  }
+}
+
+/// `configuration` into Rust's, replacing whatever it held.
+func fill(_ built: RustPodConfigurationRefMut, from configuration: LinuxPod.Configuration) {
+  built.setVirtualization(configuration.virtualization)
+  built.setShareProcessNamespace(configuration.shareProcessNamespace)
+  built.setHostname(rust(configuration.hostname))
+  built.setOciRuntimePath(rust(configuration.ociRuntimePath))
+  built.clearVolumes()
+
+  fill(
+    built,
+    interfaces: configuration.interfaces,
+    dns: configuration.dns,
+    hosts: configuration.hosts,
+    bootLog: configuration.bootLog,
+    seccompProfile: configuration.seccompProfile
+  )
+
+  for volume in configuration.volumes {
+    let name = rust(volume.name)
+    let format = rust(volume.format)
+
+    switch volume.source {
+    case .nbd(let url, let timeout, let readOnly):
+      built.pushVolume(name, format, .Nbd, rust(url.absoluteString), timeout, readOnly, nil)
+    case .diskImage(let path, let readOnly):
+      built.pushVolume(name, format, .DiskImage, rust(path.path(percentEncoded: false)), nil, readOnly, nil)
+    case .tmpfs(let sizeBytes):
+      built.pushVolume(name, format, .Tmpfs, rust(""), nil, false, sizeBytes)
+    }
+  }
+}
+
+/// The parts a container's and a pod's configuration share, into Rust's,
+/// replacing whatever it held.
+private func fill(
+  _ built: some FilledSandbox,
+  interfaces: [any Interface],
+  dns: DNS?,
+  hosts: Hosts?,
+  bootLog: BootLog?,
+  seccompProfile: LinuxContainer.Configuration.SeccompProfile
+) {
+  built.clearInterfaces()
+  built.clearDns()
+  built.clearHosts()
+  built.clearBootLog()
+
   // Any other conforming type crosses as a `NATInterface` of its fields.
-  for interface in configuration.interfaces {
+  for interface in interfaces {
     if let interface = interface as? VmnetNetwork.Interface {
       built.pushVmnetInterface(CzVmnetInterface(interface))
       continue
@@ -359,29 +582,7 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
     }
   }
 
-  for socket in configuration.sockets {
-    built.pushSocket(
-      rust(socket.source.path(percentEncoded: false)),
-      rust(socket.destination.path(percentEncoded: false)),
-      socket.permissions.map { UInt32($0.rawValue) },
-      socket.direction == .into ? .Into : .OutOf
-    )
-  }
-
-  for mount in configuration.mounts {
-    let (kind, options) = runtimeKind(mount.runtimeOptions)
-
-    built.pushMount(
-      rust(mount.type),
-      rust(mount.source),
-      rust(mount.destination),
-      rustStrings(mount.options),
-      kind,
-      rustStrings(options)
-    )
-  }
-
-  if let dns = configuration.dns {
+  if let dns {
     built.setDns(
       rustStrings(dns.nameservers),
       rust(dns.domain),
@@ -390,7 +591,7 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
     )
   }
 
-  if let hosts = configuration.hosts {
+  if let hosts {
     built.setHosts(rust(hosts.comment))
 
     for entry in hosts.entries {
@@ -398,14 +599,14 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
     }
   }
 
-  if let bootLog = configuration.bootLog {
+  if let bootLog {
     switch representation(of: bootLog) {
     case .file(let path, let append): built.setBootLogFile(rust(path.path(percentEncoded: false)), append)
     case .fileHandle(let handle): built.setBootLogFileHandle(handle.fileDescriptor)
     }
   }
 
-  switch configuration.seccompProfile {
+  switch seccompProfile {
   case .unconfined: built.setSeccompProfile(.Unconfined, CzOutcome.holding(nil))
   case .default: built.setSeccompProfile(.Default, CzOutcome.holding(nil))
   case .profile(let profile): built.setSeccompProfile(.Profile, CzOutcome.holding(profile))

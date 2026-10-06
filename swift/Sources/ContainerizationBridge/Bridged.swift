@@ -82,6 +82,10 @@ public final class CzOutcome: @unchecked Sendable {
   func vmnetNetwork() -> CzVmnetNetwork { taken() }
   func vmnetInterface() -> CzVmnetInterface { taken() }
   func linuxProcess() -> CzLinuxProcess { taken() }
+  func virtualMachineManager() -> CzVirtualMachineManager { taken() }
+  func virtualMachineInstance() -> CzVirtualMachineInstance { taken() }
+  func vsockListener() -> CzVsockListener { taken() }
+  func linuxPod() -> CzLinuxPod { taken() }
   func contentWriter() -> CzContentWriter { taken() }
   func ext4Reader() -> CzExt4Reader { taken() }
   func archiveWriter() -> CzArchiveWriter { taken() }
@@ -146,6 +150,24 @@ public final class CzOutcome: @unchecked Sendable {
 
   func mountRuntimeOptions() -> RustVec<RustString> {
     rustStrings(runtimeKind((taken() as Containerization.Mount).runtimeOptions).1)
+  }
+
+  // An `AttachedFilesystem`, field by field: Rust builds its own.
+
+  func attachedFilesystemType() -> String {
+    (taken() as AttachedFilesystem).type
+  }
+
+  func attachedFilesystemSource() -> String {
+    (taken() as AttachedFilesystem).source
+  }
+
+  func attachedFilesystemDestination() -> String {
+    (taken() as AttachedFilesystem).destination
+  }
+
+  func attachedFilesystemOptions() -> RustVec<RustString> {
+    rustStrings((taken() as AttachedFilesystem).options)
   }
 
   // A `Platform`, field by field: Rust builds its own.
