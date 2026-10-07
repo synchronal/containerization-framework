@@ -2,9 +2,9 @@
 //! blocks Rust builds from an outcome.
 
 use crate::bridge::ffi;
-use crate::containerization_extras;
+use crate::containerization_extras::address;
 
-impl containerization_extras::IPv6Address {
+impl address::IPv6Address {
   /// An address whose `UInt128` value crossed as two halves.
   pub(crate) fn from_halves(high: u64, low: u64, zone: Option<String>) -> Self {
     Self::new(u128::from(high) << 64 | u128::from(low), zone)
@@ -23,7 +23,7 @@ impl containerization_extras::IPv6Address {
   }
 }
 
-impl containerization_extras::IpAddress {
+impl address::IpAddress {
   pub(crate) fn holds_v6(&self) -> bool {
     matches!(self, Self::V6(_))
   }
@@ -35,7 +35,7 @@ impl containerization_extras::IpAddress {
     }
   }
 
-  pub(crate) fn v6(&self) -> &containerization_extras::IPv6Address {
+  pub(crate) fn v6(&self) -> &address::IPv6Address {
     match self {
       Self::V6(address) => address,
       Self::V4(_) => unreachable!("Swift asks for an IPv6 address only after `holds_v6`"),
@@ -44,73 +44,73 @@ impl containerization_extras::IpAddress {
 }
 
 impl ffi::CzOutcome {
-  pub(crate) fn ipv4_address(&self) -> containerization_extras::IPv4Address {
-    containerization_extras::IPv4Address::new(self.ipv4_value())
+  pub(crate) fn ipv4_address(&self) -> address::IPv4Address {
+    address::IPv4Address::new(self.ipv4_value())
   }
 
-  pub(crate) fn ipv6_address(&self) -> containerization_extras::IPv6Address {
-    containerization_extras::IPv6Address::from_halves(self.ipv6_high(), self.ipv6_low(), self.ipv6_zone())
+  pub(crate) fn ipv6_address(&self) -> address::IPv6Address {
+    address::IPv6Address::from_halves(self.ipv6_high(), self.ipv6_low(), self.ipv6_zone())
   }
 
-  pub(crate) fn ip_address(&self) -> containerization_extras::IpAddress {
+  pub(crate) fn ip_address(&self) -> address::IpAddress {
     if self.is_ipv6() {
-      containerization_extras::IpAddress::V6(self.ipv6_address())
+      address::IpAddress::V6(self.ipv6_address())
     } else {
-      containerization_extras::IpAddress::V4(self.ipv4_address())
+      address::IpAddress::V4(self.ipv4_address())
     }
   }
 
-  pub(crate) fn prefix(&self) -> containerization_extras::Prefix {
-    containerization_extras::Prefix {
+  pub(crate) fn prefix(&self) -> address::Prefix {
+    address::Prefix {
       length: self.prefix_length(),
     }
   }
 
-  pub(crate) fn cidr_v4(&self) -> containerization_extras::CIDRv4 {
-    containerization_extras::CIDRv4 {
+  pub(crate) fn cidr_v4(&self) -> address::CIDRv4 {
+    address::CIDRv4 {
       address: self.ipv4_address(),
       prefix: self.prefix(),
     }
   }
 
-  pub(crate) fn cidr_v6(&self) -> containerization_extras::CIDRv6 {
-    containerization_extras::CIDRv6 {
+  pub(crate) fn cidr_v6(&self) -> address::CIDRv6 {
+    address::CIDRv6 {
       address: self.ipv6_address(),
       prefix: self.prefix(),
     }
   }
 
-  pub(crate) fn cidr(&self) -> containerization_extras::Cidr {
+  pub(crate) fn cidr(&self) -> address::Cidr {
     if self.is_ipv6() {
-      containerization_extras::Cidr::V6(self.ipv6_address(), self.prefix())
+      address::Cidr::V6(self.ipv6_address(), self.prefix())
     } else {
-      containerization_extras::Cidr::V4(self.ipv4_address(), self.prefix())
+      address::Cidr::V4(self.ipv4_address(), self.prefix())
     }
   }
 
-  pub(crate) fn mac_address(&self) -> containerization_extras::MACAddress {
-    containerization_extras::MACAddress {
+  pub(crate) fn mac_address(&self) -> address::MACAddress {
+    address::MACAddress {
       value: self.mac_value(),
     }
   }
 
   /// The `IPv4Address?` an outcome holds.
-  pub(crate) fn optional_ipv4_address(&self) -> Option<containerization_extras::IPv4Address> {
+  pub(crate) fn optional_ipv4_address(&self) -> Option<address::IPv4Address> {
     self.optional(Self::ipv4_address)
   }
 
   /// The `IPv6Address?` an outcome holds.
-  pub(crate) fn optional_ipv6_address(&self) -> Option<containerization_extras::IPv6Address> {
+  pub(crate) fn optional_ipv6_address(&self) -> Option<address::IPv6Address> {
     self.optional(Self::ipv6_address)
   }
 
   /// The `CIDRv6?` an outcome holds.
-  pub(crate) fn optional_cidr_v6(&self) -> Option<containerization_extras::CIDRv6> {
+  pub(crate) fn optional_cidr_v6(&self) -> Option<address::CIDRv6> {
     self.optional(Self::cidr_v6)
   }
 
   /// The `MACAddress?` an outcome holds.
-  pub(crate) fn optional_mac_address(&self) -> Option<containerization_extras::MACAddress> {
+  pub(crate) fn optional_mac_address(&self) -> Option<address::MACAddress> {
     self.optional(Self::mac_address)
   }
 

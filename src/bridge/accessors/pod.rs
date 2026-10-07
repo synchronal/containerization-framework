@@ -5,9 +5,9 @@ use super::container;
 use super::entry_at;
 use crate::bridge::ffi;
 use crate::containerization;
-use crate::containerization::linux_pod;
-use crate::containerization::linux_pod::pod_volume;
-use crate::containerization_oci;
+use crate::containerization::container::linux_pod;
+use crate::containerization::container::linux_pod::pod_volume;
+use crate::containerization_oci::runtime;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -99,7 +99,7 @@ impl linux_pod::Configuration {
   }
 
   pub(crate) fn set_boot_log_file_handle(&mut self, descriptor: i32) {
-    self.boot_log = Some(containerization::BootLog::FileHandle(descriptor));
+    self.boot_log = Some(containerization::vm::BootLog::FileHandle(descriptor));
   }
 
   /// `profile` holds the `LinuxSeccomp` of a `Profile`, or `Absent`.
@@ -151,7 +151,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::interface_kind_at`] is `Nat`.
-  pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::NatInterface {
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::network::NatInterface {
     container::nat_interface(&self.interfaces[index])
   }
 
@@ -169,7 +169,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::has_boot_log`].
-  pub(crate) fn boot_log(&self) -> &containerization::BootLog {
+  pub(crate) fn boot_log(&self) -> &containerization::vm::BootLog {
     self
       .boot_log
       .as_ref()
@@ -189,7 +189,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::has_dns`].
-  pub(crate) fn dns(&self) -> &containerization::Dns {
+  pub(crate) fn dns(&self) -> &containerization::network::Dns {
     self
       .dns
       .as_ref()
@@ -201,7 +201,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::has_hosts`].
-  pub(crate) fn hosts(&self) -> &containerization::Hosts {
+  pub(crate) fn hosts(&self) -> &containerization::network::Hosts {
     self
       .hosts
       .as_ref()
@@ -225,7 +225,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::seccomp_mode`] is `Profile`.
-  pub(crate) fn seccomp_profile(&self) -> &containerization_oci::LinuxSeccomp {
+  pub(crate) fn seccomp_profile(&self) -> &runtime::LinuxSeccomp {
     container::custom_seccomp(&self.seccomp_profile)
   }
 }
@@ -281,7 +281,7 @@ impl linux_pod::PodVolume {
 }
 
 impl linux_pod::ContainerConfiguration {
-  pub(crate) fn process(&self) -> &containerization::LinuxProcessConfiguration {
+  pub(crate) fn process(&self) -> &containerization::process::LinuxProcessConfiguration {
     &self.process
   }
 
@@ -313,7 +313,7 @@ impl linux_pod::ContainerConfiguration {
     self.mounts.len()
   }
 
-  pub(crate) fn mounts_at(&self, index: usize) -> &containerization::Mount {
+  pub(crate) fn mounts_at(&self, index: usize) -> &containerization::container::Mount {
     &self.mounts[index]
   }
 
@@ -337,7 +337,7 @@ impl linux_pod::ContainerConfiguration {
     self.sockets.len()
   }
 
-  pub(crate) fn sockets_at(&self, index: usize) -> &containerization::UnixSocketConfiguration {
+  pub(crate) fn sockets_at(&self, index: usize) -> &containerization::container::UnixSocketConfiguration {
     &self.sockets[index]
   }
 
@@ -346,7 +346,7 @@ impl linux_pod::ContainerConfiguration {
   }
 
   /// Only when [`Self::has_dns`].
-  pub(crate) fn dns(&self) -> &containerization::Dns {
+  pub(crate) fn dns(&self) -> &containerization::network::Dns {
     self
       .dns
       .as_ref()
@@ -358,7 +358,7 @@ impl linux_pod::ContainerConfiguration {
   }
 
   /// Only when [`Self::has_hosts`].
-  pub(crate) fn hosts(&self) -> &containerization::Hosts {
+  pub(crate) fn hosts(&self) -> &containerization::network::Hosts {
     self
       .hosts
       .as_ref()
@@ -375,11 +375,11 @@ impl linux_pod::ContainerConfiguration {
   }
 
   /// Only when [`Self::seccomp_mode`] is `Profile`.
-  pub(crate) fn seccomp_profile(&self) -> &containerization_oci::LinuxSeccomp {
+  pub(crate) fn seccomp_profile(&self) -> &runtime::LinuxSeccomp {
     container::custom_seccomp(self.own_seccomp_profile())
   }
 
-  fn own_seccomp_profile(&self) -> &containerization::linux_container::SeccompProfile {
+  fn own_seccomp_profile(&self) -> &containerization::container::linux_container::SeccompProfile {
     self
       .seccomp_profile
       .as_ref()

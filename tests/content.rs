@@ -9,8 +9,8 @@ use containerization_framework as cfw;
 /// Well formed, and the hash of nothing this suite stores.
 const ABSENT: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
-fn content_store() -> cfw::containerization_oci::LocalContentStore {
-  cfw::containerization_oci::LocalContentStore::new(&support::store::content_store_path())
+fn content_store() -> cfw::containerization_oci::content::LocalContentStore {
+  cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
     .expect("the suite's content store should open")
 }
 
@@ -62,10 +62,10 @@ fn finds_no_blob_the_store_never_held() {
 }
 
 /// A file outside any ingest directory, and a store of its own.
-fn blob_and_store(contents: &str) -> (tempfile::TempDir, cfw::containerization_oci::LocalContentStore) {
+fn blob_and_store(contents: &str) -> (tempfile::TempDir, cfw::containerization_oci::content::LocalContentStore) {
   let directory = tempfile::tempdir().expect("a temporary directory");
   std::fs::write(directory.path().join("blob"), contents).expect("the blob should write");
-  let store = cfw::containerization_oci::LocalContentStore::new(&directory.path().join("content"))
+  let store = cfw::containerization_oci::content::LocalContentStore::new(&directory.path().join("content"))
     .expect("a new content store should open");
 
   (directory, store)
@@ -79,7 +79,7 @@ fn ingests_what_a_content_writer_wrote() {
 
   let ingested = store
     .ingest(move |ingest_directory| {
-      let created = cfw::containerization_oci::ContentWriter::new(ingest_directory)?.create(&blob)?;
+      let created = cfw::containerization_oci::content::ContentWriter::new(ingest_directory)?.create(&blob)?;
       written.send(created).expect("the test is listening");
       Ok(())
     })
@@ -105,7 +105,7 @@ fn returns_the_error_its_body_returned_and_ingests_nothing() {
 
   let error = store
     .ingest(move |ingest_directory| {
-      let (_, digest) = cfw::containerization_oci::ContentWriter::new(ingest_directory)?.create(&blob)?;
+      let (_, digest) = cfw::containerization_oci::content::ContentWriter::new(ingest_directory)?.create(&blob)?;
       written.send(digest).expect("the test is listening");
       Err(cfw::Error::failed("finish the body", "it gave up"))
     })
@@ -141,7 +141,7 @@ fn completes_an_ingest_session() {
 
   let (id, ingest_directory) = store.new_ingest_session().expect("a new session");
   assert!(ingest_directory.is_dir(), "{}", ingest_directory.display());
-  let (size, digest) = cfw::containerization_oci::ContentWriter::new(&ingest_directory)
+  let (size, digest) = cfw::containerization_oci::content::ContentWriter::new(&ingest_directory)
     .expect("a writer into the session")
     .write(b"written")
     .expect("the data should write");
@@ -171,7 +171,7 @@ fn cancels_an_ingest_session() {
   let (_directory, store) = blob_and_store("unused");
 
   let (id, ingest_directory) = store.new_ingest_session().expect("a new session");
-  let (_, digest) = cfw::containerization_oci::ContentWriter::new(&ingest_directory)
+  let (_, digest) = cfw::containerization_oci::content::ContentWriter::new(&ingest_directory)
     .expect("a writer into the session")
     .write(b"cancelled")
     .expect("the data should write");
@@ -188,23 +188,24 @@ fn copies_a_file_and_reads_it_without_a_store() {
   let (directory, _store) = blob_and_store("copied");
   let destination = directory.path().join("copy");
 
-  let (size, digest) = cfw::containerization_oci::ContentWriter::copy(&directory.path().join("blob"), &destination)
-    .expect("the blob should copy");
-  let content = cfw::containerization_oci::Content::open(&destination).expect("the copy as content");
+  let (size, digest) =
+    cfw::containerization_oci::content::ContentWriter::copy(&directory.path().join("blob"), &destination)
+      .expect("the blob should copy");
+  let content = cfw::containerization_oci::content::Content::open(&destination).expect("the copy as content");
 
   assert_eq!(size, "copied".len() as i64);
   assert_eq!(content.path(), destination);
   assert_eq!(content.digest().expect("a digest"), digest);
   assert_eq!(content.data().expect("the copy's bytes"), b"copied");
   assert!(
-    cfw::containerization_oci::ContentWriter::copy(&directory.path().join("blob"), &destination).is_err(),
+    cfw::containerization_oci::content::ContentWriter::copy(&directory.path().join("blob"), &destination).is_err(),
     "a copy refuses to overwrite"
   );
 }
 
 #[test]
 fn says_which_file_it_could_not_open_as_content() {
-  let error = cfw::containerization_oci::Content::open("/nowhere/at/all".as_ref())
+  let error = cfw::containerization_oci::content::Content::open("/nowhere/at/all".as_ref())
     .err()
     .expect("a file that doesn't exist");
 
@@ -214,7 +215,7 @@ fn says_which_file_it_could_not_open_as_content() {
 
 #[test]
 fn says_which_directory_a_content_writer_could_not_write_into() {
-  let error = cfw::containerization_oci::ContentWriter::new("/nowhere/at/all".as_ref())
+  let error = cfw::containerization_oci::content::ContentWriter::new("/nowhere/at/all".as_ref())
     .err()
     .expect("a directory that doesn't exist");
 

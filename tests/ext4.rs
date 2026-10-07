@@ -37,10 +37,10 @@ fn unpacks_an_image_and_reports_its_progress() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let at = directory.path().join("rootfs.ext4");
   let image = support::store::image(&support::store::image_store());
-  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+  let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
   let (events, handler) = recorded();
 
-  let mount = cfw::containerization::Ext4Unpacker::new(CAPACITY_IN_BYTES, None)
+  let mount = cfw::containerization::image::Ext4Unpacker::new(CAPACITY_IN_BYTES, None)
     .unpack(&image, &platform, &at, Some(handler))
     .expect("the image should unpack");
 
@@ -76,13 +76,13 @@ fn unpacks_with_a_journal() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let at = directory.path().join("journaled.ext4");
   let image = support::store::image(&support::store::image_store());
-  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+  let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
   let journal = cfw::containerization_ext4::ext4::JournalConfig {
     size: None,
     default_mode: Some(cfw::containerization_ext4::ext4::journal_config::JournalMode::Ordered),
   };
 
-  cfw::containerization::Ext4Unpacker::new(CAPACITY_IN_BYTES, Some(journal))
+  cfw::containerization::image::Ext4Unpacker::new(CAPACITY_IN_BYTES, Some(journal))
     .unpack(&image, &platform, &at, None)
     .expect("the image should unpack");
 
@@ -127,7 +127,7 @@ fn says_which_block_device_it_could_not_read() {
 
 #[test]
 fn reads_the_current_platform() {
-  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+  let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
 
   assert_eq!(platform.os, "linux");
   assert_eq!(platform.architecture, "arm64");

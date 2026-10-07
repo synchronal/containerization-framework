@@ -1,0 +1,255 @@
+//! Getters for a virtual machine's configuration, boot log, kernel and
+//! platform.
+
+use super::network::interface_kind;
+use super::network::nat_interface;
+use super::network::vmnet_interface;
+use crate::bridge::accessors;
+use crate::bridge::ffi;
+use crate::containerization::container;
+use crate::containerization::network;
+use crate::containerization::vm;
+use crate::containerization::vm::kernel;
+use crate::containerization::vm::system_platform;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+impl ffi::CzOutcome {
+  /// The `AttachedFilesystem` an outcome holds, read field by field.
+  pub(crate) fn attached_filesystem(&self) -> vm::AttachedFilesystem {
+    vm::AttachedFilesystem {
+      r#type: self.attached_filesystem_type(),
+      source: self.attached_filesystem_source(),
+      destination: self.attached_filesystem_destination(),
+      options: self.attached_filesystem_options(),
+    }
+  }
+
+  /// A held `[String: [AttachedFilesystem]]`.
+  pub(crate) fn attached_filesystems_by_id(&self) -> BTreeMap<String, Vec<vm::AttachedFilesystem>> {
+    self.map_of(|filesystems| filesystems.list(Self::attached_filesystem))
+  }
+}
+
+impl From<ffi::InstanceState> for vm::VirtualMachineInstanceState {
+  fn from(state: ffi::InstanceState) -> Self {
+    match state {
+      ffi::InstanceState::Starting => Self::Starting,
+      ffi::InstanceState::Running => Self::Running,
+      ffi::InstanceState::Stopped => Self::Stopped,
+      ffi::InstanceState::Stopping => Self::Stopping,
+      ffi::InstanceState::Unknown => Self::Unknown,
+    }
+  }
+}
+
+impl From<ffi::VirtiofsLayoutKind> for vm::VirtiofsLayout {
+  fn from(layout: ffi::VirtiofsLayoutKind) -> Self {
+    match layout {
+      ffi::VirtiofsLayoutKind::Unified => Self::Unified,
+      ffi::VirtiofsLayoutKind::PerTag => Self::PerTag,
+    }
+  }
+}
+
+impl From<kernel::LogLevel> for ffi::LogLevel {
+  fn from(level: kernel::LogLevel) -> Self {
+    match level {
+      kernel::LogLevel::Trace => Self::Trace,
+      kernel::LogLevel::Debug => Self::Debug,
+      kernel::LogLevel::Info => Self::Info,
+      kernel::LogLevel::Notice => Self::Notice,
+      kernel::LogLevel::Warning => Self::Warning,
+      kernel::LogLevel::Error => Self::Error,
+      kernel::LogLevel::Critical => Self::Critical,
+    }
+  }
+}
+
+impl vm::BootLog {
+  pub(crate) fn kind(&self) -> ffi::BootLogKind {
+    match self {
+      Self::File { .. } => ffi::BootLogKind::File,
+      Self::FileHandle(_) => ffi::BootLogKind::FileHandle,
+    }
+  }
+
+  /// Empty unless [`Self::kind`] is `File`.
+  pub(crate) fn path(&self) -> String {
+    match self {
+      Self::File { path, .. } => accessors::path(path),
+      Self::FileHandle(_) => String::new(),
+    }
+  }
+
+  pub(crate) fn append(&self) -> bool {
+    matches!(self, Self::File { append: true, .. })
+  }
+
+  /// `-1` unless [`Self::kind`] is `FileHandle`.
+  pub(crate) fn file_handle(&self) -> i32 {
+    match self {
+      Self::FileHandle(descriptor) => *descriptor,
+      Self::File { .. } => -1,
+    }
+  }
+}
+
+pub(in super::super) fn boot_log_file(path: String, append: bool) -> vm::BootLog {
+  vm::BootLog::File {
+    path: PathBuf::from(path),
+    append,
+  }
+}
+
+impl vm::VmConfiguration {
+  pub(crate) fn cpus(&self) -> u32 {
+    self.cpus
+  }
+
+  pub(crate) fn memory_in_bytes(&self) -> u64 {
+    self.memory_in_bytes
+  }
+
+  pub(crate) fn interfaces_len(&self) -> usize {
+    self.interfaces.len()
+  }
+
+  pub(crate) fn interface_kind_at(&self, index: usize) -> ffi::InterfaceKind {
+    interface_kind(&self.interfaces[index])
+  }
+
+  /// Only when [`Self::interface_kind_at`] is `Nat`.
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NatInterface {
+    nat_interface(&self.interfaces[index])
+  }
+
+  /// Only when [`Self::interface_kind_at`] is `Vmnet`.
+  pub(crate) fn vmnet_interface_at(&self, index: usize) -> ffi::CzVmnetInterface {
+    vmnet_interface(&self.interfaces[index])
+  }
+
+  pub(crate) fn mounts_by_id_len(&self) -> usize {
+    self.mounts_by_id.len()
+  }
+
+  pub(crate) fn mounts_by_id_key_at(&self, index: usize) -> &str {
+    self.mounts_by_id_entry(index).0
+  }
+
+  pub(crate) fn mounts_by_id_mounts_len(&self, index: usize) -> usize {
+    self.mounts_by_id_entry(index).1.len()
+  }
+
+  pub(crate) fn mounts_by_id_mount_at(&self, index: usize, mount: usize) -> &container::Mount {
+    &self.mounts_by_id_entry(index).1[mount]
+  }
+
+  fn mounts_by_id_entry(&self, index: usize) -> (&str, &[container::Mount]) {
+    self
+      .mounts_by_id
+      .iter()
+      .nth(index)
+      .map(|(id, mounts)| (id.as_str(), mounts.as_slice()))
+      .expect("Swift asks for an entry only below the length")
+  }
+
+  pub(crate) fn has_boot_log(&self) -> bool {
+    self.boot_log.is_some()
+  }
+
+  /// Only when [`Self::has_boot_log`].
+  pub(crate) fn boot_log(&self) -> &vm::BootLog {
+    self
+      .boot_log
+      .as_ref()
+      .expect("Swift asks for a boot log only after has_boot_log")
+  }
+
+  pub(crate) fn nested_virtualization(&self) -> bool {
+    self.nested_virtualization
+  }
+}
+
+impl vm::AttachedFilesystem {
+  pub(crate) fn filesystem_type(&self) -> &str {
+    &self.r#type
+  }
+
+  pub(crate) fn source(&self) -> &str {
+    &self.source
+  }
+
+  pub(crate) fn destination(&self) -> &str {
+    &self.destination
+  }
+
+  pub(crate) fn options_len(&self) -> usize {
+    self.options.len()
+  }
+
+  pub(crate) fn options_at(&self, index: usize) -> &str {
+    &self.options[index]
+  }
+}
+
+impl vm::SystemPlatform {
+  pub(crate) fn os(&self) -> ffi::PlatformOs {
+    match self.os {
+      system_platform::Os::Linux => ffi::PlatformOs::Linux,
+      system_platform::Os::Darwin => ffi::PlatformOs::Darwin,
+    }
+  }
+
+  pub(crate) fn architecture(&self) -> ffi::PlatformArchitecture {
+    match self.architecture {
+      system_platform::Architecture::Arm64 => ffi::PlatformArchitecture::Arm64,
+      system_platform::Architecture::Amd64 => ffi::PlatformArchitecture::Amd64,
+    }
+  }
+}
+
+impl vm::Kernel {
+  pub(crate) fn path(&self) -> String {
+    accessors::path(&self.path)
+  }
+
+  pub(crate) fn platform(&self) -> &vm::SystemPlatform {
+    &self.platform
+  }
+
+  pub(crate) fn kernel_args_len(&self) -> usize {
+    self.command_line.kernel_args.len()
+  }
+
+  pub(crate) fn kernel_args_at(&self, index: usize) -> &str {
+    &self.command_line.kernel_args[index]
+  }
+
+  pub(crate) fn init_args_len(&self) -> usize {
+    self.command_line.init_args.len()
+  }
+
+  pub(crate) fn init_args_at(&self, index: usize) -> &str {
+    &self.command_line.init_args[index]
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::bridge::ffi;
+  use crate::containerization::vm::system_platform;
+
+  #[test]
+  fn copies_swifts_system_platform_raw_values() {
+    let os = system_platform::Os::ALL_CASES.iter().map(|os| os.as_str());
+    let architectures = system_platform::Architecture::ALL_CASES
+      .iter()
+      .map(|architecture| architecture.as_str());
+
+    assert_eq!(
+      ffi::cz_system_platform_raw_values(),
+      os.chain(architectures).collect::<Vec<_>>()
+    );
+  }
+}

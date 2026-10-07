@@ -1,0 +1,25 @@
+//! Virtual machines: the kernel they boot, how they are configured, and the
+//! manager that creates them.
+
+mod attached_filesystem;
+mod boot_log;
+pub mod kernel;
+pub mod system_platform;
+mod virtual_machine_instance;
+mod vm_configuration;
+mod vm_resources;
+mod vsock_listener;
+mod vz_virtual_machine_instance;
+pub mod vz_virtual_machine_manager;
+
+pub use self::attached_filesystem::AttachedFilesystem;
+pub use self::boot_log::BootLog;
+pub use self::kernel::Kernel;
+pub use self::system_platform::SystemPlatform;
+pub use self::virtual_machine_instance::VirtiofsLayout;
+pub use self::virtual_machine_instance::VirtualMachineInstanceState;
+pub use self::vm_configuration::VmConfiguration;
+pub use self::vm_resources::VmResources;
+pub use self::vsock_listener::VsockListener;
+pub use self::vz_virtual_machine_instance::VzVirtualMachineInstance;
+pub use self::vz_virtual_machine_manager::VzVirtualMachineManager;

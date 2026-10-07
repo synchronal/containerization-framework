@@ -219,7 +219,7 @@ fn reads_file_info_without_following_symlinks() {
 /// it wrote.
 #[test]
 fn saves_gets_lists_and_deletes_keychain_entries() {
-  let query = cfw::containerization_os::KeychainQuery::new();
+  let query = cfw::containerization_os::keychain::KeychainQuery::new();
   let hostname = "os.example.test";
 
   query

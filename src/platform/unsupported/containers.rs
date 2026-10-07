@@ -1,0 +1,366 @@
+//! Container manager, Linux containers, pods, processes, mounts and signals.
+
+use super::CzImage;
+use super::CzImageStore;
+use super::CzNetwork;
+use super::CzOutcome;
+use super::CzTerminal;
+use super::CzVirtualMachineManager;
+use super::FilesystemOperationKind;
+use crate::containerization::container;
+use crate::containerization::process;
+use crate::containerization::vm;
+use crate::containerization_oci;
+use crate::platform::ConfigureContainer;
+use crate::platform::ConfigurePod;
+use crate::platform::ConfigurePodContainer;
+use crate::platform::ConfigureProcess;
+use crate::platform::Progress;
+use std::convert::Infallible;
+
+taken!(
+  container_manager -> CzContainerManager,
+  linux_container -> CzLinuxContainer,
+  linux_process -> CzLinuxProcess,
+  linux_pod -> CzLinuxPod,
+  container_statistics_list -> Vec<container::ContainerStatistics>,
+  mount -> container::Mount,
+  optional_mount -> Option<container::Mount>,
+  container_statistics -> container::ContainerStatistics,
+  exit_code -> i32,
+  exited_at -> f64,
+);
+
+handles!(CzContainerManager, CzLinuxContainer, CzLinuxProcess, CzLinuxPod,);
+
+failing!(
+  cz_container_manager_at_root(vm::Kernel, container::Mount, Option<String>, CzNetwork, bool, bool),
+  cz_container_manager_at_root_with_initfs_reference(vm::Kernel, &str, Option<String>, CzNetwork, bool, bool),
+  cz_container_manager_with_vmm(CzVirtualMachineManager, CzNetwork),
+  cz_linux_container_new(
+    &str,
+    container::Mount,
+    bool,
+    container::Mount,
+    CzVirtualMachineManager,
+    u32,
+    u64,
+    container::linux_container::Configuration,
+  ),
+  cz_linux_pod_new(
+    &str,
+    CzVirtualMachineManager,
+    u32,
+    u64,
+    container::linux_pod::Configuration
+  ),
+  cz_linux_rlimit_to_oci(process::LinuxRLimit),
+  cz_linux_capabilities_to_oci(process::LinuxCapabilities),
+  cz_mount_clone(container::Mount, &str),
+  cz_mount_tag_hash(container::Mount),
+  cz_exit_status_new(i32),
+  cz_linux_rlimit_kind_parse(&str),
+  cz_linux_process_configuration_from_image_config(
+    containerization_oci::image::ImageConfig,
+    process::LinuxProcessConfiguration,
+    ConfigureProcess,
+  ),
+  cz_linux_process_configuration_set_terminal_io(process::LinuxProcessConfiguration, CzTerminal, ConfigureProcess,),
+  cz_signal_parse(&str),
+  cz_signal_parse_from(&str, Vec<String>, Vec<i32>),
+  cz_signal_linux(),
+  cz_signal_platform(),
+  cz_signal_platform_name(i32),
+  cz_signal_linux_signal(i32),
+);
+
+impl CzContainerManager {
+  pub(crate) fn image_store(&self) -> CzImageStore {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_from_reference(
+    &self,
+    _id: &str,
+    _reference: &str,
+    _options: container::container_manager::CreateOptions,
+    _progress: Progress,
+    _seed: container::linux_container::Configuration,
+    _configuration: ConfigureContainer,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(
+    &self,
+    _id: &str,
+    _image: CzImage,
+    _options: container::container_manager::CreateOptions,
+    _progress: Progress,
+    _seed: container::linux_container::Configuration,
+    _configuration: ConfigureContainer,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create_with_rootfs(
+    &self,
+    _id: &str,
+    _image: CzImage,
+    _rootfs: container::Mount,
+    _options: container::container_manager::RootfsCreateOptions,
+    _seed: container::linux_container::Configuration,
+    _configuration: ConfigureContainer,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn release_network(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzLinuxContainer {
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn virtual_machine_instance(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn rootfs(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn writable_layer(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn config(&self, _seed: container::linux_container::Configuration, _receive: ConfigureContainer) {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_cpus(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn exec_with(
+    &self,
+    _id: &str,
+    _seed: process::LinuxProcessConfiguration,
+    _configuration: ConfigureProcess,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn dial_vsock(&self, _port: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn statistics(&self, _categories: i64) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn filesystem_operation(&self, _operation: FilesystemOperationKind, _path: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn copy_in(
+    &self,
+    _source: &str,
+    _destination: &str,
+    _mode: u32,
+    _create_parents: bool,
+    _chunk_size: usize,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn copy_out(
+    &self,
+    _source: &str,
+    _destination: &str,
+    _create_parents: bool,
+    _chunk_size: usize,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn start(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn kill(&self, _signal: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn wait(&self, _timeout_in_seconds: Option<i64>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize(&self, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn exec(&self, _id: &str, _configuration: process::LinuxProcessConfiguration) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close_stdin(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzLinuxPod {
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn config(&self, _seed: container::linux_pod::Configuration, _receive: ConfigurePod) {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_cpus(&self) -> u32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
+    match self.0 {}
+  }
+
+  pub(crate) fn add_container(
+    &self,
+    _id: &str,
+    _rootfs: container::Mount,
+    _seed: container::linux_pod::ContainerConfiguration,
+    _configuration: ConfigurePodContainer,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn create(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn start_container(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop_container(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn stop(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn kill_container(&self, _id: &str, _signal: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn wait_container(&self, _id: &str, _timeout_in_seconds: Option<i64>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize_container(&self, _id: &str, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn exec_in_container(
+    &self,
+    _id: &str,
+    _process_id: &str,
+    _seed: process::LinuxProcessConfiguration,
+    _configuration: ConfigureProcess,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn list_containers(&self) -> Vec<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn statistics(
+    &self,
+    _has_container_ids: bool,
+    _container_ids: Vec<String>,
+    _categories: i64,
+  ) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn dial_vsock(&self, _port: u32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn virtual_machine_instance(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn filesystem_operation(&self, _id: &str, _operation: FilesystemOperationKind, _path: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close_container_stdin(&self, _id: &str) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn relay_unix_socket(&self, _id: &str, _socket: container::UnixSocketConfiguration) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzLinuxProcess {
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn owning_container(&self) -> Option<String> {
+    match self.0 {}
+  }
+
+  pub(crate) fn pid(&self) -> i32 {
+    match self.0 {}
+  }
+
+  pub(crate) fn start(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn kill(&self, _signal: i32) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn resize(&self, _width: u16, _height: u16) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn close_stdin(&self) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn wait(&self, _timeout_in_seconds: Option<i64>) -> CzOutcome {
+    match self.0 {}
+  }
+
+  pub(crate) fn delete(&self) -> CzOutcome {
+    match self.0 {}
+  }
+}

@@ -7,16 +7,19 @@ The Rust API mirrors Containerization's Swift API as much as possible.
 Modules are named after the Swift modules, types after the Swift types, and
 methods after their Swift methods, except for using snake case. A Swift type
 nested in another, like `LinuxContainer.Configuration`, is found in a module
-named after its parent: `linux_container::Configuration`.
+named after its parent: `linux_container::Configuration`. Types are grouped
+into modules of related types, such as `containerization::container` and
+`containerization_oci::image`, so a path reads
+`containerization::container::linux_container::Configuration`.
 
 ```rust
 use containerization_framework as cfw;
 use cfw::containerization as cz;
 use cfw::containerization_extras as cz_extras;
 
-let store = cz::ImageStore::new("/Users/me/.cache/containers".as_ref())?;
-let kernel = cz::Kernel::new("/Users/me/.cache/vmlinux", cz::SystemPlatform::LINUX_ARM);
-let mut manager = cz::ContainerManager::with_initfs_reference(
+let store = cz::image::ImageStore::new("/Users/me/.cache/containers".as_ref())?;
+let kernel = cz::vm::Kernel::new("/Users/me/.cache/vmlinux", cz::vm::SystemPlatform::LINUX_ARM);
+let mut manager = cz::container::ContainerManager::with_initfs_reference(
     &kernel,
     "ghcr.io/apple/containerization/vminit:0.48.0",
     &store,
@@ -24,18 +27,18 @@ let mut manager = cz::ContainerManager::with_initfs_reference(
 )?;
 
 let image = store.get("docker.io/library/alpine:3", true)?;
-let address = cz_extras::CIDRv4::parse("192.168.64.7/24")?;
-let gateway = cz_extras::IPv4Address::parse("192.168.64.1")?;
-let options = cz::container_manager::CreateOptions { networking: false, ..Default::default() };
+let address = cz_extras::address::CIDRv4::parse("192.168.64.7/24")?;
+let gateway = cz_extras::address::IPv4Address::parse("192.168.64.1")?;
+let options = cz::container::container_manager::CreateOptions { networking: false, ..Default::default() };
 let container = manager.create("example", &image, options, move |config| {
     config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
-    config.interfaces = vec![cz::Interface::Nat(cz::NatInterface::new(address, Some(gateway)))];
-    config.dns = Some(cz::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
+    config.interfaces = vec![cz::network::Interface::Nat(cz::network::NatInterface::new(address, Some(gateway)))];
+    config.dns = Some(cz::network::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
 })?;
 container.create()?;
 container.start()?;
 
-let process = container.exec("hello", cz::LinuxProcessConfiguration::new(&["/bin/echo", "hello"]))?;
+let process = container.exec("hello", cz::process::LinuxProcessConfiguration::new(&["/bin/echo", "hello"]))?;
 process.start()?;
 let status = process.wait(None)?;
 process.delete()?;
@@ -98,29 +101,34 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 
 ## Shape
 
-- `containerization`: `ImageStore`, `Image`, `image::Description`,
-  `InitImage`, `Ext4Unpacker`, `Kernel`, `ContainerManager`, `VmnetNetwork`,
-  `LinuxContainer`, `LinuxPod`, `LinuxProcess`, `VzVirtualMachineManager`,
-  `VzVirtualMachineInstance`, and the configuration types they take
-  (`linux_container::Configuration`, `LinuxProcessConfiguration`, `Mount`,
-  `Dns`, `Hosts`, `Signal`, ...). Their defaults match Containerization's.
-- `containerization_oci`: `LocalContentStore`, `Content`, `ContentWriter`,
-  `Descriptor`, `Platform`, `User`.
+- `containerization`, in five groups. `image`: `ImageStore`, `Image`,
+  `image::Description`, `InitImage`, `KernelImage`, `Ext4Unpacker`. `vm`:
+  `Kernel`, `SystemPlatform`, `VmConfiguration`, `VmResources`, `BootLog`,
+  `VzVirtualMachineManager`, `VzVirtualMachineInstance`. `network`:
+  `VmnetNetwork`, `NatInterface`, `Interface`, `Dns`, `Hosts`. `container`:
+  `ContainerManager`, `LinuxContainer`, `LinuxPod`, `Mount`, and the
+  configuration types they take (`linux_container::Configuration`, ...).
+  `process`: `LinuxProcess`, `LinuxProcessConfiguration`, `Signal`,
+  `LinuxCapabilities`, `ExitStatus`. Their defaults match Containerization's.
+- `containerization_oci`, in four groups. `content`: `LocalContentStore`,
+  `Content`, `ContentWriter`. `image`: `Descriptor`, `Platform`, `Reference`,
+  `Manifest`. `client`: `RegistryClient`, `Authentication`. `runtime`: `Spec`,
+  `Bundle`, `User`.
 - `containerization_ext4`: `ext4::Formatter`, `ext4::Ext4Reader`,
   `ext4::SuperBlock`, `ext4::Inode`, `ext4::JournalConfig`,
   `FileTimestamps`.
-- `containerization_extras`: `IPv4Address`, `IPv6Address`, `IpAddress`,
-  `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr`, `MACAddress`, `ProgressEvent`,
-  `ProgressHandler`.
+- `containerization_extras`: in `address`, `IPv4Address`, `IPv6Address`,
+  `IpAddress`, `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr` and `MACAddress`; and
+  `ProgressEvent` and `ProgressHandler` at the root.
 - `containerization_io`: `ReadStream`.
-- `containerization_os`: `terminal::Size`.
+- `containerization_os`: `terminal::Size` and `keychain::KeychainQuery`.
 
 A few things work differently because Rust can't express them the way Swift
 does:
 
 - Rust has no default arguments, so `ContainerManager.create`'s optional
-  arguments are fields of `container_manager::CreateOptions`. Its `Default`
-  uses the same values as Swift.
+  arguments are fields of `container::container_manager::CreateOptions`. Its
+  `Default` uses the same values as Swift.
 - Rust has no overloading either. Where Swift overloads a name, the second
   Rust method adds a suffix naming the argument that tells them apart:
   `ContainerManager.create(_:image:rootfs:...)` is `create_with_rootfs`, and

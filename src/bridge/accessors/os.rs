@@ -1,14 +1,14 @@
 //! Readers for what ContainerizationOS returns.
 
 use crate::bridge::ffi;
-use crate::containerization_os;
+use crate::containerization_os::keychain;
 use crate::platform;
 
 impl ffi::CzOutcome {
   /// The `KeychainQueryResult` an outcome holds, its dates crossing as
   /// seconds since 1970.
-  pub(crate) fn keychain_query_result(&self) -> containerization_os::KeychainQueryResult {
-    containerization_os::KeychainQueryResult {
+  pub(crate) fn keychain_query_result(&self) -> keychain::KeychainQueryResult {
+    keychain::KeychainQueryResult {
       username: self.keychain_query_result_username(),
       password: self.keychain_query_result_password(),
       modified_date: platform::system_time(self.keychain_query_result_modified_date()),

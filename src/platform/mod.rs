@@ -13,9 +13,8 @@ pub(crate) use crate::bridge::ffi;
 #[cfg(not(target_os = "macos"))]
 pub(crate) use self::unsupported as ffi;
 
-use crate::containerization;
-use crate::containerization::linux_container;
-use crate::containerization::linux_pod;
+use crate::containerization::container;
+use crate::containerization::process;
 #[cfg(target_os = "macos")]
 use crate::containerization_error;
 use crate::containerization_extras::ProgressHandler;
@@ -51,16 +50,16 @@ impl<T> Configure<T> {
 }
 
 /// The manager's `(inout LinuxContainer.Configuration) -> Void`.
-pub(crate) type ConfigureContainer = Configure<linux_container::Configuration>;
+pub(crate) type ConfigureContainer = Configure<container::linux_container::Configuration>;
 
 /// An `(inout LinuxProcessConfiguration) -> Void`.
-pub(crate) type ConfigureProcess = Configure<containerization::LinuxProcessConfiguration>;
+pub(crate) type ConfigureProcess = Configure<process::LinuxProcessConfiguration>;
 
 /// An `(inout LinuxPod.Configuration) -> Void`.
-pub(crate) type ConfigurePod = Configure<linux_pod::Configuration>;
+pub(crate) type ConfigurePod = Configure<container::linux_pod::Configuration>;
 
 /// An `(inout LinuxPod.ContainerConfiguration) -> Void`.
-pub(crate) type ConfigurePodContainer = Configure<linux_pod::ContainerConfiguration>;
+pub(crate) type ConfigurePodContainer = Configure<container::linux_pod::ContainerConfiguration>;
 
 /// What `call` returned, and the value its Swift call filled and handed to
 /// the closure `call` passes it, if it did.
@@ -82,7 +81,7 @@ pub(crate) fn filled<T: Default + Send + 'static, R>(call: impl FnOnce(Configure
 pub(crate) fn filled_process(
   call: impl FnOnce(ConfigureProcess) -> ffi::CzOutcome,
   action: impl Into<String>,
-) -> Result<containerization::LinuxProcessConfiguration, Error> {
+) -> Result<process::LinuxProcessConfiguration, Error> {
   let (returned, process) = filled(call);
 
   outcome(returned, action)?;
@@ -113,8 +112,8 @@ fn error(_outcome: &ffi::CzOutcome, action: impl Into<String>, message: String) 
 }
 
 /// `ExitStatus`, its `exitedAt` crossing as seconds since 1970.
-pub(crate) fn exit_status(outcome: &ffi::CzOutcome) -> containerization::ExitStatus {
-  containerization::ExitStatus {
+pub(crate) fn exit_status(outcome: &ffi::CzOutcome) -> process::ExitStatus {
+  process::ExitStatus {
     exit_code: outcome.exit_code(),
     exited_at: SystemTime::UNIX_EPOCH + Duration::from_secs_f64(outcome.exited_at().max(0.0)),
   }

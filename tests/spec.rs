@@ -19,14 +19,15 @@ fn map(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
 }
 
 /// A `Spec` with every field set, and none at its default.
-fn full_spec() -> oci::Spec {
-  let hook = |path: &str| oci::Hook::new(path, strings(&[path, "--flag"]), strings(&["TOKEN=secret"]), Some(5));
-  let mapping = oci::LinuxIDMapping::new(0, 100_000, 65_536);
-  let throttle = |rate| oci::LinuxThrottleDevice::new(8, 0, rate);
+fn full_spec() -> oci::runtime::Spec {
+  let hook =
+    |path: &str| oci::runtime::Hook::new(path, strings(&[path, "--flag"]), strings(&["TOKEN=secret"]), Some(5));
+  let mapping = oci::runtime::LinuxIDMapping::new(0, 100_000, 65_536);
+  let throttle = |rate| oci::runtime::LinuxThrottleDevice::new(8, 0, rate);
 
-  oci::Spec {
+  oci::runtime::Spec {
     version: "1.0.2-dev".to_string(),
-    hooks: Some(oci::Hooks::new(
+    hooks: Some(oci::runtime::Hooks::new(
       vec![hook("/prestart")],
       vec![hook("/create-runtime")],
       vec![hook("/create-container")],
@@ -34,15 +35,15 @@ fn full_spec() -> oci::Spec {
       vec![hook("/poststart")],
       vec![hook("/poststop")],
     )),
-    process: Some(oci::Process {
+    process: Some(oci::runtime::Process {
       cwd: "/work".to_string(),
       env: strings(&["PATH=/bin", "HOME=/root"]),
-      console_size: Some(oci::Box::new(24, 80)),
+      console_size: Some(oci::runtime::Box::new(24, 80)),
       selinux_label: "system_u:system_r:container_t".to_string(),
       no_new_privileges: true,
       command_line: "sh -c true".to_string(),
       oom_score_adj: Some(-500),
-      capabilities: Some(oci::LinuxCapabilities {
+      capabilities: Some(oci::runtime::LinuxCapabilities {
         bounding: Some(strings(&["CAP_CHOWN", "CAP_KILL"])),
         effective: Some(strings(&["CAP_CHOWN"])),
         inheritable: Some(Vec::new()),
@@ -50,20 +51,20 @@ fn full_spec() -> oci::Spec {
         ambient: None,
       }),
       apparmor_profile: "docker-default".to_string(),
-      user: oci::User {
+      user: oci::runtime::User {
         uid: 1000,
         gid: 1000,
         umask: Some(0o022),
         additional_gids: vec![10, 20],
         username: "user".to_string(),
       },
-      rlimits: vec![oci::POSIXRlimit::new("RLIMIT_NOFILE", 4096, 1024)],
+      rlimits: vec![oci::runtime::POSIXRlimit::new("RLIMIT_NOFILE", 4096, 1024)],
       args: strings(&["/bin/sh", "-c", "true"]),
       terminal: true,
     }),
     hostname: "host".to_string(),
     domainname: "example.com".to_string(),
-    mounts: vec![oci::Mount {
+    mounts: vec![oci::runtime::Mount {
       r#type: "bind".to_string(),
       source: "/src".to_string(),
       destination: "/dst".to_string(),
@@ -72,20 +73,20 @@ fn full_spec() -> oci::Spec {
       gid_mappings: None,
     }],
     annotations: Some(map(&[("org.example/a", "1"), ("org.example/b", "2")])),
-    root: Some(oci::Root::new("rootfs", true)),
-    linux: Some(oci::Linux {
+    root: Some(oci::runtime::Root::new("rootfs", true)),
+    linux: Some(oci::runtime::Linux {
       uid_mappings: vec![mapping],
       gid_mappings: vec![mapping],
       sysctl: Some(map(&[("net.ipv4.ip_forward", "1")])),
-      resources: Some(oci::LinuxResources {
-        devices: vec![oci::LinuxDeviceCgroup::new(
+      resources: Some(oci::runtime::LinuxResources {
+        devices: vec![oci::runtime::LinuxDeviceCgroup::new(
           false,
           "a",
           None,
           Some(3),
           Some("rwm".to_string()),
         )],
-        memory: Some(oci::LinuxMemory {
+        memory: Some(oci::runtime::LinuxMemory {
           limit: Some(1 << 30),
           reservation: Some(1 << 29),
           swap: Some(-1),
@@ -96,7 +97,7 @@ fn full_spec() -> oci::Spec {
           use_hierarchy: None,
           check_before_update: Some(true),
         }),
-        cpu: Some(oci::LinuxCPU {
+        cpu: Some(oci::runtime::LinuxCPU {
           shares: Some(1024),
           quota: Some(50_000),
           burst: None,
@@ -107,25 +108,28 @@ fn full_spec() -> oci::Spec {
           mems: "0".to_string(),
           idle: Some(0),
         }),
-        pids: Some(oci::LinuxPids::new(512)),
-        block_io: Some(oci::LinuxBlockIO::new(
+        pids: Some(oci::runtime::LinuxPids::new(512)),
+        block_io: Some(oci::runtime::LinuxBlockIO::new(
           Some(500),
           None,
-          vec![oci::LinuxWeightDevice::new(8, 0, Some(300), Some(200))],
+          vec![oci::runtime::LinuxWeightDevice::new(8, 0, Some(300), Some(200))],
           vec![throttle(1)],
           vec![throttle(2)],
           vec![throttle(3)],
           vec![throttle(4)],
         )),
-        hugepage_limits: vec![oci::LinuxHugepageLimit::new("2MB", 1 << 21)],
-        network: Some(oci::LinuxNetwork::new(
+        hugepage_limits: vec![oci::runtime::LinuxHugepageLimit::new("2MB", 1 << 21)],
+        network: Some(oci::runtime::LinuxNetwork::new(
           Some(0x10001),
-          vec![oci::LinuxInterfacePriority::new("eth0", 5)],
+          vec![oci::runtime::LinuxInterfacePriority::new("eth0", 5)],
         )),
         rdma: Some(
           [
-            ("mlx5_0".to_string(), oci::LinuxRdma::new(Some(3), Some(10_000))),
-            ("mlx5_1".to_string(), oci::LinuxRdma::new(None, Some(1))),
+            (
+              "mlx5_0".to_string(),
+              oci::runtime::LinuxRdma::new(Some(3), Some(10_000)),
+            ),
+            ("mlx5_1".to_string(), oci::runtime::LinuxRdma::new(None, Some(1))),
           ]
           .into(),
         ),
@@ -133,13 +137,13 @@ fn full_spec() -> oci::Spec {
       }),
       cgroups_path: "/container".to_string(),
       namespaces: vec![
-        oci::LinuxNamespace::new(oci::LinuxNamespaceType::Pid),
-        oci::LinuxNamespace {
-          r#type: oci::LinuxNamespaceType::Network,
+        oci::runtime::LinuxNamespace::new(oci::runtime::LinuxNamespaceType::Pid),
+        oci::runtime::LinuxNamespace {
+          r#type: oci::runtime::LinuxNamespaceType::Network,
           path: "/var/run/netns/one".to_string(),
         },
       ],
-      devices: vec![oci::LinuxDevice::new(
+      devices: vec![oci::runtime::LinuxDevice::new(
         "/dev/fuse",
         "c",
         10,
@@ -148,22 +152,22 @@ fn full_spec() -> oci::Spec {
         Some(0),
         None,
       )],
-      seccomp: Some(oci::LinuxSeccomp::new(
-        oci::LinuxSeccompAction::ActErrno,
+      seccomp: Some(oci::runtime::LinuxSeccomp::new(
+        oci::runtime::LinuxSeccompAction::ActErrno,
         Some(1),
-        vec![oci::Arch::ArchAARCH64, oci::Arch::ArchX86_64],
-        vec![oci::LinuxSeccompFlag::FlagLog],
+        vec![oci::runtime::Arch::ArchAARCH64, oci::runtime::Arch::ArchX86_64],
+        vec![oci::runtime::LinuxSeccompFlag::FlagLog],
         "/run/listener.sock",
         "metadata",
-        vec![oci::LinuxSyscall::new(
+        vec![oci::runtime::LinuxSyscall::new(
           strings(&["personality"]),
-          oci::LinuxSeccompAction::ActAllow,
+          oci::runtime::LinuxSeccompAction::ActAllow,
           None,
-          vec![oci::LinuxSeccompArg::new(
+          vec![oci::runtime::LinuxSeccompArg::new(
             0,
             0xffff_ffff,
             8,
-            oci::LinuxSeccompOperator::OpMaskedEqual,
+            oci::runtime::LinuxSeccompOperator::OpMaskedEqual,
           )],
         )],
       )),
@@ -171,8 +175,8 @@ fn full_spec() -> oci::Spec {
       masked_paths: strings(&["/proc/kcore"]),
       readonly_paths: strings(&["/proc/sys"]),
       mount_label: "label".to_string(),
-      personality: Some(oci::LinuxPersonality::new(
-        oci::LinuxPersonalityDomain::PerLinux32,
+      personality: Some(oci::runtime::LinuxPersonality::new(
+        oci::runtime::LinuxPersonalityDomain::PerLinux32,
         strings(&["flag"]),
       )),
     }),
@@ -185,7 +189,7 @@ fn round_trips_a_spec_through_a_bundle() {
   let path = directory.path().join("bundle");
   let spec = full_spec();
 
-  let bundle = oci::Bundle::create(&path, &spec).expect("a bundle");
+  let bundle = oci::runtime::Bundle::create(&path, &spec).expect("a bundle");
   assert_eq!(bundle.path(), path);
   assert_eq!(bundle.config_path().expect("a path"), path.join("config.json"));
   assert_eq!(bundle.rootfs_path().expect("a path"), path.join("rootfs"));
@@ -193,7 +197,7 @@ fn round_trips_a_spec_through_a_bundle() {
 
   assert_eq!(bundle.load_config().expect("the spec"), spec);
   assert_eq!(
-    oci::Bundle::load(&path)
+    oci::runtime::Bundle::load(&path)
       .expect("the bundle")
       .load_config()
       .expect("the spec"),
@@ -202,21 +206,21 @@ fn round_trips_a_spec_through_a_bundle() {
 
   bundle.delete().expect("deleted");
   assert!(!path.exists());
-  assert!(oci::Bundle::load(&path).is_err());
+  assert!(oci::runtime::Bundle::load(&path).is_err());
 }
 
 #[test]
 fn round_trips_a_spec_of_defaults() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let bundle = oci::Bundle::create(directory.path(), &oci::Spec::default()).expect("a bundle");
+  let bundle = oci::runtime::Bundle::create(directory.path(), &oci::runtime::Spec::default()).expect("a bundle");
 
-  assert_eq!(bundle.load_config().expect("the spec"), oci::Spec::default());
+  assert_eq!(bundle.load_config().expect("the spec"), oci::runtime::Spec::default());
 }
 
 #[test]
 fn writes_a_bundles_config_as_given() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let bundle = oci::Bundle::create_from_data(directory.path(), b"not a spec").expect("a bundle");
+  let bundle = oci::runtime::Bundle::create_from_data(directory.path(), b"not a spec").expect("a bundle");
 
   assert_eq!(
     std::fs::read(bundle.config_path().expect("a path")).expect("the config"),
@@ -227,7 +231,7 @@ fn writes_a_bundles_config_as_given() {
 
 #[test]
 fn makes_a_process_from_an_image_config() {
-  let config = oci::ImageConfig {
+  let config = oci::image::ImageConfig {
     user: Some("nobody".to_string()),
     env: Some(strings(&["PATH=/bin"])),
     entrypoint: Some(strings(&["/bin/sh", "-c"])),
@@ -236,21 +240,21 @@ fn makes_a_process_from_an_image_config() {
     ..Default::default()
   };
 
-  let process = oci::Process::from_image_config(&config).expect("a process");
+  let process = oci::runtime::Process::from_image_config(&config).expect("a process");
   assert_eq!(process.args, strings(&["/bin/sh", "-c", "true"]));
   assert_eq!(process.cwd, "/work");
   assert_eq!(process.env, strings(&["PATH=/bin"]));
   assert_eq!(process.user.username, "nobody");
 
   assert_eq!(
-    oci::Process::from_image_config(&oci::ImageConfig::default()).expect("a process"),
-    oci::Process::default()
+    oci::runtime::Process::from_image_config(&oci::image::ImageConfig::default()).expect("a process"),
+    oci::runtime::Process::default()
   );
 }
 
 #[test]
 fn describes_a_process_and_a_hook_without_their_secrets() {
-  let process = oci::Process {
+  let process = oci::runtime::Process {
     env: strings(&["TOKEN=secret"]),
     ..Default::default()
   };
@@ -258,7 +262,7 @@ fn describes_a_process_and_a_hook_without_their_secrets() {
   assert!(description.contains("TOKEN=<redacted>"), "{description}");
   assert!(!description.contains("secret"), "{description}");
 
-  let hook = oci::Hook::new("/hook", Vec::new(), strings(&["TOKEN=secret"]), None);
+  let hook = oci::runtime::Hook::new("/hook", Vec::new(), strings(&["TOKEN=secret"]), None);
   let description = hook.description().expect("a description");
   assert!(description.contains("TOKEN=<redacted>"), "{description}");
   assert!(!description.contains("secret"), "{description}");
@@ -266,7 +270,7 @@ fn describes_a_process_and_a_hook_without_their_secrets() {
 
 #[test]
 fn decodes_a_seccomp_profile() {
-  let profile = oci::LinuxSeccomp::decode(
+  let profile = oci::runtime::LinuxSeccomp::decode(
     br#"{
       "defaultAction": "SCMP_ACT_ERRNO",
       "architectures": ["SCMP_ARCH_AARCH64"],
@@ -277,16 +281,16 @@ fn decodes_a_seccomp_profile() {
 
   assert_eq!(
     profile,
-    oci::LinuxSeccomp::new(
-      oci::LinuxSeccompAction::ActErrno,
+    oci::runtime::LinuxSeccomp::new(
+      oci::runtime::LinuxSeccompAction::ActErrno,
       None,
-      vec![oci::Arch::ArchAARCH64],
+      vec![oci::runtime::Arch::ArchAARCH64],
       Vec::new(),
       "",
       "",
-      vec![oci::LinuxSyscall::new(
+      vec![oci::runtime::LinuxSyscall::new(
         strings(&["read"]),
-        oci::LinuxSeccompAction::ActAllow,
+        oci::runtime::LinuxSeccompAction::ActAllow,
         None,
         Vec::new()
       )],
@@ -296,7 +300,7 @@ fn decodes_a_seccomp_profile() {
 
 #[test]
 fn rejects_a_seccomp_profile_that_is_not_one() {
-  let error = oci::LinuxSeccomp::decode(b"not json").expect_err("not JSON");
+  let error = oci::runtime::LinuxSeccomp::decode(b"not json").expect_err("not JSON");
   assert!(error.is_code(cfw::containerization_error::Code::InvalidArgument));
 }
 
@@ -304,7 +308,7 @@ fn rejects_a_seccomp_profile_that_is_not_one() {
 /// unconditionally.
 #[test]
 fn rejects_a_docker_format_seccomp_profile() {
-  let error = oci::LinuxSeccomp::decode(
+  let error = oci::runtime::LinuxSeccomp::decode(
     br#"{
       "defaultAction": "SCMP_ACT_ERRNO",
       "syscalls": [{"names": ["mount"], "action": "SCMP_ACT_ALLOW", "includes": {"caps": ["CAP_SYS_ADMIN"]}}]
@@ -318,44 +322,47 @@ fn rejects_a_docker_format_seccomp_profile() {
 
 #[test]
 fn makes_the_default_seccomp_profile_for_this_machine() {
-  let arch = oci::Arch::current_verified().expect("a seccomp architecture");
-  assert_eq!(oci::Arch::current().expect("an answer"), Some(arch));
+  let arch = oci::runtime::Arch::current_verified().expect("a seccomp architecture");
+  assert_eq!(oci::runtime::Arch::current().expect("an answer"), Some(arch));
 
-  let profile = oci::LinuxSeccomp::default_profile(None, arch).expect("a profile");
+  let profile = oci::runtime::LinuxSeccomp::default_profile(None, arch).expect("a profile");
   assert!(profile.architectures.contains(&arch));
   assert!(!profile.syscalls.is_empty());
 
-  let capabilities = oci::LinuxCapabilities {
+  let capabilities = oci::runtime::LinuxCapabilities {
     bounding: Some(strings(&["CAP_SYS_ADMIN"])),
     ..Default::default()
   };
-  let privileged = oci::LinuxSeccomp::default_profile(Some(&capabilities), arch).expect("a profile");
+  let privileged = oci::runtime::LinuxSeccomp::default_profile(Some(&capabilities), arch).expect("a profile");
   assert_ne!(privileged, profile, "CAP_SYS_ADMIN allows more syscalls");
 }
 
 #[test]
 fn reads_the_runtime_spec_version() {
   assert_eq!(
-    oci::RuntimeSpecVersion::current().expect("a version"),
-    oci::RuntimeSpecVersion::new(1, 0, 2, "-dev")
+    oci::runtime::RuntimeSpecVersion::current().expect("a version"),
+    oci::runtime::RuntimeSpecVersion::new(1, 0, 2, "-dev")
   );
 }
 
 #[test]
 fn converts_containerizations_types_to_ocis() {
-  let rlimit = cfw::containerization::LinuxRLimit::new(cfw::containerization::linux_rlimit::Kind::OpenFiles, 1024);
+  let rlimit = cfw::containerization::process::LinuxRLimit::new(
+    cfw::containerization::process::linux_rlimit::Kind::OpenFiles,
+    1024,
+  );
   assert_eq!(
     rlimit.to_oci().expect("an rlimit"),
-    oci::POSIXRlimit::new("RLIMIT_NOFILE", 1024, 1024)
+    oci::runtime::POSIXRlimit::new("RLIMIT_NOFILE", 1024, 1024)
   );
 
-  let capabilities = cfw::containerization::LinuxCapabilities {
+  let capabilities = cfw::containerization::process::LinuxCapabilities {
     bounding: vec![cfw::containerization_os::CapabilityName::Chown],
     ..Default::default()
   };
   assert_eq!(
     capabilities.to_oci().expect("capabilities"),
-    oci::LinuxCapabilities {
+    oci::runtime::LinuxCapabilities {
       bounding: Some(strings(&["CAP_CHOWN"])),
       ..Default::default()
     },
@@ -363,9 +370,9 @@ fn converts_containerizations_types_to_ocis() {
   );
 
   assert_eq!(
-    cfw::containerization::SystemPlatform::LINUX_ARM
+    cfw::containerization::vm::SystemPlatform::LINUX_ARM
       .oci_platform()
       .expect("a platform"),
-    oci::Platform::parse("linux/arm64").expect("a platform")
+    oci::image::Platform::parse("linux/arm64").expect("a platform")
   );
 }

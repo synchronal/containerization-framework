@@ -24,9 +24,9 @@ pub const TEST_MEMORY_IN_BYTES: u64 = 512 * 1024 * 1024;
 pub const TEST_ROOTFS_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// A VM for the test limits plus guest overhead.
-pub fn vm() -> cfw::containerization::VmResources {
-  cfw::containerization::VmResources {
+pub fn vm() -> cfw::containerization::vm::VmResources {
+  cfw::containerization::vm::VmResources {
     cpus: TEST_CPUS,
-    memory_in_bytes: TEST_MEMORY_IN_BYTES + cfw::containerization::VmResources::GUEST_MEMORY_OVERHEAD,
+    memory_in_bytes: TEST_MEMORY_IN_BYTES + cfw::containerization::vm::VmResources::GUEST_MEMORY_OVERHEAD,
   }
 }

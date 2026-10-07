@@ -2,67 +2,113 @@
 
 ## Unreleased
 
-Where a Swift method has defaulted arguments, the Rust method takes them in an
-options struct whose `Default` matches Swift, such as
-`image_store::PullOptions`.
+This release binds most of the rest of Containerization's Swift API. Each
+module's types are now grouped into submodules by what they work on, such as
+`containerization::image` and `containerization::container`, and the entries
+below name each new type's group. Where a Swift method has defaulted
+arguments, the Rust method takes them in an options struct whose `Default`
+matches Swift's, such as `image::image_store::PullOptions`.
 
-- Images can be pushed to registries and saved to disk through `ImageStore`.
-  `Image` exposes its descriptor, index, manifest and config, and `Image`,
+### Images and content
+
+- `ImageStore` can push images to a registry and save them to disk. `Image`
+  exposes its descriptor, index, manifest and config, and `Image`,
   `InitImage` and the new `KernelImage` can be created directly.
-  `RegistryClient`, `Authentication` and `KeychainHelper` are also available,
-  although `RegistryClient` can't take Swift's TLS configuration or logger.
-  `LocalContentStore` supports ingest sessions.
-- Containerization's configuration types have the rest of their Swift API,
-  such as `LinuxProcessConfiguration::from_image_config`, `Mount::tag_hash`,
-  `Dns::resolv_conf` and `Hosts::hosts_file`. `Signal` can be parsed from a
-  name or number, and every Linux and Darwin signal is a constant in
-  `signal::linux` and `signal::darwin`.
+- `LocalContentStore` supports ingest sessions.
+- The new `containerization_oci::client` module has `RegistryClient`,
+  `Authentication` and `KeychainHelper`. `RegistryClient` can't take Swift's
+  TLS configuration or logger.
+
+### Containers and processes
+
 - `LinuxContainer` exposes what it was made with, such as its `config`,
-  `rootfs` and `vm`. It can exec a process through a closure with
+  `rootfs` and `vm`. It can run a process configured by a closure with
   `exec_with`, report `ContainerStatistics`, freeze, thaw or trim a
-  filesystem, copy files in and out, and dial a vsock port. `LinuxProcess`
-  exposes its `owning_container`.
-- A `ContainerManager` given a `VmnetNetwork` gives each container it creates
-  an interface on it. The manager can also open a store at a root directory,
-  create a container from an image reference, report unpacking progress, and
-  release a container's network.
-- `VzVirtualMachineManager` boots VMs without a container manager, and the
-  `VzVirtualMachineInstance` it creates can be started, paused, dialed over
-  vsock and listened on. A `LinuxContainer` can be made directly on a VM
-  manager, and its VM can be reached with `with_virtual_machine_instance`.
-  `ContainerManager::with_vmm` makes a manager on one.
+  filesystem, copy files in and out, and dial a vsock port.
+- `ContainerManager` can open a store at a root directory, create a container
+  from an image reference, report unpacking progress, and release a
+  container's network. Given a `VmnetNetwork`, it gives each container it
+  creates an interface on that network.
 - The new `LinuxPod` runs several containers in one VM, and they can share
   the pod's volumes.
-- `containerization_oci` adds the image types, including `Index`, `Manifest`,
-  `Reference` and `ParsedDigest`, and the runtime spec, including `Spec`,
-  `State` and `Bundle`. `containerization_oci::Image` is an image's config,
-  not `containerization::Image`. `LinuxSeccomp::decode` rejects Docker's
-  profile format instead of turning its conditional rules into unconditional
-  allows.
-- `Platform` can be parsed, printed and matched, and its `==` follows Swift's:
+- The configuration types have the rest of their Swift API, such as
+  `LinuxProcessConfiguration::from_image_config`, `Mount::tag_hash`,
+  `Dns::resolv_conf` and `Hosts::hosts_file`. `LinuxProcess` exposes its
+  `owning_container`.
+- `Signal` can be parsed from a name or a number, and every Linux and Darwin
+  signal is a constant in `signal::linux` and `signal::darwin`.
+
+### Virtual machines
+
+- The new `containerization::vm::VzVirtualMachineManager` boots VMs without a
+  container manager. The `VzVirtualMachineInstance` it creates can be
+  started, paused, dialed over vsock and listened on.
+- A `LinuxContainer` can be made directly on a VM manager, and its VM can be
+  reached with `with_virtual_machine_instance`. `ContainerManager::with_vmm`
+  makes a container manager on one.
+
+### OCI types
+
+- `containerization_oci::image` has the image format's types, such as
+  `Index`, `Manifest` and `Reference`. Its `Image` is an image's config, not
+  `containerization::image::Image`.
+- `containerization_oci::runtime` has the runtime spec, such as `Spec`,
+  `State` and `Bundle`. `LinuxSeccomp::decode` reads a seccomp profile, and
+  rejects Docker's profile format rather than turning its conditional rules
+  into unconditional allows.
+- `containerization_oci::content` has `ParsedDigest`.
+- `Platform` can be parsed, printed and matched. Its `==` follows Swift's, so
   an `arm64` platform with no variant equals `arm64/v8`, and the OS version
   and features are ignored. Off macOS, every field must match.
-- `containerization_extras` adds the address types, such as `IPv4Address`,
-  `CIDRv4` and `MACAddress`, and `proxy_utils::proxy_from_environment`. Swift
-  does the parsing, so these calls return a `Result`. `ProgressEvent` exposes
-  its event and value.
-- `containerization_os` adds `Terminal`, `CapabilityName`, `CapabilitySet`,
-  `KeychainQuery`, `Stat`, `sysctl::by_name` and `file::info`.
+
+### Other modules
+
+- `containerization_extras` has `proxy_utils::proxy_from_environment`, and
+  its `address` module has network address types such as `IPv4Address`,
+  `CIDRv4` and `MACAddress`. Swift does the parsing, so these calls return a
+  `Result`. `ProgressEvent` exposes its event and value.
+- `containerization_os` has `Terminal`, `CapabilityName`, `CapabilitySet`,
+  `Stat`, `sysctl::by_name` and `file::info`, and its `keychain` module has
+  `KeychainQuery`.
 - `ext4::Formatter` builds an ext4 filesystem file by file, or unpacks an
   archive into one. `Ext4Reader` can read the superblock, stat paths, list
   directories and read files.
 - The new `containerization_archive` module writes, reads and extracts
-  archives, and `Ext4Unpacker::unpack_archive` unpacks one into an ext4
-  filesystem.
-- The new `containerization_io` module adds `ReadStream`, whose `data_stream`
+  archives, and `Ext4Unpacker::unpack_archive` unpacks an archive into an
+  ext4 filesystem.
+- The new `containerization_io` module has `ReadStream`, whose `data_stream`
   is an iterator over the chunks it reads.
 - `Error::Failed` carries the code of a thrown `ContainerizationError`, which
   `Error::is_code` checks.
+
+### Fixes
+
 - `LocalContentStore::ingest` no longer intermittently crashes after its
   closure returns.
 
 ### Breaking
 
+- The types that were at the root of `containerization` and
+  `containerization_oci` have moved into the new groups, along with the
+  modules for their nested types:
+  - `containerization::image` has `Image`, `ImageStore`, `InitImage` and
+    `Ext4Unpacker`, so `containerization::ImageStore` is now
+    `containerization::image::ImageStore`. `image::Description` hasn't moved.
+  - `containerization::vm` has `Kernel`, `SystemPlatform`, `BootLog` and
+    `VmResources`, and the `kernel` and `system_platform` modules.
+  - `containerization::network` has `Dns`, `Hosts`, `NatInterface` and the
+    `hosts` module.
+  - `containerization::container` has `ContainerManager`, `LinuxContainer`,
+    `Mount` and `UnixSocketConfiguration`, and the `container_manager`,
+    `linux_container`, `mount` and `unix_socket_configuration` modules. So
+    `containerization::linux_container::Configuration` is now
+    `containerization::container::linux_container::Configuration`.
+  - `containerization::process` has `LinuxProcess`,
+    `LinuxProcessConfiguration`, `LinuxCapabilities`, `LinuxRLimit`, `Signal`
+    and `ExitStatus`, and the `linux_rlimit` module.
+  - In `containerization_oci`, `Descriptor` and `Platform` are in `image`,
+    `Content`, `ContentWriter` and `LocalContentStore` are in `content`, and
+    `User` is in `runtime`.
 - `ImageStore::pull` takes a `PullOptions`, and `ImageStore::get_init_image`
   takes `auth` and `progress` arguments. Pass `Default::default()` or `None`
   to keep the old behavior.
@@ -71,15 +117,14 @@ options struct whose `Default` matches Swift, such as
 - `linux_container::Configuration::interfaces` holds `Interface`s, so wrap a
   `NatInterface` in `Interface::Nat`. `NatInterface` holds parsed address
   types instead of strings, so a malformed address fails when you parse it
-  rather than when the container is created, and its IPv4 gateway is optional,
-  as it is in Swift.
+  rather than when the container is created. `NatInterface::new` takes its
+  IPv4 gateway as an `Option`, as Swift does.
 - `SeccompProfile::Profile` holds a `LinuxSeccomp` instead of JSON. Read the
   JSON with `LinuxSeccomp::decode`.
 - `Error::Failed` has a new `code` field, so a pattern that names its fields
   needs `..`.
 - `LinuxCapabilities`' sets hold `CapabilityName`s instead of strings, so a
-  misspelled capability is a compile error and `to_oci` can no longer fail
-  because of one.
+  misspelled capability is a compile error.
 - `ContainerManager::new` and `ContainerManager::with_initfs_reference` take
   a `ManagerOptions` in place of `rosetta` and `nested_virtualization`. Pass
   `Default::default()` to keep the old behavior. `CreateOptions` holds an

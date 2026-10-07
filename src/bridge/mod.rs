@@ -13,57 +13,63 @@
 //! Containerization's `Mount`, `User`, etc.): Swift reads them through
 //! `accessors`, and builds them through the constructors there when it hands
 //! one back. swift-bridge can't put a `String`-holding struct in a `Vec`
-//! (declined upstream, swift-bridge#305). (No doc comments inside the module:
-//! swift-bridge can't parse them.)
+//! (declined upstream, swift-bridge#305). (No doc comments inside a bridge
+//! module: swift-bridge can't parse them.)
+//!
+//! The bridge is several `#[swift_bridge::bridge]` modules, and `build.rs`
+//! parses each of them. This one declares the shared enums and every Swift
+//! type, with the Rust types that hold a Swift object. swift-bridge 0.1.59
+//! ignores `already_declared` on a Swift type: a second module would emit
+//! its Rust struct and Swift release shim again. The other Rust types are
+//! declared in a sibling module by concern, and re-declared here as
+//! `already_declared` where a Swift function takes them. A sibling reaches
+//! an enum here the same way, through a `use` of it, since swift-bridge
+//! resolves an `already_declared` type as `super::`.
 
 mod accessors;
+mod addresses;
+mod callbacks;
+mod containers;
+mod ext4_archive;
+mod images;
+mod network;
+mod spec;
+mod vm;
 
-use crate::containerization::AttachedFilesystem as RustAttachedFilesystem;
-use crate::containerization::BootLog as RustBootLog;
-use crate::containerization::Dns as RustDns;
-use crate::containerization::Ext4Unpacker as RustExt4Unpacker;
-use crate::containerization::Hosts as RustHosts;
-use crate::containerization::Kernel as RustKernel;
-use crate::containerization::LinuxCapabilities as RustLinuxCapabilities;
-use crate::containerization::LinuxProcessConfiguration as RustLinuxProcessConfiguration;
-use crate::containerization::LinuxRLimit as RustLinuxRLimit;
-use crate::containerization::Mount as RustMount;
-use crate::containerization::NatInterface as RustNatInterface;
-use crate::containerization::SystemPlatform as RustSystemPlatform;
-use crate::containerization::UnixSocketConfiguration as RustUnixSocketConfiguration;
-use crate::containerization::VmConfiguration as RustVmConfiguration;
-use crate::containerization::container_manager::CreateOptions as RustCreateOptions;
-use crate::containerization::container_manager::RootfsCreateOptions as RustRootfsCreateOptions;
-use crate::containerization::hosts::Entry as RustHostsEntry;
+use crate::containerization::container::Mount as RustMount;
+use crate::containerization::container::UnixSocketConfiguration as RustUnixSocketConfiguration;
+use crate::containerization::container::container_manager::CreateOptions as RustCreateOptions;
+use crate::containerization::container::container_manager::RootfsCreateOptions as RustRootfsCreateOptions;
+use crate::containerization::container::linux_container::Configuration as RustLinuxContainerConfiguration;
+use crate::containerization::container::linux_pod::Configuration as RustPodConfiguration;
+use crate::containerization::container::linux_pod::ContainerConfiguration as RustPodContainerConfiguration;
+use crate::containerization::container::linux_pod::PodVolume as RustPodVolume;
 use crate::containerization::image::Description as RustImageDescription;
-use crate::containerization::linux_container::Configuration as RustLinuxContainerConfiguration;
-use crate::containerization::linux_pod::Configuration as RustPodConfiguration;
-use crate::containerization::linux_pod::ContainerConfiguration as RustPodContainerConfiguration;
-use crate::containerization::linux_pod::PodVolume as RustPodVolume;
+use crate::containerization::image::Ext4Unpacker as RustExt4Unpacker;
+use crate::containerization::network::Dns as RustDns;
+use crate::containerization::network::Hosts as RustHosts;
+use crate::containerization::network::NatInterface as RustNatInterface;
+use crate::containerization::network::hosts::Entry as RustHostsEntry;
+use crate::containerization::process::LinuxCapabilities as RustLinuxCapabilities;
+use crate::containerization::process::LinuxProcessConfiguration as RustLinuxProcessConfiguration;
+use crate::containerization::process::LinuxRLimit as RustLinuxRLimit;
+use crate::containerization::vm::AttachedFilesystem as RustAttachedFilesystem;
+use crate::containerization::vm::BootLog as RustBootLog;
+use crate::containerization::vm::Kernel as RustKernel;
+use crate::containerization::vm::SystemPlatform as RustSystemPlatform;
+use crate::containerization::vm::VmConfiguration as RustVmConfiguration;
 use crate::containerization_archive::ArchiveWriterConfiguration as RustArchiveWriterConfiguration;
 use crate::containerization_ext4::ext4::formatter::FormatterOptions as RustFormatterOptions;
-use crate::containerization_extras::IPv6Address as RustIPv6Address;
-use crate::containerization_extras::IpAddress as RustIpAddress;
-use crate::containerization_oci::Descriptor as RustDescriptor;
-use crate::containerization_oci::Hook as RustHook;
-use crate::containerization_oci::Hooks as RustHooks;
-use crate::containerization_oci::ImageConfig as RustImageConfig;
-use crate::containerization_oci::Linux as RustLinux;
-use crate::containerization_oci::LinuxBlockIO as RustLinuxBlockIO;
-use crate::containerization_oci::LinuxCPU as RustLinuxCPU;
-use crate::containerization_oci::LinuxCapabilities as RustOciLinuxCapabilities;
-use crate::containerization_oci::LinuxDevice as RustLinuxDevice;
-use crate::containerization_oci::LinuxDeviceCgroup as RustLinuxDeviceCgroup;
-use crate::containerization_oci::LinuxIDMapping as RustLinuxIDMapping;
-use crate::containerization_oci::LinuxMemory as RustLinuxMemory;
-use crate::containerization_oci::LinuxResources as RustLinuxResources;
-use crate::containerization_oci::LinuxSeccomp as RustLinuxSeccomp;
-use crate::containerization_oci::LinuxSyscall as RustLinuxSyscall;
-use crate::containerization_oci::Mount as RustOciMount;
-use crate::containerization_oci::Platform as RustPlatform;
-use crate::containerization_oci::Process as RustProcess;
-use crate::containerization_oci::Spec as RustSpec;
-use crate::containerization_oci::User as RustUser;
+use crate::containerization_extras::address::IPv6Address as RustIPv6Address;
+use crate::containerization_extras::address::IpAddress as RustIpAddress;
+use crate::containerization_oci::image::Descriptor as RustDescriptor;
+use crate::containerization_oci::image::ImageConfig as RustImageConfig;
+use crate::containerization_oci::image::Platform as RustPlatform;
+use crate::containerization_oci::runtime::Hook as RustHook;
+use crate::containerization_oci::runtime::LinuxCapabilities as RustOciLinuxCapabilities;
+use crate::containerization_oci::runtime::LinuxSeccomp as RustLinuxSeccomp;
+use crate::containerization_oci::runtime::Process as RustProcess;
+use crate::containerization_oci::runtime::Spec as RustSpec;
 use crate::platform::ConfigureContainer as RustConfigure;
 use crate::platform::ConfigurePod as RustConfigurePod;
 use crate::platform::ConfigurePodContainer as RustConfigurePodContainer;
@@ -245,299 +251,83 @@ pub(crate) mod ffi {
   }
 
   extern "Rust" {
-    // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
-    // with the configuration it seeded.
-    type RustConfigure;
-    fn call(self: &RustConfigure, configuration: &mut RustLinuxContainerConfiguration);
-
-    // A `(inout LinuxProcessConfiguration) -> Void`: Swift calls it once,
-    // with the configuration it filled.
-    type RustConfigureProcess;
-    fn call(self: &RustConfigureProcess, process: &mut RustLinuxProcessConfiguration);
-
-    // A `(inout LinuxPod.Configuration) -> Void`, which takes what Swift
-    // filled, and a `(inout LinuxPod.ContainerConfiguration) -> Void`, which
-    // Swift calls once on Rust's default, which is Swift's.
-    type RustConfigurePod;
-    fn call(self: &RustConfigurePod, configuration: &mut RustPodConfiguration);
-    type RustConfigurePodContainer;
-    fn call(self: &RustConfigurePodContainer, configuration: &mut RustPodContainerConfiguration);
-
-    // A `ProgressHandler?`. Swift asks `is_some` before calling it.
-    type RustProgressHandler;
-    #[swift_bridge(swift_name = "isSome")]
-    fn is_some(self: &RustProgressHandler) -> bool;
-    fn call(self: &RustProgressHandler, kinds: Vec<ProgressKind>, values: Vec<i64>);
-
-    // Its `UInt128` value crosses as two halves.
+    // Declared by the sibling module of each concern; the Swift functions
+    // below take them, or the configurations here hold them.
+    #[swift_bridge(already_declared)]
     type RustIPv6Address;
-    #[swift_bridge(swift_name = "valueHigh")]
-    fn value_high(self: &RustIPv6Address) -> u64;
-    #[swift_bridge(swift_name = "valueLow")]
-    fn value_low(self: &RustIPv6Address) -> u64;
-    fn zone(self: &RustIPv6Address) -> Option<&str>;
-
+    #[swift_bridge(already_declared)]
     type RustIpAddress;
-    #[swift_bridge(swift_name = "holdsV6")]
-    fn holds_v6(self: &RustIpAddress) -> bool;
-    #[swift_bridge(swift_name = "v4Value")]
-    fn v4_value(self: &RustIpAddress) -> u32;
-    fn v6(self: &RustIpAddress) -> &RustIPv6Address;
-
+    #[swift_bridge(already_declared)]
     type RustPlatform;
-    fn architecture(self: &RustPlatform) -> &str;
-    fn os(self: &RustPlatform) -> &str;
-    #[swift_bridge(swift_name = "osVersion")]
-    fn os_version(self: &RustPlatform) -> Option<&str>;
-    #[swift_bridge(swift_name = "hasOsFeatures")]
-    fn has_os_features(self: &RustPlatform) -> bool;
-    #[swift_bridge(swift_name = "osFeaturesLen")]
-    fn os_features_len(self: &RustPlatform) -> usize;
-    #[swift_bridge(swift_name = "osFeaturesAt")]
-    fn os_features_at(self: &RustPlatform, index: usize) -> &str;
-    fn variant(self: &RustPlatform) -> Option<&str>;
-
+    #[swift_bridge(already_declared)]
     type RustDescriptor;
-    #[swift_bridge(swift_name = "mediaType")]
-    fn media_type(self: &RustDescriptor) -> &str;
-    fn digest(self: &RustDescriptor) -> &str;
-    fn size(self: &RustDescriptor) -> i64;
-    #[swift_bridge(swift_name = "hasUrls")]
-    fn has_urls(self: &RustDescriptor) -> bool;
-    #[swift_bridge(swift_name = "urlsLen")]
-    fn urls_len(self: &RustDescriptor) -> usize;
-    #[swift_bridge(swift_name = "urlsAt")]
-    fn urls_at(self: &RustDescriptor, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasAnnotations")]
-    fn has_annotations(self: &RustDescriptor) -> bool;
-    #[swift_bridge(swift_name = "annotationsLen")]
-    fn annotations_len(self: &RustDescriptor) -> usize;
-    #[swift_bridge(swift_name = "annotationKeyAt")]
-    fn annotation_key_at(self: &RustDescriptor, index: usize) -> &str;
-    #[swift_bridge(swift_name = "annotationValueAt")]
-    fn annotation_value_at(self: &RustDescriptor, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasPlatform")]
-    fn has_platform(self: &RustDescriptor) -> bool;
-    fn platform(self: &RustDescriptor) -> &RustPlatform;
-    #[swift_bridge(swift_name = "artifactType")]
-    fn artifact_type(self: &RustDescriptor) -> Option<&str>;
-
+    #[swift_bridge(already_declared)]
     type RustImageDescription;
-    fn reference(self: &RustImageDescription) -> &str;
-    fn descriptor(self: &RustImageDescription) -> &RustDescriptor;
-
+    #[swift_bridge(already_declared)]
+    type RustImageConfig;
+    #[swift_bridge(already_declared)]
     type RustExt4Unpacker;
-    #[swift_bridge(swift_name = "capacityInBytes")]
-    fn capacity_in_bytes(self: &RustExt4Unpacker) -> u64;
-    #[swift_bridge(swift_name = "hasJournal")]
-    fn has_journal(self: &RustExt4Unpacker) -> bool;
-    #[swift_bridge(swift_name = "journalSize")]
-    fn journal_size(self: &RustExt4Unpacker) -> Option<u64>;
-    #[swift_bridge(swift_name = "hasJournalMode")]
-    fn has_journal_mode(self: &RustExt4Unpacker) -> bool;
-    #[swift_bridge(swift_name = "journalMode")]
-    fn journal_mode(self: &RustExt4Unpacker) -> JournalModeKind;
-
+    #[swift_bridge(already_declared)]
     type RustFormatterOptions;
-    #[swift_bridge(swift_name = "blockSize")]
-    fn block_size(self: &RustFormatterOptions) -> u32;
-    #[swift_bridge(swift_name = "minDiskSize")]
-    fn min_disk_size(self: &RustFormatterOptions) -> u64;
-    #[swift_bridge(swift_name = "hasJournal")]
-    fn has_journal(self: &RustFormatterOptions) -> bool;
-    #[swift_bridge(swift_name = "journalSize")]
-    fn journal_size(self: &RustFormatterOptions) -> Option<u64>;
-    #[swift_bridge(swift_name = "hasJournalMode")]
-    fn has_journal_mode(self: &RustFormatterOptions) -> bool;
-    #[swift_bridge(swift_name = "journalMode")]
-    fn journal_mode(self: &RustFormatterOptions) -> JournalModeKind;
-
-    // Its enums are their `rawValue`s. An option's level and format are
-    // read only for the kinds that have them.
+    #[swift_bridge(already_declared)]
     type RustArchiveWriterConfiguration;
-    fn format(self: &RustArchiveWriterConfiguration) -> &str;
-    fn filter(self: &RustArchiveWriterConfiguration) -> &str;
-    #[swift_bridge(swift_name = "optionsLen")]
-    fn options_len(self: &RustArchiveWriterConfiguration) -> usize;
-    #[swift_bridge(swift_name = "optionKindAt")]
-    fn option_kind_at(self: &RustArchiveWriterConfiguration, index: usize) -> ArchiveOptionKind;
-    #[swift_bridge(swift_name = "optionCompressionLevelAt")]
-    fn option_compression_level_at(self: &RustArchiveWriterConfiguration, index: usize) -> u32;
-    #[swift_bridge(swift_name = "optionXattrFormatAt")]
-    fn option_xattr_format_at(self: &RustArchiveWriterConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "localesLen")]
-    fn locales_len(self: &RustArchiveWriterConfiguration) -> usize;
-    #[swift_bridge(swift_name = "localesAt")]
-    fn locales_at(self: &RustArchiveWriterConfiguration, index: usize) -> &str;
-
-    type RustRootfsCreateOptions;
-    #[swift_bridge(swift_name = "hasWritableLayer")]
-    fn has_writable_layer(self: &RustRootfsCreateOptions) -> bool;
-    #[swift_bridge(swift_name = "writableLayer")]
-    fn writable_layer(self: &RustRootfsCreateOptions) -> &RustMount;
-    fn networking(self: &RustRootfsCreateOptions) -> bool;
-    #[swift_bridge(swift_name = "vmCpus")]
-    fn vm_cpus(self: &RustRootfsCreateOptions) -> u32;
-    #[swift_bridge(swift_name = "vmMemoryInBytes")]
-    fn vm_memory_in_bytes(self: &RustRootfsCreateOptions) -> u64;
-
-    type RustMount;
-    #[swift_bridge(swift_name = "mountType")]
-    fn mount_type(self: &RustMount) -> &str;
-    fn source(self: &RustMount) -> &str;
-    fn destination(self: &RustMount) -> &str;
-    #[swift_bridge(swift_name = "optionsLen")]
-    fn options_len(self: &RustMount) -> usize;
-    #[swift_bridge(swift_name = "optionsAt")]
-    fn options_at(self: &RustMount, index: usize) -> &str;
-    #[swift_bridge(swift_name = "runtimeKind")]
-    fn runtime_kind(self: &RustMount) -> RuntimeKind;
-    #[swift_bridge(swift_name = "runtimeOptionsLen")]
-    fn runtime_options_len(self: &RustMount) -> usize;
-    #[swift_bridge(swift_name = "runtimeOptionsAt")]
-    fn runtime_options_at(self: &RustMount, index: usize) -> &str;
-
-    type RustUnixSocketConfiguration;
-    fn source(self: &RustUnixSocketConfiguration) -> String;
-    fn destination(self: &RustUnixSocketConfiguration) -> String;
-    fn permissions(self: &RustUnixSocketConfiguration) -> Option<u32>;
-    fn direction(self: &RustUnixSocketConfiguration) -> SocketDirection;
-
+    #[swift_bridge(already_declared)]
     type RustNatInterface;
-    #[swift_bridge(swift_name = "ipv4AddressValue")]
-    fn ipv4_address_value(self: &RustNatInterface) -> u32;
-    #[swift_bridge(swift_name = "ipv4Prefix")]
-    fn ipv4_prefix(self: &RustNatInterface) -> u8;
-    #[swift_bridge(swift_name = "ipv4Gateway")]
-    fn ipv4_gateway(self: &RustNatInterface) -> Option<u32>;
-    #[swift_bridge(swift_name = "hasIpv6Address")]
-    fn has_ipv6_address(self: &RustNatInterface) -> bool;
-    #[swift_bridge(swift_name = "ipv6Address")]
-    fn ipv6_address(self: &RustNatInterface) -> &RustIPv6Address;
-    #[swift_bridge(swift_name = "ipv6Prefix")]
-    fn ipv6_prefix(self: &RustNatInterface) -> u8;
-    #[swift_bridge(swift_name = "hasIpv6Gateway")]
-    fn has_ipv6_gateway(self: &RustNatInterface) -> bool;
-    #[swift_bridge(swift_name = "ipv6Gateway")]
-    fn ipv6_gateway(self: &RustNatInterface) -> &RustIPv6Address;
-    #[swift_bridge(swift_name = "macAddress")]
-    fn mac_address(self: &RustNatInterface) -> Option<u64>;
-    fn mtu(self: &RustNatInterface) -> u32;
-
+    #[swift_bridge(already_declared)]
     type RustDns;
-    #[swift_bridge(swift_name = "nameserversLen")]
-    fn nameservers_len(self: &RustDns) -> usize;
-    #[swift_bridge(swift_name = "nameserversAt")]
-    fn nameservers_at(self: &RustDns, index: usize) -> &str;
-    fn domain(self: &RustDns) -> Option<&str>;
-    #[swift_bridge(swift_name = "searchDomainsLen")]
-    fn search_domains_len(self: &RustDns) -> usize;
-    #[swift_bridge(swift_name = "searchDomainsAt")]
-    fn search_domains_at(self: &RustDns, index: usize) -> &str;
-    #[swift_bridge(swift_name = "optionsLen")]
-    fn options_len(self: &RustDns) -> usize;
-    #[swift_bridge(swift_name = "optionsAt")]
-    fn options_at(self: &RustDns, index: usize) -> &str;
-
+    #[swift_bridge(already_declared)]
     type RustHostsEntry;
-    #[swift_bridge(swift_name = "ipAddress")]
-    fn ip_address(self: &RustHostsEntry) -> &str;
-    #[swift_bridge(swift_name = "hostnamesLen")]
-    fn hostnames_len(self: &RustHostsEntry) -> usize;
-    #[swift_bridge(swift_name = "hostnamesAt")]
-    fn hostnames_at(self: &RustHostsEntry, index: usize) -> &str;
-    fn comment(self: &RustHostsEntry) -> Option<&str>;
-
+    #[swift_bridge(already_declared)]
     type RustHosts;
-    #[swift_bridge(swift_name = "entriesLen")]
-    fn entries_len(self: &RustHosts) -> usize;
-    #[swift_bridge(swift_name = "entriesAt")]
-    fn entries_at(self: &RustHosts, index: usize) -> &RustHostsEntry;
-    fn comment(self: &RustHosts) -> Option<&str>;
-
-    type RustBootLog;
-    fn kind(self: &RustBootLog) -> BootLogKind;
-    fn path(self: &RustBootLog) -> String;
-    fn append(self: &RustBootLog) -> bool;
-    #[swift_bridge(swift_name = "fileHandle")]
-    fn file_handle(self: &RustBootLog) -> i32;
-
-    type RustUser;
-    fn uid(self: &RustUser) -> u32;
-    fn gid(self: &RustUser) -> u32;
-    fn umask(self: &RustUser) -> Option<u32>;
-    #[swift_bridge(swift_name = "additionalGidsLen")]
-    fn additional_gids_len(self: &RustUser) -> usize;
-    #[swift_bridge(swift_name = "additionalGidsAt")]
-    fn additional_gids_at(self: &RustUser, index: usize) -> u32;
-    fn username(self: &RustUser) -> &str;
-
+    #[swift_bridge(already_declared)]
+    type RustRootfsCreateOptions;
+    #[swift_bridge(already_declared)]
+    type RustMount;
+    #[swift_bridge(already_declared)]
+    type RustUnixSocketConfiguration;
+    #[swift_bridge(already_declared)]
     type RustLinuxCapabilities;
-    #[swift_bridge(swift_name = "setLen")]
-    fn set_len(self: &RustLinuxCapabilities, set: CapabilitySet) -> usize;
-    #[swift_bridge(swift_name = "setAt")]
-    fn set_at(self: &RustLinuxCapabilities, set: CapabilitySet, index: usize) -> &str;
-
+    #[swift_bridge(already_declared)]
     type RustLinuxProcessConfiguration;
-    #[swift_bridge(swift_name = "setArguments")]
-    fn set_arguments(self: &mut RustLinuxProcessConfiguration, arguments: Vec<String>);
-    #[swift_bridge(swift_name = "setEnvironmentVariables")]
-    fn set_environment_variables(self: &mut RustLinuxProcessConfiguration, environment_variables: Vec<String>);
-    #[swift_bridge(swift_name = "setWorkingDirectory")]
-    fn set_working_directory(self: &mut RustLinuxProcessConfiguration, working_directory: String);
-    #[swift_bridge(swift_name = "setUser")]
-    fn set_user(
-      self: &mut RustLinuxProcessConfiguration,
-      uid: u32,
-      gid: u32,
-      umask: Option<u32>,
-      additional_gids: Vec<u32>,
-      username: String,
-    );
-    #[swift_bridge(swift_name = "setNoNewPrivileges")]
-    fn set_no_new_privileges(self: &mut RustLinuxProcessConfiguration, no_new_privileges: bool);
-    #[swift_bridge(swift_name = "setCapabilities")]
-    fn set_capabilities(
-      self: &mut RustLinuxProcessConfiguration,
-      bounding: Vec<String>,
-      effective: Vec<String>,
-      inheritable: Vec<String>,
-      permitted: Vec<String>,
-      ambient: Vec<String>,
-    );
-    #[swift_bridge(swift_name = "setTerminal")]
-    fn set_terminal(self: &mut RustLinuxProcessConfiguration, terminal: bool);
-    #[swift_bridge(swift_name = "clearRlimits")]
-    fn clear_rlimits(self: &mut RustLinuxProcessConfiguration);
-    #[swift_bridge(swift_name = "pushRlimit")]
-    fn push_rlimit(self: &mut RustLinuxProcessConfiguration, kind: RlimitKind, hard: u64, soft: u64);
-    #[swift_bridge(swift_name = "argumentsLen")]
-    fn arguments_len(self: &RustLinuxProcessConfiguration) -> usize;
-    #[swift_bridge(swift_name = "argumentsAt")]
-    fn arguments_at(self: &RustLinuxProcessConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "environmentVariablesLen")]
-    fn environment_variables_len(self: &RustLinuxProcessConfiguration) -> usize;
-    #[swift_bridge(swift_name = "environmentVariablesAt")]
-    fn environment_variables_at(self: &RustLinuxProcessConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "workingDirectory")]
-    fn working_directory(self: &RustLinuxProcessConfiguration) -> &str;
-    fn user(self: &RustLinuxProcessConfiguration) -> &RustUser;
-    #[swift_bridge(swift_name = "rlimitsLen")]
-    fn rlimits_len(self: &RustLinuxProcessConfiguration) -> usize;
-    #[swift_bridge(swift_name = "rlimitKindAt")]
-    fn rlimit_kind_at(self: &RustLinuxProcessConfiguration, index: usize) -> RlimitKind;
-    #[swift_bridge(swift_name = "rlimitHardAt")]
-    fn rlimit_hard_at(self: &RustLinuxProcessConfiguration, index: usize) -> u64;
-    #[swift_bridge(swift_name = "rlimitSoftAt")]
-    fn rlimit_soft_at(self: &RustLinuxProcessConfiguration, index: usize) -> u64;
-    #[swift_bridge(swift_name = "noNewPrivileges")]
-    fn no_new_privileges(self: &RustLinuxProcessConfiguration) -> bool;
-    fn capabilities(self: &RustLinuxProcessConfiguration) -> &RustLinuxCapabilities;
-    fn terminal(self: &RustLinuxProcessConfiguration) -> bool;
-    fn stdin(self: &RustLinuxProcessConfiguration) -> Option<i32>;
-    fn stdout(self: &RustLinuxProcessConfiguration) -> Option<i32>;
-    fn stderr(self: &RustLinuxProcessConfiguration) -> Option<i32>;
+    #[swift_bridge(already_declared)]
+    type RustCreateOptions;
+    #[swift_bridge(already_declared)]
+    type RustLinuxRLimit;
+    #[swift_bridge(already_declared)]
+    type RustBootLog;
+    #[swift_bridge(already_declared)]
+    type RustPodVolume;
+    #[swift_bridge(already_declared)]
+    type RustPodContainerConfiguration;
+    #[swift_bridge(already_declared)]
+    type RustAttachedFilesystem;
+    #[swift_bridge(already_declared)]
+    type RustSystemPlatform;
+    #[swift_bridge(already_declared)]
+    type RustKernel;
+    #[swift_bridge(already_declared)]
+    type RustSpec;
+    #[swift_bridge(already_declared)]
+    type RustProcess;
+    #[swift_bridge(already_declared)]
+    type RustOciLinuxCapabilities;
+    #[swift_bridge(already_declared)]
+    type RustHook;
+    #[swift_bridge(already_declared)]
+    type RustLinuxSeccomp;
+    #[swift_bridge(already_declared)]
+    type RustConfigure;
+    #[swift_bridge(already_declared)]
+    type RustConfigureProcess;
+    #[swift_bridge(already_declared)]
+    type RustConfigurePod;
+    #[swift_bridge(already_declared)]
+    type RustConfigurePodContainer;
+    #[swift_bridge(already_declared)]
+    type RustProgressHandler;
 
+    // The configurations that hold Swift objects stay with the Swift types:
+    // swift-bridge can't declare a Swift type in a second module.
     type RustLinuxContainerConfiguration;
     #[swift_bridge(swift_name = "processMut")]
     fn process_mut(self: &mut RustLinuxContainerConfiguration) -> &mut RustLinuxProcessConfiguration;
@@ -724,19 +514,6 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "nestedVirtualization")]
     fn nested_virtualization(self: &RustVmConfiguration) -> bool;
 
-    // `location` is an `nbd` source's URL or a `diskImage`'s path.
-    type RustPodVolume;
-    fn name(self: &RustPodVolume) -> &str;
-    fn format(self: &RustPodVolume) -> &str;
-    #[swift_bridge(swift_name = "sourceKind")]
-    fn source_kind(self: &RustPodVolume) -> PodVolumeKind;
-    fn location(self: &RustPodVolume) -> String;
-    fn timeout(self: &RustPodVolume) -> Option<f64>;
-    #[swift_bridge(swift_name = "readOnly")]
-    fn read_only(self: &RustPodVolume) -> bool;
-    #[swift_bridge(swift_name = "sizeBytes")]
-    fn size_bytes(self: &RustPodVolume) -> Option<u64>;
-
     // Filled as `RustLinuxContainerConfiguration` is, and read the same way.
     type RustPodConfiguration;
     #[swift_bridge(swift_name = "setVirtualization")]
@@ -844,475 +621,6 @@ pub(crate) mod ffi {
     fn seccomp_mode(self: &RustPodConfiguration) -> SeccompMode;
     #[swift_bridge(swift_name = "seccompProfile")]
     fn seccomp_profile(self: &RustPodConfiguration) -> &RustLinuxSeccomp;
-
-    // Read as `RustLinuxContainerConfiguration` is. Its seccomp profile is
-    // `nil` unless `has_seccomp_profile`.
-    type RustPodContainerConfiguration;
-    fn process(self: &RustPodContainerConfiguration) -> &RustLinuxProcessConfiguration;
-    fn cpus(self: &RustPodContainerConfiguration) -> u32;
-    #[swift_bridge(swift_name = "memoryInBytes")]
-    fn memory_in_bytes(self: &RustPodContainerConfiguration) -> u64;
-    fn hostname(self: &RustPodContainerConfiguration) -> Option<&str>;
-    #[swift_bridge(swift_name = "sysctlLen")]
-    fn sysctl_len(self: &RustPodContainerConfiguration) -> usize;
-    #[swift_bridge(swift_name = "sysctlKeyAt")]
-    fn sysctl_key_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "sysctlValueAt")]
-    fn sysctl_value_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "mountsLen")]
-    fn mounts_len(self: &RustPodContainerConfiguration) -> usize;
-    #[swift_bridge(swift_name = "mountsAt")]
-    fn mounts_at(self: &RustPodContainerConfiguration, index: usize) -> &RustMount;
-    #[swift_bridge(swift_name = "maskedPathsLen")]
-    fn masked_paths_len(self: &RustPodContainerConfiguration) -> usize;
-    #[swift_bridge(swift_name = "maskedPathsAt")]
-    fn masked_paths_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "readonlyPathsLen")]
-    fn readonly_paths_len(self: &RustPodContainerConfiguration) -> usize;
-    #[swift_bridge(swift_name = "readonlyPathsAt")]
-    fn readonly_paths_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
-    #[swift_bridge(swift_name = "socketsLen")]
-    fn sockets_len(self: &RustPodContainerConfiguration) -> usize;
-    #[swift_bridge(swift_name = "socketsAt")]
-    fn sockets_at(self: &RustPodContainerConfiguration, index: usize) -> &RustUnixSocketConfiguration;
-    #[swift_bridge(swift_name = "hasDns")]
-    fn has_dns(self: &RustPodContainerConfiguration) -> bool;
-    fn dns(self: &RustPodContainerConfiguration) -> &RustDns;
-    #[swift_bridge(swift_name = "hasHosts")]
-    fn has_hosts(self: &RustPodContainerConfiguration) -> bool;
-    fn hosts(self: &RustPodContainerConfiguration) -> &RustHosts;
-    #[swift_bridge(swift_name = "hasSeccompProfile")]
-    fn has_seccomp_profile(self: &RustPodContainerConfiguration) -> bool;
-    #[swift_bridge(swift_name = "seccompMode")]
-    fn seccomp_mode(self: &RustPodContainerConfiguration) -> SeccompMode;
-    #[swift_bridge(swift_name = "seccompProfile")]
-    fn seccomp_profile(self: &RustPodContainerConfiguration) -> &RustLinuxSeccomp;
-    #[swift_bridge(swift_name = "useInit")]
-    fn use_init(self: &RustPodContainerConfiguration) -> bool;
-
-    type RustAttachedFilesystem;
-    #[swift_bridge(swift_name = "filesystemType")]
-    fn filesystem_type(self: &RustAttachedFilesystem) -> &str;
-    fn source(self: &RustAttachedFilesystem) -> &str;
-    fn destination(self: &RustAttachedFilesystem) -> &str;
-    #[swift_bridge(swift_name = "optionsLen")]
-    fn options_len(self: &RustAttachedFilesystem) -> usize;
-    #[swift_bridge(swift_name = "optionsAt")]
-    fn options_at(self: &RustAttachedFilesystem, index: usize) -> &str;
-
-    type RustCreateOptions;
-    #[swift_bridge(swift_name = "rootfsSizeInBytes")]
-    fn rootfs_size_in_bytes(self: &RustCreateOptions) -> u64;
-    #[swift_bridge(swift_name = "writableLayerSizeInBytes")]
-    fn writable_layer_size_in_bytes(self: &RustCreateOptions) -> Option<u64>;
-    #[swift_bridge(swift_name = "readOnly")]
-    fn read_only(self: &RustCreateOptions) -> bool;
-    fn networking(self: &RustCreateOptions) -> bool;
-    #[swift_bridge(swift_name = "vmCpus")]
-    fn vm_cpus(self: &RustCreateOptions) -> u32;
-    #[swift_bridge(swift_name = "vmMemoryInBytes")]
-    fn vm_memory_in_bytes(self: &RustCreateOptions) -> u64;
-
-    type RustSystemPlatform;
-    fn os(self: &RustSystemPlatform) -> PlatformOs;
-    fn architecture(self: &RustSystemPlatform) -> PlatformArchitecture;
-
-    type RustKernel;
-    fn path(self: &RustKernel) -> String;
-    fn platform(self: &RustKernel) -> &RustSystemPlatform;
-    #[swift_bridge(swift_name = "kernelArgsLen")]
-    fn kernel_args_len(self: &RustKernel) -> usize;
-    #[swift_bridge(swift_name = "kernelArgsAt")]
-    fn kernel_args_at(self: &RustKernel, index: usize) -> &str;
-    #[swift_bridge(swift_name = "initArgsLen")]
-    fn init_args_len(self: &RustKernel) -> usize;
-    #[swift_bridge(swift_name = "initArgsAt")]
-    fn init_args_at(self: &RustKernel, index: usize) -> &str;
-
-    type RustLinuxRLimit;
-    fn kind(self: &RustLinuxRLimit) -> RlimitKind;
-    fn hard(self: &RustLinuxRLimit) -> u64;
-    fn soft(self: &RustLinuxRLimit) -> u64;
-
-    type RustImageConfig;
-    fn user(self: &RustImageConfig) -> Option<&str>;
-    #[swift_bridge(swift_name = "hasEnv")]
-    fn has_env(self: &RustImageConfig) -> bool;
-    #[swift_bridge(swift_name = "envLen")]
-    fn env_len(self: &RustImageConfig) -> usize;
-    #[swift_bridge(swift_name = "envAt")]
-    fn env_at(self: &RustImageConfig, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasEntrypoint")]
-    fn has_entrypoint(self: &RustImageConfig) -> bool;
-    #[swift_bridge(swift_name = "entrypointLen")]
-    fn entrypoint_len(self: &RustImageConfig) -> usize;
-    #[swift_bridge(swift_name = "entrypointAt")]
-    fn entrypoint_at(self: &RustImageConfig, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasCmd")]
-    fn has_cmd(self: &RustImageConfig) -> bool;
-    #[swift_bridge(swift_name = "cmdLen")]
-    fn cmd_len(self: &RustImageConfig) -> usize;
-    #[swift_bridge(swift_name = "cmdAt")]
-    fn cmd_at(self: &RustImageConfig, index: usize) -> &str;
-    #[swift_bridge(swift_name = "workingDir")]
-    fn working_dir(self: &RustImageConfig) -> Option<&str>;
-    #[swift_bridge(swift_name = "hasLabels")]
-    fn has_labels(self: &RustImageConfig) -> bool;
-    #[swift_bridge(swift_name = "labelsLen")]
-    fn labels_len(self: &RustImageConfig) -> usize;
-    #[swift_bridge(swift_name = "labelKeyAt")]
-    fn label_key_at(self: &RustImageConfig, index: usize) -> &str;
-    #[swift_bridge(swift_name = "labelValueAt")]
-    fn label_value_at(self: &RustImageConfig, index: usize) -> &str;
-    #[swift_bridge(swift_name = "stopSignal")]
-    fn stop_signal(self: &RustImageConfig) -> Option<&str>;
-
-    // The OCI runtime spec. An enum is its `rawValue`.
-    type RustSpec;
-    fn version(self: &RustSpec) -> &str;
-    #[swift_bridge(swift_name = "hasHooks")]
-    fn has_hooks(self: &RustSpec) -> bool;
-    fn hooks(self: &RustSpec) -> &RustHooks;
-    #[swift_bridge(swift_name = "hasProcess")]
-    fn has_process(self: &RustSpec) -> bool;
-    fn process(self: &RustSpec) -> &RustProcess;
-    fn hostname(self: &RustSpec) -> &str;
-    fn domainname(self: &RustSpec) -> &str;
-    #[swift_bridge(swift_name = "mountsLen")]
-    fn mounts_len(self: &RustSpec) -> usize;
-    #[swift_bridge(swift_name = "mountsAt")]
-    fn mounts_at(self: &RustSpec, index: usize) -> &RustOciMount;
-    #[swift_bridge(swift_name = "hasAnnotations")]
-    fn has_annotations(self: &RustSpec) -> bool;
-    #[swift_bridge(swift_name = "annotationsLen")]
-    fn annotations_len(self: &RustSpec) -> usize;
-    #[swift_bridge(swift_name = "annotationKeyAt")]
-    fn annotation_key_at(self: &RustSpec, index: usize) -> &str;
-    #[swift_bridge(swift_name = "annotationValueAt")]
-    fn annotation_value_at(self: &RustSpec, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasRoot")]
-    fn has_root(self: &RustSpec) -> bool;
-    #[swift_bridge(swift_name = "rootPath")]
-    fn root_path(self: &RustSpec) -> &str;
-    #[swift_bridge(swift_name = "rootReadonly")]
-    fn root_readonly(self: &RustSpec) -> bool;
-    #[swift_bridge(swift_name = "hasLinux")]
-    fn has_linux(self: &RustSpec) -> bool;
-    fn linux(self: &RustSpec) -> &RustLinux;
-
-    type RustProcess;
-    fn cwd(self: &RustProcess) -> &str;
-    #[swift_bridge(swift_name = "envLen")]
-    fn env_len(self: &RustProcess) -> usize;
-    #[swift_bridge(swift_name = "envAt")]
-    fn env_at(self: &RustProcess, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasConsoleSize")]
-    fn has_console_size(self: &RustProcess) -> bool;
-    #[swift_bridge(swift_name = "consoleHeight")]
-    fn console_height(self: &RustProcess) -> usize;
-    #[swift_bridge(swift_name = "consoleWidth")]
-    fn console_width(self: &RustProcess) -> usize;
-    #[swift_bridge(swift_name = "selinuxLabel")]
-    fn selinux_label(self: &RustProcess) -> &str;
-    #[swift_bridge(swift_name = "noNewPrivileges")]
-    fn no_new_privileges(self: &RustProcess) -> bool;
-    #[swift_bridge(swift_name = "commandLine")]
-    fn command_line(self: &RustProcess) -> &str;
-    #[swift_bridge(swift_name = "oomScoreAdj")]
-    fn oom_score_adj(self: &RustProcess) -> Option<isize>;
-    #[swift_bridge(swift_name = "hasCapabilities")]
-    fn has_capabilities(self: &RustProcess) -> bool;
-    fn capabilities(self: &RustProcess) -> &RustOciLinuxCapabilities;
-    #[swift_bridge(swift_name = "apparmorProfile")]
-    fn apparmor_profile(self: &RustProcess) -> &str;
-    fn user(self: &RustProcess) -> &RustUser;
-    #[swift_bridge(swift_name = "rlimitsLen")]
-    fn rlimits_len(self: &RustProcess) -> usize;
-    #[swift_bridge(swift_name = "rlimitTypeAt")]
-    fn rlimit_type_at(self: &RustProcess, index: usize) -> &str;
-    #[swift_bridge(swift_name = "rlimitHardAt")]
-    fn rlimit_hard_at(self: &RustProcess, index: usize) -> u64;
-    #[swift_bridge(swift_name = "rlimitSoftAt")]
-    fn rlimit_soft_at(self: &RustProcess, index: usize) -> u64;
-    #[swift_bridge(swift_name = "argsLen")]
-    fn args_len(self: &RustProcess) -> usize;
-    #[swift_bridge(swift_name = "argsAt")]
-    fn args_at(self: &RustProcess, index: usize) -> &str;
-    fn terminal(self: &RustProcess) -> bool;
-
-    type RustOciLinuxCapabilities;
-    #[swift_bridge(swift_name = "hasSet")]
-    fn has_set(self: &RustOciLinuxCapabilities, set: CapabilitySet) -> bool;
-    #[swift_bridge(swift_name = "setLen")]
-    fn set_len(self: &RustOciLinuxCapabilities, set: CapabilitySet) -> usize;
-    #[swift_bridge(swift_name = "setAt")]
-    fn set_at(self: &RustOciLinuxCapabilities, set: CapabilitySet, index: usize) -> &str;
-
-    type RustOciMount;
-    #[swift_bridge(swift_name = "mountType")]
-    fn mount_type(self: &RustOciMount) -> &str;
-    fn source(self: &RustOciMount) -> &str;
-    fn destination(self: &RustOciMount) -> &str;
-    #[swift_bridge(swift_name = "optionsLen")]
-    fn options_len(self: &RustOciMount) -> usize;
-    #[swift_bridge(swift_name = "optionsAt")]
-    fn options_at(self: &RustOciMount, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasUidMappings")]
-    fn has_uid_mappings(self: &RustOciMount) -> bool;
-    #[swift_bridge(swift_name = "uidMappingsLen")]
-    fn uid_mappings_len(self: &RustOciMount) -> usize;
-    #[swift_bridge(swift_name = "uidMappingsAt")]
-    fn uid_mappings_at(self: &RustOciMount, index: usize) -> &RustLinuxIDMapping;
-    #[swift_bridge(swift_name = "hasGidMappings")]
-    fn has_gid_mappings(self: &RustOciMount) -> bool;
-    #[swift_bridge(swift_name = "gidMappingsLen")]
-    fn gid_mappings_len(self: &RustOciMount) -> usize;
-    #[swift_bridge(swift_name = "gidMappingsAt")]
-    fn gid_mappings_at(self: &RustOciMount, index: usize) -> &RustLinuxIDMapping;
-
-    type RustLinuxIDMapping;
-    #[swift_bridge(swift_name = "containerID")]
-    fn container_id(self: &RustLinuxIDMapping) -> u32;
-    #[swift_bridge(swift_name = "hostID")]
-    fn host_id(self: &RustLinuxIDMapping) -> u32;
-    fn size(self: &RustLinuxIDMapping) -> u32;
-
-    type RustHook;
-    fn path(self: &RustHook) -> &str;
-    #[swift_bridge(swift_name = "argsLen")]
-    fn args_len(self: &RustHook) -> usize;
-    #[swift_bridge(swift_name = "argsAt")]
-    fn args_at(self: &RustHook, index: usize) -> &str;
-    #[swift_bridge(swift_name = "envLen")]
-    fn env_len(self: &RustHook) -> usize;
-    #[swift_bridge(swift_name = "envAt")]
-    fn env_at(self: &RustHook, index: usize) -> &str;
-    fn timeout(self: &RustHook) -> Option<isize>;
-
-    type RustHooks;
-    #[swift_bridge(swift_name = "hooksLen")]
-    fn hooks_len(self: &RustHooks, kind: HookKind) -> usize;
-    #[swift_bridge(swift_name = "hooksAt")]
-    fn hooks_at(self: &RustHooks, kind: HookKind, index: usize) -> &RustHook;
-
-    type RustLinux;
-    #[swift_bridge(swift_name = "uidMappingsLen")]
-    fn uid_mappings_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "uidMappingsAt")]
-    fn uid_mappings_at(self: &RustLinux, index: usize) -> &RustLinuxIDMapping;
-    #[swift_bridge(swift_name = "gidMappingsLen")]
-    fn gid_mappings_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "gidMappingsAt")]
-    fn gid_mappings_at(self: &RustLinux, index: usize) -> &RustLinuxIDMapping;
-    #[swift_bridge(swift_name = "hasSysctl")]
-    fn has_sysctl(self: &RustLinux) -> bool;
-    #[swift_bridge(swift_name = "sysctlLen")]
-    fn sysctl_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "sysctlKeyAt")]
-    fn sysctl_key_at(self: &RustLinux, index: usize) -> &str;
-    #[swift_bridge(swift_name = "sysctlValueAt")]
-    fn sysctl_value_at(self: &RustLinux, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hasResources")]
-    fn has_resources(self: &RustLinux) -> bool;
-    fn resources(self: &RustLinux) -> &RustLinuxResources;
-    #[swift_bridge(swift_name = "cgroupsPath")]
-    fn cgroups_path(self: &RustLinux) -> &str;
-    #[swift_bridge(swift_name = "namespacesLen")]
-    fn namespaces_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "namespaceTypeAt")]
-    fn namespace_type_at(self: &RustLinux, index: usize) -> &str;
-    #[swift_bridge(swift_name = "namespacePathAt")]
-    fn namespace_path_at(self: &RustLinux, index: usize) -> &str;
-    #[swift_bridge(swift_name = "devicesLen")]
-    fn devices_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "devicesAt")]
-    fn devices_at(self: &RustLinux, index: usize) -> &RustLinuxDevice;
-    #[swift_bridge(swift_name = "hasSeccomp")]
-    fn has_seccomp(self: &RustLinux) -> bool;
-    fn seccomp(self: &RustLinux) -> &RustLinuxSeccomp;
-    #[swift_bridge(swift_name = "rootfsPropagation")]
-    fn rootfs_propagation(self: &RustLinux) -> &str;
-    #[swift_bridge(swift_name = "maskedPathsLen")]
-    fn masked_paths_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "maskedPathsAt")]
-    fn masked_paths_at(self: &RustLinux, index: usize) -> &str;
-    #[swift_bridge(swift_name = "readonlyPathsLen")]
-    fn readonly_paths_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "readonlyPathsAt")]
-    fn readonly_paths_at(self: &RustLinux, index: usize) -> &str;
-    #[swift_bridge(swift_name = "mountLabel")]
-    fn mount_label(self: &RustLinux) -> &str;
-    #[swift_bridge(swift_name = "hasPersonality")]
-    fn has_personality(self: &RustLinux) -> bool;
-    #[swift_bridge(swift_name = "personalityDomain")]
-    fn personality_domain(self: &RustLinux) -> &str;
-    #[swift_bridge(swift_name = "personalityFlagsLen")]
-    fn personality_flags_len(self: &RustLinux) -> usize;
-    #[swift_bridge(swift_name = "personalityFlagsAt")]
-    fn personality_flags_at(self: &RustLinux, index: usize) -> &str;
-
-    type RustLinuxResources;
-    #[swift_bridge(swift_name = "devicesLen")]
-    fn devices_len(self: &RustLinuxResources) -> usize;
-    #[swift_bridge(swift_name = "devicesAt")]
-    fn devices_at(self: &RustLinuxResources, index: usize) -> &RustLinuxDeviceCgroup;
-    #[swift_bridge(swift_name = "hasMemory")]
-    fn has_memory(self: &RustLinuxResources) -> bool;
-    fn memory(self: &RustLinuxResources) -> &RustLinuxMemory;
-    #[swift_bridge(swift_name = "hasCpu")]
-    fn has_cpu(self: &RustLinuxResources) -> bool;
-    fn cpu(self: &RustLinuxResources) -> &RustLinuxCPU;
-    #[swift_bridge(swift_name = "pidsLimit")]
-    fn pids_limit(self: &RustLinuxResources) -> Option<i64>;
-    #[swift_bridge(swift_name = "hasBlockIO")]
-    fn has_block_io(self: &RustLinuxResources) -> bool;
-    #[swift_bridge(swift_name = "blockIO")]
-    fn block_io(self: &RustLinuxResources) -> &RustLinuxBlockIO;
-    #[swift_bridge(swift_name = "hugepageLimitsLen")]
-    fn hugepage_limits_len(self: &RustLinuxResources) -> usize;
-    #[swift_bridge(swift_name = "hugepageLimitPagesizeAt")]
-    fn hugepage_limit_pagesize_at(self: &RustLinuxResources, index: usize) -> &str;
-    #[swift_bridge(swift_name = "hugepageLimitLimitAt")]
-    fn hugepage_limit_limit_at(self: &RustLinuxResources, index: usize) -> u64;
-    #[swift_bridge(swift_name = "hasNetwork")]
-    fn has_network(self: &RustLinuxResources) -> bool;
-    #[swift_bridge(swift_name = "networkClassID")]
-    fn network_class_id(self: &RustLinuxResources) -> Option<u32>;
-    #[swift_bridge(swift_name = "networkPrioritiesLen")]
-    fn network_priorities_len(self: &RustLinuxResources) -> usize;
-    #[swift_bridge(swift_name = "networkPriorityNameAt")]
-    fn network_priority_name_at(self: &RustLinuxResources, index: usize) -> &str;
-    #[swift_bridge(swift_name = "networkPriorityAt")]
-    fn network_priority_at(self: &RustLinuxResources, index: usize) -> u32;
-    #[swift_bridge(swift_name = "hasRdma")]
-    fn has_rdma(self: &RustLinuxResources) -> bool;
-    #[swift_bridge(swift_name = "rdmaLen")]
-    fn rdma_len(self: &RustLinuxResources) -> usize;
-    #[swift_bridge(swift_name = "rdmaKeyAt")]
-    fn rdma_key_at(self: &RustLinuxResources, index: usize) -> &str;
-    #[swift_bridge(swift_name = "rdmaHcsHandlesAt")]
-    fn rdma_hcs_handles_at(self: &RustLinuxResources, index: usize) -> Option<u32>;
-    #[swift_bridge(swift_name = "rdmaHcaObjectsAt")]
-    fn rdma_hca_objects_at(self: &RustLinuxResources, index: usize) -> Option<u32>;
-    #[swift_bridge(swift_name = "hasUnified")]
-    fn has_unified(self: &RustLinuxResources) -> bool;
-    #[swift_bridge(swift_name = "unifiedLen")]
-    fn unified_len(self: &RustLinuxResources) -> usize;
-    #[swift_bridge(swift_name = "unifiedKeyAt")]
-    fn unified_key_at(self: &RustLinuxResources, index: usize) -> &str;
-    #[swift_bridge(swift_name = "unifiedValueAt")]
-    fn unified_value_at(self: &RustLinuxResources, index: usize) -> &str;
-
-    type RustLinuxMemory;
-    fn limit(self: &RustLinuxMemory) -> Option<i64>;
-    fn reservation(self: &RustLinuxMemory) -> Option<i64>;
-    fn swap(self: &RustLinuxMemory) -> Option<i64>;
-    fn kernel(self: &RustLinuxMemory) -> Option<i64>;
-    #[swift_bridge(swift_name = "kernelTCP")]
-    fn kernel_tcp(self: &RustLinuxMemory) -> Option<i64>;
-    fn swappiness(self: &RustLinuxMemory) -> Option<u64>;
-    #[swift_bridge(swift_name = "disableOOMKiller")]
-    fn disable_oom_killer(self: &RustLinuxMemory) -> Option<bool>;
-    #[swift_bridge(swift_name = "useHierarchy")]
-    fn use_hierarchy(self: &RustLinuxMemory) -> Option<bool>;
-    #[swift_bridge(swift_name = "checkBeforeUpdate")]
-    fn check_before_update(self: &RustLinuxMemory) -> Option<bool>;
-
-    type RustLinuxCPU;
-    fn shares(self: &RustLinuxCPU) -> Option<u64>;
-    fn quota(self: &RustLinuxCPU) -> Option<i64>;
-    fn burst(self: &RustLinuxCPU) -> Option<u64>;
-    fn period(self: &RustLinuxCPU) -> Option<u64>;
-    #[swift_bridge(swift_name = "realtimeRuntime")]
-    fn realtime_runtime(self: &RustLinuxCPU) -> Option<i64>;
-    #[swift_bridge(swift_name = "realtimePeriod")]
-    fn realtime_period(self: &RustLinuxCPU) -> Option<i64>;
-    fn cpus(self: &RustLinuxCPU) -> &str;
-    fn mems(self: &RustLinuxCPU) -> &str;
-    fn idle(self: &RustLinuxCPU) -> Option<i64>;
-
-    type RustLinuxBlockIO;
-    fn weight(self: &RustLinuxBlockIO) -> Option<u16>;
-    #[swift_bridge(swift_name = "leafWeight")]
-    fn leaf_weight(self: &RustLinuxBlockIO) -> Option<u16>;
-    #[swift_bridge(swift_name = "weightDeviceLen")]
-    fn weight_device_len(self: &RustLinuxBlockIO) -> usize;
-    #[swift_bridge(swift_name = "weightDeviceMajorAt")]
-    fn weight_device_major_at(self: &RustLinuxBlockIO, index: usize) -> i64;
-    #[swift_bridge(swift_name = "weightDeviceMinorAt")]
-    fn weight_device_minor_at(self: &RustLinuxBlockIO, index: usize) -> i64;
-    #[swift_bridge(swift_name = "weightDeviceWeightAt")]
-    fn weight_device_weight_at(self: &RustLinuxBlockIO, index: usize) -> Option<u16>;
-    #[swift_bridge(swift_name = "weightDeviceLeafWeightAt")]
-    fn weight_device_leaf_weight_at(self: &RustLinuxBlockIO, index: usize) -> Option<u16>;
-    #[swift_bridge(swift_name = "throttleLen")]
-    fn throttle_len(self: &RustLinuxBlockIO, kind: ThrottleKind) -> usize;
-    #[swift_bridge(swift_name = "throttleMajorAt")]
-    fn throttle_major_at(self: &RustLinuxBlockIO, kind: ThrottleKind, index: usize) -> i64;
-    #[swift_bridge(swift_name = "throttleMinorAt")]
-    fn throttle_minor_at(self: &RustLinuxBlockIO, kind: ThrottleKind, index: usize) -> i64;
-    #[swift_bridge(swift_name = "throttleRateAt")]
-    fn throttle_rate_at(self: &RustLinuxBlockIO, kind: ThrottleKind, index: usize) -> u64;
-
-    type RustLinuxDevice;
-    fn path(self: &RustLinuxDevice) -> &str;
-    #[swift_bridge(swift_name = "deviceType")]
-    fn device_type(self: &RustLinuxDevice) -> &str;
-    fn major(self: &RustLinuxDevice) -> i64;
-    fn minor(self: &RustLinuxDevice) -> i64;
-    #[swift_bridge(swift_name = "fileMode")]
-    fn file_mode(self: &RustLinuxDevice) -> Option<u32>;
-    fn uid(self: &RustLinuxDevice) -> Option<u32>;
-    fn gid(self: &RustLinuxDevice) -> Option<u32>;
-
-    type RustLinuxDeviceCgroup;
-    fn allow(self: &RustLinuxDeviceCgroup) -> bool;
-    #[swift_bridge(swift_name = "deviceType")]
-    fn device_type(self: &RustLinuxDeviceCgroup) -> &str;
-    fn major(self: &RustLinuxDeviceCgroup) -> Option<i64>;
-    fn minor(self: &RustLinuxDeviceCgroup) -> Option<i64>;
-    fn access(self: &RustLinuxDeviceCgroup) -> Option<&str>;
-
-    type RustLinuxSeccomp;
-    #[swift_bridge(swift_name = "defaultAction")]
-    fn default_action(self: &RustLinuxSeccomp) -> &str;
-    #[swift_bridge(swift_name = "defaultErrnoRet")]
-    fn default_errno_ret(self: &RustLinuxSeccomp) -> Option<usize>;
-    #[swift_bridge(swift_name = "architecturesLen")]
-    fn architectures_len(self: &RustLinuxSeccomp) -> usize;
-    #[swift_bridge(swift_name = "architecturesAt")]
-    fn architectures_at(self: &RustLinuxSeccomp, index: usize) -> &str;
-    #[swift_bridge(swift_name = "flagsLen")]
-    fn flags_len(self: &RustLinuxSeccomp) -> usize;
-    #[swift_bridge(swift_name = "flagsAt")]
-    fn flags_at(self: &RustLinuxSeccomp, index: usize) -> &str;
-    #[swift_bridge(swift_name = "listenerPath")]
-    fn listener_path(self: &RustLinuxSeccomp) -> &str;
-    #[swift_bridge(swift_name = "listenerMetadata")]
-    fn listener_metadata(self: &RustLinuxSeccomp) -> &str;
-    #[swift_bridge(swift_name = "syscallsLen")]
-    fn syscalls_len(self: &RustLinuxSeccomp) -> usize;
-    #[swift_bridge(swift_name = "syscallsAt")]
-    fn syscalls_at(self: &RustLinuxSeccomp, index: usize) -> &RustLinuxSyscall;
-
-    type RustLinuxSyscall;
-    #[swift_bridge(swift_name = "namesLen")]
-    fn names_len(self: &RustLinuxSyscall) -> usize;
-    #[swift_bridge(swift_name = "namesAt")]
-    fn names_at(self: &RustLinuxSyscall, index: usize) -> &str;
-    fn action(self: &RustLinuxSyscall) -> &str;
-    #[swift_bridge(swift_name = "errnoRet")]
-    fn errno_ret(self: &RustLinuxSyscall) -> Option<usize>;
-    #[swift_bridge(swift_name = "argsLen")]
-    fn args_len(self: &RustLinuxSyscall) -> usize;
-    #[swift_bridge(swift_name = "argIndexAt")]
-    fn arg_index_at(self: &RustLinuxSyscall, index: usize) -> usize;
-    #[swift_bridge(swift_name = "argValueAt")]
-    fn arg_value_at(self: &RustLinuxSyscall, index: usize) -> u64;
-    #[swift_bridge(swift_name = "argValueTwoAt")]
-    fn arg_value_two_at(self: &RustLinuxSyscall, index: usize) -> u64;
-    #[swift_bridge(swift_name = "argOpAt")]
-    fn arg_op_at(self: &RustLinuxSyscall, index: usize) -> &str;
   }
 
   extern "Swift" {

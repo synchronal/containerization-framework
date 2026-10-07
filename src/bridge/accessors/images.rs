@@ -5,10 +5,10 @@
 use super::entry_at;
 use crate::bridge::ffi;
 use crate::containerization;
-use crate::containerization::container_manager;
+use crate::containerization::container::container_manager;
 use crate::containerization::image;
-use crate::containerization::kernel;
-use crate::containerization::system_platform;
+use crate::containerization::vm::kernel;
+use crate::containerization::vm::system_platform;
 use crate::containerization_ext4::ext4::journal_config::JournalMode;
 use crate::containerization_extras::ProgressEvent;
 use crate::containerization_oci;
@@ -40,7 +40,7 @@ impl Progress {
   }
 }
 
-impl containerization_oci::Platform {
+impl containerization_oci::image::Platform {
   pub(crate) fn architecture(&self) -> &str {
     &self.architecture
   }
@@ -75,8 +75,8 @@ impl containerization_oci::Platform {
 
 impl ffi::CzOutcome {
   /// The `Platform` an outcome holds, read field by field.
-  pub(crate) fn platform(&self) -> containerization_oci::Platform {
-    containerization_oci::Platform {
+  pub(crate) fn platform(&self) -> containerization_oci::image::Platform {
+    containerization_oci::image::Platform {
       architecture: self.platform_architecture(),
       os: self.platform_os(),
       os_version: self.platform_os_version(),
@@ -103,8 +103,8 @@ impl ffi::CzOutcome {
   }
 
   /// The `Descriptor` an outcome holds, read field by field.
-  pub(crate) fn descriptor(&self) -> containerization_oci::Descriptor {
-    containerization_oci::Descriptor {
+  pub(crate) fn descriptor(&self) -> containerization_oci::image::Descriptor {
+    containerization_oci::image::Descriptor {
       media_type: self.descriptor_media_type(),
       digest: self.descriptor_digest(),
       size: self.descriptor_size(),
@@ -115,8 +115,8 @@ impl ffi::CzOutcome {
     }
   }
 
-  pub(crate) fn index(&self) -> containerization_oci::Index {
-    containerization_oci::Index {
+  pub(crate) fn index(&self) -> containerization_oci::image::Index {
+    containerization_oci::image::Index {
       schema_version: self.index_schema_version(),
       media_type: self.index_media_type(),
       manifests: self.index_manifests().list(Self::descriptor),
@@ -126,8 +126,8 @@ impl ffi::CzOutcome {
     }
   }
 
-  pub(crate) fn manifest(&self) -> containerization_oci::Manifest {
-    containerization_oci::Manifest {
+  pub(crate) fn manifest(&self) -> containerization_oci::image::Manifest {
+    containerization_oci::image::Manifest {
       schema_version: self.manifest_schema_version(),
       media_type: self.manifest_media_type(),
       config: self.manifest_config().descriptor(),
@@ -138,8 +138,8 @@ impl ffi::CzOutcome {
     }
   }
 
-  fn image_config(&self) -> containerization_oci::ImageConfig {
-    containerization_oci::ImageConfig {
+  fn image_config(&self) -> containerization_oci::image::ImageConfig {
+    containerization_oci::image::ImageConfig {
       user: self.image_config_user(),
       env: self.image_config_env().optional(Self::strings),
       entrypoint: self.image_config_entrypoint().optional(Self::strings),
@@ -150,15 +150,15 @@ impl ffi::CzOutcome {
     }
   }
 
-  fn rootfs(&self) -> containerization_oci::Rootfs {
-    containerization_oci::Rootfs {
+  fn rootfs(&self) -> containerization_oci::image::Rootfs {
+    containerization_oci::image::Rootfs {
       r#type: self.rootfs_type(),
       diff_ids: self.rootfs_diff_ids(),
     }
   }
 
-  fn history(&self) -> containerization_oci::History {
-    containerization_oci::History {
+  fn history(&self) -> containerization_oci::image::History {
+    containerization_oci::image::History {
       created: self.history_created(),
       created_by: self.history_created_by(),
       author: self.history_author(),
@@ -168,8 +168,8 @@ impl ffi::CzOutcome {
   }
 
   /// The `ContainerizationOCI.Image` an outcome holds.
-  pub(crate) fn oci_image(&self) -> containerization_oci::Image {
-    containerization_oci::Image {
+  pub(crate) fn oci_image(&self) -> containerization_oci::image::Image {
+    containerization_oci::image::Image {
       created: self.oci_image_created(),
       author: self.oci_image_author(),
       architecture: self.oci_image_architecture(),
@@ -186,10 +186,10 @@ impl ffi::CzOutcome {
   }
 
   /// The `Kernel` an outcome holds.
-  pub(crate) fn kernel(&self) -> containerization::Kernel {
-    containerization::Kernel {
+  pub(crate) fn kernel(&self) -> containerization::vm::Kernel {
+    containerization::vm::Kernel {
       path: self.kernel_path().into(),
-      platform: containerization::SystemPlatform {
+      platform: containerization::vm::SystemPlatform {
         os: match self.kernel_platform_os() {
           ffi::PlatformOs::Linux => system_platform::Os::Linux,
           ffi::PlatformOs::Darwin => system_platform::Os::Darwin,
@@ -207,7 +207,7 @@ impl ffi::CzOutcome {
   }
 }
 
-impl containerization_oci::Descriptor {
+impl containerization_oci::image::Descriptor {
   pub(crate) fn media_type(&self) -> &str {
     &self.media_type
   }
@@ -265,7 +265,7 @@ impl containerization_oci::Descriptor {
     self.platform.is_some()
   }
 
-  pub(crate) fn platform(&self) -> &containerization_oci::Platform {
+  pub(crate) fn platform(&self) -> &containerization_oci::image::Platform {
     self
       .platform
       .as_ref()
@@ -282,12 +282,12 @@ impl image::Description {
     &self.reference
   }
 
-  pub(crate) fn descriptor(&self) -> &containerization_oci::Descriptor {
+  pub(crate) fn descriptor(&self) -> &containerization_oci::image::Descriptor {
     &self.descriptor
   }
 }
 
-impl containerization::Ext4Unpacker {
+impl image::Ext4Unpacker {
   pub(crate) fn capacity_in_bytes(&self) -> u64 {
     self.capacity_in_bytes
   }
@@ -325,7 +325,7 @@ impl container_manager::RootfsCreateOptions {
     self.writable_layer.is_some()
   }
 
-  pub(crate) fn writable_layer(&self) -> &containerization::Mount {
+  pub(crate) fn writable_layer(&self) -> &containerization::container::Mount {
     self
       .writable_layer
       .as_ref()
@@ -352,14 +352,14 @@ mod tests {
 
   #[test]
   fn copies_swifts_media_types() {
-    assert_eq!(ffi::cz_media_types(), containerization_oci::MediaTypes::ALL);
+    assert_eq!(ffi::cz_media_types(), containerization_oci::image::MediaTypes::ALL);
   }
 
   #[test]
   fn copies_swifts_digest_algorithm() {
     assert_eq!(
       ffi::cz_parsed_digest_algorithm(),
-      containerization_oci::ParsedDigest::ALGORITHM
+      containerization_oci::content::ParsedDigest::ALGORITHM
     );
   }
 
@@ -367,7 +367,7 @@ mod tests {
   fn copies_swifts_max_decoded_size() {
     assert_eq!(
       ffi::cz_local_content_max_decoded_size(),
-      containerization_oci::Content::MAX_DECODED_SIZE
+      containerization_oci::content::Content::MAX_DECODED_SIZE
     );
   }
 
@@ -375,12 +375,15 @@ mod tests {
   fn copies_swifts_kernel_media_type() {
     assert_eq!(
       ffi::cz_kernel_image_media_type(),
-      crate::containerization::KernelImage::MEDIA_TYPE
+      crate::containerization::image::KernelImage::MEDIA_TYPE
     );
   }
 
   #[test]
   fn copies_swifts_annotation_keys() {
-    assert_eq!(ffi::cz_annotation_keys(), containerization_oci::AnnotationKeys::ALL);
+    assert_eq!(
+      ffi::cz_annotation_keys(),
+      containerization_oci::image::AnnotationKeys::ALL
+    );
   }
 }

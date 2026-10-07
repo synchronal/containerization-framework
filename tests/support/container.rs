@@ -14,8 +14,8 @@ const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
 /// The VM dies with this process whatever happens here, so dropping one is
 /// about the store: its directory would otherwise be left behind per run.
 pub struct Container {
-  manager: cfw::containerization::ContainerManager,
-  container: cfw::containerization::LinuxContainer,
+  manager: cfw::containerization::container::ContainerManager,
+  container: cfw::containerization::container::LinuxContainer,
 }
 
 impl Container {
@@ -30,7 +30,7 @@ impl Container {
   /// suite's own changes.
   pub fn boot_with(
     name: &str,
-    configure: impl FnOnce(&mut cfw::containerization::linux_container::Configuration) + Send + 'static,
+    configure: impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static,
   ) -> Self {
     Self::try_boot_with(name, configure).unwrap_or_else(|error| panic!("{name} should boot: {error}"))
   }
@@ -39,7 +39,7 @@ impl Container {
   /// than panicking.
   pub fn try_boot_with(
     name: &str,
-    configure: impl FnOnce(&mut cfw::containerization::linux_container::Configuration) + Send + 'static,
+    configure: impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static,
   ) -> Result<Self, cfw::Error> {
     let image_store = store::image_store();
     let image = store::image(&image_store);
@@ -48,7 +48,7 @@ impl Container {
     // Left by a run that died before dropping its container.
     let _ = manager.delete(name);
 
-    let options = cfw::containerization::container_manager::CreateOptions {
+    let options = cfw::containerization::container::container_manager::CreateOptions {
       rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
       networking: false,
       vm: super::vm(),
@@ -61,12 +61,12 @@ impl Container {
 
   /// Creates and starts [`store::IMAGE`] on `network`, which gives the
   /// container its interface and resolver in place of the suite's.
-  pub fn boot_on(name: &str, network: cfw::containerization::VmnetNetwork) -> Self {
+  pub fn boot_on(name: &str, network: cfw::containerization::network::VmnetNetwork) -> Self {
     let image_store = store::image_store();
     let image = store::image(&image_store);
     let mut manager = store::manager_with(
       &image_store,
-      cfw::containerization::container_manager::ManagerOptions {
+      cfw::containerization::container::container_manager::ManagerOptions {
         network: Some(network),
         ..Default::default()
       },
@@ -75,7 +75,7 @@ impl Container {
     // Left by a run that died before dropping its container.
     let _ = manager.delete(name);
 
-    let options = cfw::containerization::container_manager::CreateOptions {
+    let options = cfw::containerization::container::container_manager::CreateOptions {
       rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
       vm: super::vm(),
       ..Default::default()
@@ -92,7 +92,7 @@ impl Container {
   ///
   /// Its boot log goes beside the rootfs: the manager seeds one in a container
   /// directory that only the image `create` makes.
-  pub fn boot_from_rootfs(name: &str, rootfs: cfw::containerization::Mount) -> Self {
+  pub fn boot_from_rootfs(name: &str, rootfs: cfw::containerization::container::Mount) -> Self {
     let boot_log = std::path::Path::new(&rootfs.source).with_extension("log");
     let image_store = store::image_store();
     let image = store::image(&image_store);
@@ -101,7 +101,7 @@ impl Container {
     // Left by a run that died before dropping its container.
     let _ = manager.delete(name);
 
-    let options = cfw::containerization::container_manager::RootfsCreateOptions {
+    let options = cfw::containerization::container::container_manager::RootfsCreateOptions {
       networking: false,
       vm: super::vm(),
       ..Default::default()
@@ -114,7 +114,7 @@ impl Container {
         rootfs,
         options,
         suite_configuration(name, move |configuration| {
-          configuration.boot_log = Some(cfw::containerization::BootLog::file(boot_log));
+          configuration.boot_log = Some(cfw::containerization::vm::BootLog::file(boot_log));
         }),
       )
       .and_then(|container| Self::start(manager, container))
@@ -122,8 +122,8 @@ impl Container {
   }
 
   fn start(
-    manager: cfw::containerization::ContainerManager,
-    container: cfw::containerization::LinuxContainer,
+    manager: cfw::containerization::container::ContainerManager,
+    container: cfw::containerization::container::LinuxContainer,
   ) -> Result<Self, cfw::Error> {
     let booted = Self { manager, container };
 
@@ -133,7 +133,7 @@ impl Container {
     Ok(booted)
   }
 
-  pub fn container(&self) -> &cfw::containerization::LinuxContainer {
+  pub fn container(&self) -> &cfw::containerization::container::LinuxContainer {
     &self.container
   }
 
@@ -143,7 +143,7 @@ impl Container {
   }
 
   /// Runs `configuration` to its end, returning its exit code.
-  pub fn run(&self, id: &str, configuration: cfw::containerization::LinuxProcessConfiguration) -> i32 {
+  pub fn run(&self, id: &str, configuration: cfw::containerization::process::LinuxProcessConfiguration) -> i32 {
     let arguments = configuration.arguments.clone();
     let name = self.container.id();
     let process = self
@@ -166,7 +166,10 @@ impl Container {
 
   /// Runs a command with nothing attached, reporting its exit code.
   pub fn exec(&self, id: &str, arguments: &[&str]) -> i32 {
-    self.run(id, cfw::containerization::LinuxProcessConfiguration::new(arguments))
+    self.run(
+      id,
+      cfw::containerization::process::LinuxProcessConfiguration::new(arguments),
+    )
   }
 
   /// The same, reporting what it wrote to stdout.
@@ -175,17 +178,24 @@ impl Container {
   /// duplicate of the descriptor, so nothing drains the pipe until the process
   /// exits, and what is run must write less than a pipe holds.
   pub fn capture(&self, id: &str, arguments: &[&str]) -> String {
-    self.capture_with(id, cfw::containerization::LinuxProcessConfiguration::new(arguments))
+    self.capture_with(
+      id,
+      cfw::containerization::process::LinuxProcessConfiguration::new(arguments),
+    )
   }
 
   /// The same, for a process configured beyond its arguments.
-  pub fn capture_with(&self, id: &str, configuration: cfw::containerization::LinuxProcessConfiguration) -> String {
+  pub fn capture_with(
+    &self,
+    id: &str,
+    configuration: cfw::containerization::process::LinuxProcessConfiguration,
+  ) -> String {
     let (mut read, write) = std::io::pipe().expect("a pipe should be creatable");
     let arguments = configuration.arguments.clone();
 
     let code = self.run(
       id,
-      cfw::containerization::LinuxProcessConfiguration {
+      cfw::containerization::process::LinuxProcessConfiguration {
         stdout: Some(write.as_raw_fd()),
         ..configuration
       },
@@ -206,13 +216,13 @@ impl Container {
 /// The suite's changes to a seeded configuration, then `configure`'s.
 fn suite_configuration(
   name: &str,
-  configure: impl FnOnce(&mut cfw::containerization::linux_container::Configuration) + Send + 'static,
-) -> impl FnOnce(&mut cfw::containerization::linux_container::Configuration) + Send + 'static {
+  configure: impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static,
+) -> impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static {
   let interface = network::interface(name);
 
   move |configuration| {
     keep_alive(configuration);
-    configuration.interfaces = vec![cfw::containerization::Interface::Nat(interface)];
+    configuration.interfaces = vec![cfw::containerization::network::Interface::Nat(interface)];
     configuration.dns = Some(network::gateway_dns());
 
     configure(configuration);
@@ -220,7 +230,7 @@ fn suite_configuration(
 }
 
 /// A process that holds the container open, in the suite's limits.
-fn keep_alive(configuration: &mut cfw::containerization::linux_container::Configuration) {
+fn keep_alive(configuration: &mut cfw::containerization::container::linux_container::Configuration) {
   configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
   configuration.cpus = super::TEST_CPUS;
   configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;

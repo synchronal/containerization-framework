@@ -7,15 +7,15 @@ mod support;
 use cfw::containerization_oci as oci;
 use containerization_framework as cfw;
 
-fn platform(string: &str) -> oci::Platform {
-  oci::Platform::parse(string).expect("a valid platform")
+fn platform(string: &str) -> oci::image::Platform {
+  oci::image::Platform::parse(string).expect("a valid platform")
 }
 
 #[test]
 fn parses_a_platform() {
   assert_eq!(
     platform("linux/arm64"),
-    oci::Platform {
+    oci::image::Platform {
       architecture: "arm64".to_string(),
       os: "linux".to_string(),
       os_version: None,
@@ -29,10 +29,10 @@ fn parses_a_platform() {
 
 #[test]
 fn rejects_a_malformed_platform() {
-  let error = oci::Platform::parse("plan9/amd64").expect_err("an unknown OS");
+  let error = oci::image::Platform::parse("plan9/amd64").expect_err("an unknown OS");
   assert!(error.is_code(cfw::containerization_error::Code::InvalidArgument));
-  assert!(oci::Platform::parse("linux").is_err());
-  assert!(oci::Platform::parse("linux/amd64/v3").is_err());
+  assert!(oci::image::Platform::parse("linux").is_err());
+  assert!(oci::image::Platform::parse("linux/amd64/v3").is_err());
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn describes_a_platform() {
 
 #[test]
 fn compares_platforms_as_swift_does() {
-  let arm64 = |variant: Option<&str>, os_version: Option<&str>| oci::Platform {
+  let arm64 = |variant: Option<&str>, os_version: Option<&str>| oci::image::Platform {
     architecture: "arm64".to_string(),
     os: "linux".to_string(),
     os_version: os_version.map(str::to_string),
@@ -106,7 +106,8 @@ fn reads_a_pulled_images_index_manifest_and_config() {
 
   let manifest = image.manifest(&platform).expect("the arm64 manifest");
   assert!(!manifest.layers.is_empty());
-  let content_store = oci::LocalContentStore::new(&support::store::content_store_path()).expect("the content store");
+  let content_store =
+    oci::content::LocalContentStore::new(&support::store::content_store_path()).expect("the content store");
   for layer in &manifest.layers {
     assert!(
       content_store
@@ -146,7 +147,7 @@ fn fails_for_a_platform_the_image_lacks() {
 
 #[test]
 fn parses_and_normalizes_a_reference() {
-  let mut reference = oci::Reference::parse("docker.io/alpine").expect("a valid reference");
+  let mut reference = oci::image::Reference::parse("docker.io/alpine").expect("a valid reference");
 
   assert_eq!(reference.domain().as_deref(), Some("docker.io"));
   assert_eq!(reference.resolved_domain().as_deref(), Some("registry-1.docker.io"));
@@ -173,9 +174,9 @@ fn parses_and_normalizes_a_reference() {
 
 #[test]
 fn makes_a_reference_from_its_parts() {
-  let reference = oci::Reference::new(
+  let reference = oci::image::Reference::new(
     "library/alpine",
-    oci::reference::NewOptions {
+    oci::image::reference::NewOptions {
       domain: Some("ghcr.io".to_string()),
       tag: Some("3".to_string()),
       ..Default::default()
@@ -185,19 +186,19 @@ fn makes_a_reference_from_its_parts() {
 
   assert_eq!(reference.description(), "ghcr.io/library/alpine:3");
   assert_eq!(
-    oci::Reference::resolve_domain("docker.io").expect("a domain"),
+    oci::image::Reference::resolve_domain("docker.io").expect("a domain"),
     "registry-1.docker.io"
   );
 }
 
 #[test]
 fn rejects_a_malformed_reference() {
-  let error = oci::Reference::parse("Alpine")
+  let error = oci::image::Reference::parse("Alpine")
     .err()
     .expect("an uppercase path");
   assert!(error.is_code(cfw::containerization_error::Code::InvalidArgument));
   assert!(
-    oci::Reference::parse("alpine")
+    oci::image::Reference::parse("alpine")
       .expect("a reference")
       .with_tag("")
       .is_err()
@@ -207,7 +208,7 @@ fn rejects_a_malformed_reference() {
 #[test]
 fn parses_a_digest() {
   let encoded = "0123456789abcdef".repeat(4);
-  let digest = oci::ParsedDigest::parse(&format!("sha256:{encoded}")).expect("a valid digest");
+  let digest = oci::content::ParsedDigest::parse(&format!("sha256:{encoded}")).expect("a valid digest");
 
   assert_eq!(digest.encoded(), encoded);
   assert_eq!(
@@ -215,13 +216,16 @@ fn parses_a_digest() {
     format!("sha256:{encoded}")
   );
   assert_eq!(
-    oci::ParsedDigest::parse_path_component(&encoded).expect("the hex digits alone"),
+    oci::content::ParsedDigest::parse_path_component(&encoded).expect("the hex digits alone"),
     digest
   );
-  assert!(oci::ParsedDigest::parse(&encoded).is_err(), "parse needs the prefix");
-  assert!(oci::ParsedDigest::is_valid(&encoded).expect("an answer"));
   assert!(
-    !oci::ParsedDigest::is_valid(&encoded.to_uppercase()).expect("an answer"),
+    oci::content::ParsedDigest::parse(&encoded).is_err(),
+    "parse needs the prefix"
+  );
+  assert!(oci::content::ParsedDigest::is_valid(&encoded).expect("an answer"));
+  assert!(
+    !oci::content::ParsedDigest::is_valid(&encoded.to_uppercase()).expect("an answer"),
     "uppercase hex is rejected"
   );
 }
@@ -233,20 +237,23 @@ fn finds_a_digests_path_in_a_directory() {
   // `/private` prefix, which `canonicalize` adds.
   let root = directory.path();
   let encoded = "f".repeat(64);
-  let digest = oci::ParsedDigest::parse_path_component(&encoded).expect("a valid digest");
+  let digest = oci::content::ParsedDigest::parse_path_component(&encoded).expect("a valid digest");
 
   assert_eq!(digest.path(&root).expect("a path"), root.join(&encoded));
 }
 
 #[test]
 fn makes_values_with_swifts_defaults() {
-  let config = oci::Descriptor::new(oci::MediaTypes::IMAGE_CONFIG, "sha256:00", 2);
+  let config = oci::image::Descriptor::new(oci::image::MediaTypes::IMAGE_CONFIG, "sha256:00", 2);
 
-  let index = oci::Index::new(vec![config.clone()]);
+  let index = oci::image::Index::new(vec![config.clone()]);
   assert_eq!(index.schema_version, 2);
-  assert_eq!(index.media_type, oci::MediaTypes::INDEX);
+  assert_eq!(index.media_type, oci::image::MediaTypes::INDEX);
 
-  let manifest = oci::Manifest::new(config, Vec::new());
+  let manifest = oci::image::Manifest::new(config, Vec::new());
   assert_eq!(manifest.schema_version, 2);
-  assert_eq!(manifest.media_type.as_deref(), Some(oci::MediaTypes::IMAGE_MANIFEST));
+  assert_eq!(
+    manifest.media_type.as_deref(),
+    Some(oci::image::MediaTypes::IMAGE_MANIFEST)
+  );
 }

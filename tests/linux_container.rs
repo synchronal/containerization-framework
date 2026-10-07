@@ -57,7 +57,7 @@ fn boots_from_copies_of_one_unpacked_rootfs() {
     let path = directory.path().join(name);
     std::fs::copy(&unpacked.source, &path).expect("the rootfs should copy");
 
-    cfw::containerization::Mount {
+    cfw::containerization::container::Mount {
       source: path.display().to_string(),
       ..unpacked.clone()
     }
@@ -127,7 +127,7 @@ fn execs_with_a_closure_on_swifts_defaults() {
 
   assert_eq!(
     seen.lock().unwrap().take(),
-    Some(cfw::containerization::LinuxProcessConfiguration::default()),
+    Some(cfw::containerization::process::LinuxProcessConfiguration::default()),
     "the closure should change a LinuxProcessConfiguration()"
   );
 }
@@ -138,7 +138,7 @@ fn reports_statistics_and_reaches_into_the_guest() {
   let container = booted.container();
 
   let statistics = container
-    .statistics(cfw::containerization::StatCategory::MEMORY)
+    .statistics(cfw::containerization::container::StatCategory::MEMORY)
     .expect("the container should report statistics");
 
   assert_eq!(statistics.id, container.id());
@@ -146,7 +146,7 @@ fn reports_statistics_and_reaches_into_the_guest() {
   assert_eq!(statistics.process, None, "only memory was asked for");
 
   let statistics = container
-    .statistics(cfw::containerization::StatCategory::ALL)
+    .statistics(cfw::containerization::container::StatCategory::ALL)
     .expect("the container should report every category");
 
   assert!(statistics.process.is_some());
@@ -172,7 +172,7 @@ fn copies_files_in_and_out() {
     .copy_in(
       &source,
       std::path::Path::new("/tmp/copied.txt"),
-      cfw::containerization::linux_container::CopyInOptions::default(),
+      cfw::containerization::container::linux_container::CopyInOptions::default(),
     )
     .expect("the file should copy in");
   assert_eq!(booted.sh("cat", "cat /tmp/copied.txt"), "copied across\n");
@@ -181,7 +181,7 @@ fn copies_files_in_and_out() {
     .copy_out(
       std::path::Path::new("/tmp/copied.txt"),
       &destination,
-      cfw::containerization::linux_container::CopyOutOptions::default(),
+      cfw::containerization::container::linux_container::CopyOutOptions::default(),
     )
     .expect("the file should copy out, creating its parent");
   assert_eq!(
@@ -190,9 +190,9 @@ fn copies_files_in_and_out() {
   );
 
   container
-    .filesystem_operation(cfw::containerization::FilesystemOperation::Freeze, "/")
+    .filesystem_operation(cfw::containerization::container::FilesystemOperation::Freeze, "/")
     .expect("the root filesystem should freeze");
   container
-    .filesystem_operation(cfw::containerization::FilesystemOperation::Thaw, "/")
+    .filesystem_operation(cfw::containerization::container::FilesystemOperation::Thaw, "/")
     .expect("the root filesystem should thaw");
 }

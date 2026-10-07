@@ -12,10 +12,14 @@ use containerization_framework as cfw;
 use support::container::Container;
 
 /// A shared network, or `None` with the reason printed when vmnet refuses.
-fn vmnet_network(test: &str) -> Option<cfw::containerization::VmnetNetwork> {
-  cfw::containerization::VmnetNetwork::new(cfw::containerization::vmnet_network::Mode::Shared, None, None)
-    .inspect_err(|error| eprintln!("skipping {test}: vmnet made no network: {error}"))
-    .ok()
+fn vmnet_network(test: &str) -> Option<cfw::containerization::network::VmnetNetwork> {
+  cfw::containerization::network::VmnetNetwork::new(
+    cfw::containerization::network::vmnet_network::Mode::Shared,
+    None,
+    None,
+  )
+  .inspect_err(|error| eprintln!("skipping {test}: vmnet made no network: {error}"))
+  .ok()
 }
 
 #[test]
@@ -84,7 +88,7 @@ fn routes_a_container_through_its_network() {
   let booted = Container::boot_on("cfw-test-manager-vmnet", network);
   let interfaces = booted.container().interfaces();
 
-  let [cfw::containerization::Interface::Vmnet(interface)] = interfaces.as_slice() else {
+  let [cfw::containerization::network::Interface::Vmnet(interface)] = interfaces.as_slice() else {
     panic!("the manager should give the container one vmnet interface, not {interfaces:?}");
   };
   assert_eq!(interface.ipv4_gateway(), Some(gateway));
@@ -116,7 +120,7 @@ fn reaches_its_store_and_creates_from_a_reference() {
 
   let events = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
   let counted = std::sync::Arc::clone(&events);
-  let options = cfw::containerization::container_manager::CreateOptions {
+  let options = cfw::containerization::container::container_manager::CreateOptions {
     rootfs_size_in_bytes: support::TEST_ROOTFS_SIZE_IN_BYTES,
     networking: false,
     progress: Some(Box::new(move |batch| {
@@ -145,7 +149,7 @@ fn opens_a_store_at_its_root() {
   let kernel = support::store::kernel();
   let _lock = support::store::initfs_lock();
 
-  let manager = cfw::containerization::ContainerManager::at_root_with_initfs_reference(
+  let manager = cfw::containerization::container::ContainerManager::at_root_with_initfs_reference(
     &kernel,
     support::store::INITFS_REFERENCE,
     Some(&support::store::root()),

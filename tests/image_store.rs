@@ -39,10 +39,11 @@ fn gets_lists_tags_and_deletes_images() {
 #[test]
 fn shares_a_content_store() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let content_store = cfw::containerization_oci::LocalContentStore::new(&support::store::content_store_path())
+  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
     .expect("the suite's content store should open");
-  let store = cfw::containerization::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
-    .expect("an image store sharing the suite's content store");
+  let store =
+    cfw::containerization::image::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
+      .expect("an image store sharing the suite's content store");
 
   assert_eq!(store.path(), directory.path().join("images"));
   assert!(
@@ -66,18 +67,19 @@ fn shares_a_content_store() {
 #[test]
 fn pulls_one_platform_and_reports_its_progress() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let content_store = cfw::containerization_oci::LocalContentStore::new(&support::store::content_store_path())
+  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
     .expect("the suite's content store should open");
-  let store = cfw::containerization::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
-    .expect("an image store sharing the suite's content store");
-  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+  let store =
+    cfw::containerization::image::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
+      .expect("an image store sharing the suite's content store");
+  let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
   let events = Arc::new(Mutex::new(Vec::new()));
   let recording = Arc::clone(&events);
 
   let image = store
     .pull(
       support::store::IMAGE,
-      cfw::containerization::image_store::PullOptions {
+      cfw::containerization::image::image_store::PullOptions {
         platform: Some(platform.clone()),
         progress: Some(Box::new(move |batch| {
           recording
@@ -114,14 +116,14 @@ fn pulls_one_platform_and_reports_its_progress() {
 fn saves_an_image_that_another_store_loads() {
   let store = support::store::image_store();
   let image = support::store::image(&store);
-  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+  let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
   let layout = tempfile::tempdir().expect("a temporary directory");
   let directory = tempfile::tempdir().expect("a temporary directory");
 
   store
     .save(&[support::store::IMAGE], layout.path(), Some(&platform))
     .expect("the image should save");
-  let loaded = cfw::containerization::ImageStore::new(directory.path())
+  let loaded = cfw::containerization::image::ImageStore::new(directory.path())
     .expect("a new image store should open")
     .load(layout.path(), None)
     .expect("the layout should load");
@@ -148,8 +150,10 @@ fn says_which_image_it_could_not_push() {
   let error = support::store::image_store()
     .push(
       reference,
-      cfw::containerization::image_store::PushOptions {
-        auth: Some(cfw::containerization_oci::Authentication::basic("user", "password").expect("an authentication")),
+      cfw::containerization::image::image_store::PushOptions {
+        auth: Some(
+          cfw::containerization_oci::client::Authentication::basic("user", "password").expect("an authentication"),
+        ),
         ..Default::default()
       },
     )
@@ -179,7 +183,7 @@ fn pushes_to_one_registry_at_a_time() {
 /// Opening it makes its directory, if it isn't there yet.
 #[test]
 fn opens_the_default_store() {
-  let store = cfw::containerization::ImageStore::default_store().expect("the default store");
+  let store = cfw::containerization::image::ImageStore::default_store().expect("the default store");
 
   assert!(
     store
@@ -198,8 +202,8 @@ const LAYER: &str = "application/vnd.oci.image.layer.v1.tar";
 /// Writes a one-layer linux/arm64 image's blobs into `directory` with a
 /// `ContentWriter`, returning its index's descriptor. Nothing unpacks the
 /// layer, so it needn't be a tar.
-fn write_image(directory: &Path) -> Result<cfw::containerization_oci::Descriptor, cfw::Error> {
-  let writer = cfw::containerization_oci::ContentWriter::new(directory)?;
+fn write_image(directory: &Path) -> Result<cfw::containerization_oci::image::Descriptor, cfw::Error> {
+  let writer = cfw::containerization_oci::content::ContentWriter::new(directory)?;
   let scratch = tempfile::tempdir().expect("a temporary directory");
   let blob = |name: &str, contents: &str| {
     let path = scratch.path().join(name);
@@ -225,16 +229,19 @@ fn write_image(directory: &Path) -> Result<cfw::containerization_oci::Descriptor
     ),
   )?;
 
-  Ok(cfw::containerization_oci::Descriptor::new(INDEX, index, index_size))
+  Ok(cfw::containerization_oci::image::Descriptor::new(
+    INDEX, index, index_size,
+  ))
 }
 
 #[test]
 fn creates_an_image_from_ingested_blobs() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let content_store = cfw::containerization_oci::LocalContentStore::new(&directory.path().join("content"))
+  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&directory.path().join("content"))
     .expect("a new content store should open");
-  let store = cfw::containerization::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
-    .expect("a new image store should open");
+  let store =
+    cfw::containerization::image::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
+      .expect("a new image store should open");
   let (written, writer_saw) = std::sync::mpsc::channel();
   let reference = "containerization-framework/test-created:latest";
 
@@ -279,7 +286,7 @@ fn loads_an_oci_layout_and_reports_its_progress() {
   .expect("index.json");
 
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let store = cfw::containerization::ImageStore::new(directory.path()).expect("a new image store should open");
+  let store = cfw::containerization::image::ImageStore::new(directory.path()).expect("a new image store should open");
   let events = Arc::new(Mutex::new(Vec::new()));
   let recording = Arc::clone(&events);
 
@@ -310,10 +317,10 @@ fn loads_an_oci_layout_and_reports_its_progress() {
 #[test]
 fn makes_an_image_from_its_description() {
   let image = support::store::image(&support::store::image_store());
-  let content_store = cfw::containerization_oci::LocalContentStore::new(&support::store::content_store_path())
+  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
     .expect("the suite's content store should open");
 
-  let made = cfw::containerization::Image::new(&image.description(), &content_store);
+  let made = cfw::containerization::image::Image::new(&image.description(), &content_store);
 
   assert_eq!(made.reference(), image.reference());
   assert_eq!(
@@ -326,12 +333,12 @@ fn makes_an_image_from_its_description() {
 fn new_stores(
   directory: &Path,
 ) -> (
-  cfw::containerization::ImageStore,
-  cfw::containerization_oci::LocalContentStore,
+  cfw::containerization::image::ImageStore,
+  cfw::containerization_oci::content::LocalContentStore,
 ) {
-  let content_store = cfw::containerization_oci::LocalContentStore::new(&directory.join("content"))
+  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&directory.join("content"))
     .expect("a new content store should open");
-  let store = cfw::containerization::ImageStore::with_content_store(&directory.join("images"), &content_store)
+  let store = cfw::containerization::image::ImageStore::with_content_store(&directory.join("images"), &content_store)
     .expect("a new image store should open");
 
   (store, content_store)
@@ -341,7 +348,7 @@ fn new_stores(
 fn creates_an_init_image_from_a_rootfs() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let (store, content_store) = new_stores(directory.path());
-  let platform = cfw::containerization_oci::Platform::parse("linux/arm64").expect("a platform");
+  let platform = cfw::containerization_oci::image::Platform::parse("linux/arm64").expect("a platform");
   let reference = "containerization-framework/test-init:latest";
   let labels = [("purpose".to_string(), "test".to_string())].into();
 
@@ -360,7 +367,7 @@ fn creates_an_init_image_from_a_rootfs() {
   assert!(tarred.success());
 
   let init_image =
-    cfw::containerization::InitImage::create(reference, &archive, &platform, &labels, &store, &content_store)
+    cfw::containerization::image::InitImage::create(reference, &archive, &platform, &labels, &store, &content_store)
       .expect("the init image should be created");
 
   assert_eq!(init_image.name(), reference);
@@ -371,7 +378,7 @@ fn creates_an_init_image_from_a_rootfs() {
     .expect("its config");
   assert_eq!(config.config.and_then(|config| config.labels), Some(labels));
   assert_eq!(
-    cfw::containerization::InitImage::new(&store.get(reference, false).expect("the new image")).name(),
+    cfw::containerization::image::InitImage::new(&store.get(reference, false).expect("the new image")).name(),
     reference
   );
 }
@@ -384,9 +391,9 @@ fn creates_a_kernel_image_and_finds_its_kernel() {
   let reference = "containerization-framework/test-kernel:latest";
   let binary = directory.path().join("vmlinux");
   std::fs::write(&binary, "a kernel").expect("a kernel file");
-  let kernel = cfw::containerization::Kernel::new(&binary, cfw::containerization::SystemPlatform::LINUX_ARM);
+  let kernel = cfw::containerization::vm::Kernel::new(&binary, cfw::containerization::vm::SystemPlatform::LINUX_ARM);
 
-  let kernel_image = cfw::containerization::KernelImage::create(
+  let kernel_image = cfw::containerization::image::KernelImage::create(
     reference,
     &[kernel.clone()],
     &Default::default(),
@@ -395,7 +402,7 @@ fn creates_a_kernel_image_and_finds_its_kernel() {
   )
   .expect("the kernel image should be created");
   let found = kernel_image
-    .kernel(cfw::containerization::SystemPlatform::LINUX_ARM)
+    .kernel(cfw::containerization::vm::SystemPlatform::LINUX_ARM)
     .expect("the kernel for linux/arm64");
 
   assert_eq!(kernel_image.name(), reference);
@@ -409,12 +416,12 @@ fn creates_a_kernel_image_and_finds_its_kernel() {
   );
   assert!(
     kernel_image
-      .kernel(cfw::containerization::SystemPlatform::LINUX_AMD)
+      .kernel(cfw::containerization::vm::SystemPlatform::LINUX_AMD)
       .is_err(),
     "there is no linux/amd64 kernel"
   );
   assert_eq!(
-    cfw::containerization::KernelImage::new(&store.get(reference, false).expect("the new image")).name(),
+    cfw::containerization::image::KernelImage::new(&store.get(reference, false).expect("the new image")).name(),
     reference
   );
 }
@@ -445,7 +452,7 @@ fn unpacks_an_init_image() {
     .get_init_image(support::store::INITFS_REFERENCE, None, None)
     .expect("the init image");
   let mount = init_image
-    .init_block(&at, cfw::containerization::SystemPlatform::LINUX_ARM)
+    .init_block(&at, cfw::containerization::vm::SystemPlatform::LINUX_ARM)
     .expect("the init image should unpack");
 
   assert!(at.is_file(), "{}", at.display());

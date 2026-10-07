@@ -30,10 +30,10 @@ pub fn root() -> PathBuf {
 }
 
 /// The suite's store, made if missing.
-pub fn image_store() -> cfw::containerization::ImageStore {
+pub fn image_store() -> cfw::containerization::image::ImageStore {
   std::fs::create_dir_all(root()).expect("the store directory should be creatable");
 
-  cfw::containerization::ImageStore::new(&root()).expect("the image store should open")
+  cfw::containerization::image::ImageStore::new(&root()).expect("the image store should open")
 }
 
 /// Where `ImageStore(path:)` keeps its `LocalContentStore`.
@@ -43,7 +43,7 @@ pub fn content_store_path() -> PathBuf {
 
 /// [`IMAGE`], pulled on a first run. The lock keeps concurrent first runs from
 /// pulling it at once.
-pub fn image(store: &cfw::containerization::ImageStore) -> cfw::containerization::Image {
+pub fn image(store: &cfw::containerization::image::ImageStore) -> cfw::containerization::image::Image {
   if let Ok(image) = store.get(IMAGE, false) {
     return image;
   }
@@ -56,52 +56,52 @@ pub fn image(store: &cfw::containerization::ImageStore) -> cfw::containerization
 }
 
 /// [`IMAGE`], unpacked by Rust into an ext4 file at `at`.
-pub fn unpack(at: &std::path::Path) -> cfw::containerization::Mount {
+pub fn unpack(at: &std::path::Path) -> cfw::containerization::container::Mount {
   let store = image_store();
-  let platform = cfw::containerization_oci::Platform::current().expect("the current platform");
+  let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
 
-  cfw::containerization::Ext4Unpacker::new(super::TEST_ROOTFS_SIZE_IN_BYTES, None)
+  cfw::containerization::image::Ext4Unpacker::new(super::TEST_ROOTFS_SIZE_IN_BYTES, None)
     .unpack(&image(&store), &platform, at, None)
     .unwrap_or_else(|error| panic!("{IMAGE} should unpack to {}: {error}", at.display()))
 }
 
 /// The kernel `bin/dev/prepare-integration` downloaded, which nextest runs
 /// before these tests.
-pub fn kernel() -> cfw::containerization::Kernel {
+pub fn kernel() -> cfw::containerization::vm::Kernel {
   let path = PathBuf::from(
     std::env::var("CFW_TEST_KERNEL")
       .expect("CFW_TEST_KERNEL names the kernel; run the suite with bin/dev/test-integration"),
   );
   assert!(path.is_file(), "the kernel at {} should be a file", path.display());
 
-  cfw::containerization::Kernel::new(path, cfw::containerization::SystemPlatform::LINUX_ARM)
+  cfw::containerization::vm::Kernel::new(path, cfw::containerization::vm::SystemPlatform::LINUX_ARM)
 }
 
 /// A manager booting [`kernel`] and [`INITFS_REFERENCE`]. The first one unpacks
 /// the init image into the store, so the lock keeps two from doing it at once.
-pub fn manager(store: &cfw::containerization::ImageStore) -> cfw::containerization::ContainerManager {
+pub fn manager(store: &cfw::containerization::image::ImageStore) -> cfw::containerization::container::ContainerManager {
   manager_with(store, Default::default())
 }
 
 /// The same, made with `options`.
 pub fn manager_with(
-  store: &cfw::containerization::ImageStore,
-  options: cfw::containerization::container_manager::ManagerOptions,
-) -> cfw::containerization::ContainerManager {
+  store: &cfw::containerization::image::ImageStore,
+  options: cfw::containerization::container::container_manager::ManagerOptions,
+) -> cfw::containerization::container::ContainerManager {
   let kernel = kernel();
   let _lock = initfs_lock();
 
-  cfw::containerization::ContainerManager::with_initfs_reference(&kernel, INITFS_REFERENCE, store, options)
+  cfw::containerization::container::ContainerManager::with_initfs_reference(&kernel, INITFS_REFERENCE, store, options)
     .unwrap_or_else(|error| panic!("a manager booting {INITFS_REFERENCE} should be made: {error}"))
 }
 
 /// A VM manager booting [`kernel`] and the init block a container manager
 /// unpacks into the store from [`INITFS_REFERENCE`].
-pub fn vmm() -> cfw::containerization::VzVirtualMachineManager {
+pub fn vmm() -> cfw::containerization::vm::VzVirtualMachineManager {
   // Unpacks the init block, if no manager has yet.
   drop(manager(&image_store()));
 
-  let initfs = cfw::containerization::Mount::block(
+  let initfs = cfw::containerization::container::Mount::block(
     "ext4",
     root().join("initfs.ext4").display().to_string(),
     "/",
@@ -109,7 +109,7 @@ pub fn vmm() -> cfw::containerization::VzVirtualMachineManager {
     &[],
   );
 
-  cfw::containerization::VzVirtualMachineManager::new(&kernel(), &initfs, Default::default())
+  cfw::containerization::vm::VzVirtualMachineManager::new(&kernel(), &initfs, Default::default())
     .unwrap_or_else(|error| panic!("a VM manager should be made: {error}"))
 }
 

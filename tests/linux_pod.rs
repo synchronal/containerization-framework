@@ -12,7 +12,7 @@ const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
 
 /// Runs a `/bin/sh` script in `container`, returning its exit code and what
 /// it wrote to stdout.
-fn sh(pod: &cfw::containerization::LinuxPod, container: &str, id: &str, script: &str) -> (i32, String) {
+fn sh(pod: &cfw::containerization::container::LinuxPod, container: &str, id: &str, script: &str) -> (i32, String) {
   let (mut read, write) = std::io::pipe().expect("a pipe should be creatable");
   let stdout = write.as_raw_fd();
   let script = script.to_string();
@@ -36,18 +36,19 @@ fn sh(pod: &cfw::containerization::LinuxPod, container: &str, id: &str, script: 
 fn shares_a_volume_between_its_containers() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let vmm = support::store::vmm();
-  let volume = cfw::containerization::linux_pod::PodVolume {
+  let volume = cfw::containerization::container::linux_pod::PodVolume {
     name: "shared".to_string(),
-    source: cfw::containerization::linux_pod::pod_volume::Source::Tmpfs { size_bytes: None },
+    source: cfw::containerization::container::linux_pod::pod_volume::Source::Tmpfs { size_bytes: None },
     format: "tmpfs".to_string(),
   };
   let configured = volume.clone();
 
-  let pod = cfw::containerization::LinuxPod::new("cfw-test-pod", &vmm, support::vm(), move |configuration| {
-    configuration.hostname = Some("pod".to_string());
-    configuration.volumes = vec![configured];
-  })
-  .expect("a pod should be made");
+  let pod =
+    cfw::containerization::container::LinuxPod::new("cfw-test-pod", &vmm, support::vm(), move |configuration| {
+      configuration.hostname = Some("pod".to_string());
+      configuration.volumes = vec![configured];
+    })
+    .expect("a pod should be made");
 
   assert_eq!(pod.id(), "cfw-test-pod");
   assert_eq!(pod.vm(), support::vm());
@@ -64,7 +65,11 @@ fn shares_a_volume_between_its_containers() {
         configuration.memory_in_bytes = support::TEST_MEMORY_IN_BYTES;
         configuration
           .mounts
-          .push(cfw::containerization::Mount::shared_mount("shared", "/shared", &[]));
+          .push(cfw::containerization::container::Mount::shared_mount(
+            "shared",
+            "/shared",
+            &[],
+          ));
       })
       .unwrap_or_else(|error| panic!("{name} should be added: {error}"));
   }
@@ -94,7 +99,10 @@ fn shares_a_volume_between_its_containers() {
   );
 
   let statistics = pod
-    .statistics(Some(&["writer"]), cfw::containerization::StatCategory::PROCESS)
+    .statistics(
+      Some(&["writer"]),
+      cfw::containerization::container::StatCategory::PROCESS,
+    )
     .expect("the pod should report statistics");
   let [writer] = statistics.as_slice() else {
     panic!("the pod should report the one container asked for, not {statistics:?}");
@@ -106,7 +114,7 @@ fn shares_a_volume_between_its_containers() {
     .with_virtual_machine_instance(|instance| {
       assert_eq!(
         instance.state(),
-        cfw::containerization::VirtualMachineInstanceState::Running
+        cfw::containerization::vm::VirtualMachineInstanceState::Running
       );
       Ok(())
     })

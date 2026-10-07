@@ -41,16 +41,16 @@ fn names_resolves_and_tunes_the_container() {
   let container = Container::boot_with("cfw-test-config-names", |configuration| {
     configuration.hostname = Some("configured-host".into());
     configuration.sysctl = [("net.core.somaxconn".to_string(), "4096".to_string())].into();
-    configuration.dns = Some(cfw::containerization::Dns {
+    configuration.dns = Some(cfw::containerization::network::Dns {
       nameservers: vec![support::network::GATEWAY.into(), "1.1.1.1".into()],
       domain: Some("example.test".into()),
       search_domains: vec!["a.test".into(), "b.test".into()],
       options: vec!["ndots:2".into()],
     });
-    configuration.hosts = Some(cfw::containerization::Hosts {
+    configuration.hosts = Some(cfw::containerization::network::Hosts {
       entries: vec![
-        cfw::containerization::hosts::Entry::new("127.0.0.1", &["localhost"]),
-        cfw::containerization::hosts::Entry::new(support::network::GATEWAY, &["host.internal", "host"]),
+        cfw::containerization::network::hosts::Entry::new("127.0.0.1", &["localhost"]),
+        cfw::containerization::network::hosts::Entry::new(support::network::GATEWAY, &["host.internal", "host"]),
       ],
       comment: Some("written by the suite".into()),
     });
@@ -83,12 +83,12 @@ fn names_resolves_and_tunes_the_container() {
 #[test]
 fn addresses_its_interface_as_configured() {
   let mac_address =
-    cfw::containerization_extras::MACAddress::parse("02:42:ac:11:00:02").expect("Swift parses a MAC address");
+    cfw::containerization_extras::address::MACAddress::parse("02:42:ac:11:00:02").expect("Swift parses a MAC address");
   let ipv6_address =
-    cfw::containerization_extras::CIDRv6::parse("fd00:cf::2/64").expect("Swift parses an IPv6 CIDR block");
+    cfw::containerization_extras::address::CIDRv6::parse("fd00:cf::2/64").expect("Swift parses an IPv6 CIDR block");
 
   let container = Container::boot_with("cfw-test-config-interface", move |configuration| {
-    let cfw::containerization::Interface::Nat(interface) = &mut configuration.interfaces[0] else {
+    let cfw::containerization::network::Interface::Nat(interface) = &mut configuration.interfaces[0] else {
       panic!("the suite gives each container a NAT interface");
     };
 
@@ -119,8 +119,13 @@ fn mounts_what_it_is_given() {
   let container = Container::boot_with("cfw-test-config-mounts", move |configuration| {
     let mounts = &mut configuration.mounts;
 
-    mounts.push(cfw::containerization::Mount::share(&source, "/shared", &["ro"], &[]));
-    mounts.push(cfw::containerization::Mount::any(
+    mounts.push(cfw::containerization::container::Mount::share(
+      &source,
+      "/shared",
+      &["ro"],
+      &[],
+    ));
+    mounts.push(cfw::containerization::container::Mount::any(
       "tmpfs",
       "tmpfs",
       "/scratch",
@@ -154,12 +159,12 @@ fn runs_a_process_as_configured() {
   let container = Container::boot("cfw-test-config-process");
 
   let mut configuration =
-    cfw::containerization::LinuxProcessConfiguration::new(&["/bin/sh", "-c", "pwd; id -un; echo $GREETING"]);
+    cfw::containerization::process::LinuxProcessConfiguration::new(&["/bin/sh", "-c", "pwd; id -un; echo $GREETING"]);
   configuration
     .environment_variables
     .push("GREETING=configured".into());
   configuration.working_directory = "/tmp".into();
-  configuration.user = cfw::containerization_oci::User {
+  configuration.user = cfw::containerization_oci::runtime::User {
     username: "nobody".into(),
     ..Default::default()
   };
@@ -191,7 +196,7 @@ fn hands_the_closure_what_the_manager_seeded() {
     seeded.process.environment_variables
   );
   assert!(
-    matches!(seeded.boot_log, Some(cfw::containerization::BootLog::File { .. })),
+    matches!(seeded.boot_log, Some(cfw::containerization::vm::BootLog::File { .. })),
     "the manager's boot log should be seeded: {:?}",
     seeded.boot_log
   );
@@ -274,7 +279,7 @@ fn writes_its_boot_log_where_told() {
   let configured = log.clone();
 
   let container = Container::boot_with("cfw-test-config-boot-log", move |configuration| {
-    configuration.boot_log = Some(cfw::containerization::BootLog::file(configured));
+    configuration.boot_log = Some(cfw::containerization::vm::BootLog::file(configured));
   });
 
   assert!(
@@ -312,7 +317,7 @@ fn boots_with_nested_virtualization_where_the_host_has_it() {
 #[test]
 fn refuses_seccomp_without_an_oci_runtime() {
   let refused = Container::try_boot_with("cfw-test-config-seccomp", |configuration| {
-    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Default;
+    configuration.seccomp_profile = cfw::containerization::container::linux_container::SeccompProfile::Default;
   });
 
   let error = refused
@@ -325,14 +330,14 @@ fn refuses_seccomp_without_an_oci_runtime() {
 /// starting `runc`.
 #[test]
 fn carries_a_seccomp_profile_of_its_own() {
-  let profile = cfw::containerization_oci::LinuxSeccomp::default_profile(
+  let profile = cfw::containerization_oci::runtime::LinuxSeccomp::default_profile(
     None,
-    cfw::containerization_oci::Arch::current_verified().expect("a seccomp architecture"),
+    cfw::containerization_oci::runtime::Arch::current_verified().expect("a seccomp architecture"),
   )
   .expect("the default profile");
   let refused = Container::try_boot_with("cfw-test-config-seccomp-profile", |configuration| {
     configuration.oci_runtime_path = Some("/sbin/runc".into());
-    configuration.seccomp_profile = cfw::containerization::linux_container::SeccompProfile::Profile(profile);
+    configuration.seccomp_profile = cfw::containerization::container::linux_container::SeccompProfile::Profile(profile);
   });
 
   let error = refused.err().expect("the stock init image has no runc");

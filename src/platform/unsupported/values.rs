@@ -1,0 +1,180 @@
+//! Plain values: primitives, platforms, addresses, the OCI runtime spec,
+//! bundles, progress and proxies.
+
+use super::CzOutcome;
+use super::ProgressKind;
+use crate::containerization_extras::address;
+use crate::containerization_extras::address::IPv6Address;
+use crate::containerization_extras::address::IpAddress;
+use crate::containerization_oci;
+use std::collections::BTreeMap;
+
+taken!(
+  optional_int32 -> Option<i32>,
+  integer -> i64,
+  boolean -> bool,
+  is_some -> bool,
+  ipv4_address -> address::IPv4Address,
+  ipv6_address -> address::IPv6Address,
+  ip_address -> address::IpAddress,
+  prefix -> address::Prefix,
+  cidr_v4 -> address::CIDRv4,
+  cidr_v6 -> address::CIDRv6,
+  cidr -> address::Cidr,
+  mac_address -> address::MACAddress,
+  optional_ipv4_address -> Option<address::IPv4Address>,
+  optional_ipv6_address -> Option<address::IPv6Address>,
+  optional_cidr_v6 -> Option<address::CIDRv6>,
+  optional_mac_address -> Option<address::MACAddress>,
+  uint128 -> u128,
+  platform -> containerization_oci::image::Platform,
+  spec -> containerization_oci::runtime::Spec,
+  process -> containerization_oci::runtime::Process,
+  oci_linux_capabilities -> containerization_oci::runtime::LinuxCapabilities,
+  posix_rlimit -> containerization_oci::runtime::POSIXRlimit,
+  seccomp -> containerization_oci::runtime::LinuxSeccomp,
+  runtime_spec_version -> containerization_oci::runtime::RuntimeSpecVersion,
+  optional_text -> Option<String>,
+  number -> u64,
+  text -> String,
+  strings -> Vec<String>,
+  has_bytes -> bool,
+  bytes -> Vec<u8>,
+  int32 -> i32,
+  int32_map -> BTreeMap<String, i32>,
+);
+
+pub(crate) fn cz_platform_current() -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_parse(_platform: &str) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_description(_platform: containerization_oci::image::Platform) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_equals(
+  _lhs: containerization_oci::image::Platform,
+  _rhs: containerization_oci::image::Platform,
+) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_platform_matches(
+  _lhs: containerization_oci::image::Platform,
+  _rhs: containerization_oci::image::Platform,
+) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_progress_event_event(_kind: ProgressKind, _value: i64) -> CzOutcome {
+  CzOutcome
+}
+
+pub(crate) fn cz_proxy_from_environment(
+  _scheme: Option<String>,
+  _host: &str,
+  _has_env: bool,
+  _env_keys: Vec<String>,
+  _env_values: Vec<String>,
+) -> CzOutcome {
+  CzOutcome
+}
+
+failing!(
+  cz_process_from_image_config(containerization_oci::image::ImageConfig),
+  cz_process_description(containerization_oci::runtime::Process),
+  cz_hook_description(containerization_oci::runtime::Hook),
+  cz_linux_seccomp_decode(Vec<u8>),
+  cz_linux_seccomp_default_profile(bool, containerization_oci::runtime::LinuxCapabilities, &str),
+  cz_arch_current(),
+  cz_arch_current_verified(),
+  cz_runtime_spec_version_current(),
+  cz_bundle_create(&str, containerization_oci::runtime::Spec),
+  cz_bundle_create_from_data(&str, Vec<u8>),
+  cz_bundle_load(&str),
+  cz_bundle_config_path(&str),
+  cz_bundle_rootfs_path(&str),
+  cz_bundle_delete(&str),
+  cz_bundle_load_config(&str),
+  cz_ipv4_address_from_bytes(Vec<u8>),
+  cz_ipv4_address_parse(&str),
+  cz_ipv4_address_bytes(u32),
+  cz_ipv4_address_description(u32),
+  cz_ipv4_address_is_unspecified(u32),
+  cz_ipv4_address_is_loopback(u32),
+  cz_ipv4_address_is_multicast(u32),
+  cz_ipv4_address_is_link_local(u32),
+  cz_ipv4_address_is_broadcast(u32),
+  cz_ipv4_address_less_than(u32, u32),
+  cz_ipv6_address_parse(&str),
+  cz_ipv6_address_from_bytes(Vec<u8>, Option<String>),
+  cz_ipv6_address_unspecified(),
+  cz_ipv6_address_loopback(),
+  cz_ipv6_address_bytes(IPv6Address),
+  cz_ipv6_address_description(IPv6Address),
+  cz_ipv6_address_is_unspecified(IPv6Address),
+  cz_ipv6_address_is_loopback(IPv6Address),
+  cz_ipv6_address_is_multicast(IPv6Address),
+  cz_ipv6_address_is_link_local(IPv6Address),
+  cz_ipv6_address_is_unique_local(IPv6Address),
+  cz_ipv6_address_is_global_unicast(IPv6Address),
+  cz_ipv6_address_is_documentation(IPv6Address),
+  cz_ipv6_address_less_than(IPv6Address, IPv6Address),
+  cz_ip_address_parse(&str),
+  cz_ip_address_description(IpAddress),
+  cz_ip_address_is_v4(IpAddress),
+  cz_ip_address_is_v6(IpAddress),
+  cz_ip_address_ipv4(IpAddress),
+  cz_ip_address_ipv6(IpAddress),
+  cz_ip_address_is_loopback(IpAddress),
+  cz_ip_address_is_multicast(IpAddress),
+  cz_ip_address_is_unspecified(IpAddress),
+  cz_prefix_new(u8),
+  cz_prefix_ipv4(u8),
+  cz_prefix_ipv6(u8),
+  cz_prefix_description(u8),
+  cz_prefix_suffix_mask32(u8),
+  cz_prefix_prefix_mask32(u8),
+  cz_prefix_suffix_mask128(u8),
+  cz_prefix_prefix_mask128(u8),
+  cz_cidr_v4_parse(&str),
+  cz_cidr_v4_new(u32, u8),
+  cz_cidr_v4_from_range(u32, u32),
+  cz_cidr_v4_lower(u32, u8),
+  cz_cidr_v4_upper(u32, u8),
+  cz_cidr_v4_gateway(u32, u8),
+  cz_cidr_v4_contains(u32, u8, u32),
+  cz_cidr_v4_description(u32, u8),
+  cz_cidr_v6_parse(&str),
+  cz_cidr_v6_new(IPv6Address, u8),
+  cz_cidr_v6_from_range(IPv6Address, IPv6Address),
+  cz_cidr_v6_lower(IPv6Address, u8),
+  cz_cidr_v6_upper(IPv6Address, u8),
+  cz_cidr_v6_gateway(IPv6Address, u8),
+  cz_cidr_v6_contains(IPv6Address, u8, IPv6Address),
+  cz_cidr_v6_description(IPv6Address, u8),
+  cz_cidr_parse(&str),
+  cz_cidr_new(IpAddress, u8),
+  cz_cidr_from_range(IpAddress, IpAddress),
+  cz_cidr_address(IpAddress, u8),
+  cz_cidr_prefix(IpAddress, u8),
+  cz_cidr_lower(IpAddress, u8),
+  cz_cidr_upper(IpAddress, u8),
+  cz_cidr_contains(IpAddress, u8, IpAddress),
+  cz_cidr_description(IpAddress, u8),
+  cz_mac_address_new(u64),
+  cz_mac_address_from_bytes(Vec<u8>),
+  cz_mac_address_parse(&str),
+  cz_mac_address_bytes(u64),
+  cz_mac_address_description(u64),
+  cz_mac_address_is_locally_administered(u64),
+  cz_mac_address_is_multicast(u64),
+  cz_mac_address_ipv6_address(u64, IPv6Address),
+  cz_mac_address_less_than(u64, u64),
+  cz_capability_name_parse(&str),
+  cz_capability_set_parse(&str),
+);

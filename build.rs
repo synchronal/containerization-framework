@@ -18,8 +18,22 @@ use std::process::Command;
 /// swift-bridge's generated header directory; `bridging-header.h` imports it.
 const BRIDGE: &str = "containerization-bridge";
 const PACKAGE: &str = "ContainerizationBridge";
-/// The file holding the `#[swift_bridge::bridge]` module.
-const BRIDGE_MODULE: &str = "src/bridge/mod.rs";
+/// The files holding the `#[swift_bridge::bridge]` modules.
+///
+/// Their glue is concatenated in this order, and the C header must declare an
+/// enum before a function uses it, so `mod.rs`, which declares every shared
+/// enum, comes first.
+const BRIDGE_MODULES: [&str; 9] = [
+  "src/bridge/mod.rs",
+  "src/bridge/addresses.rs",
+  "src/bridge/callbacks.rs",
+  "src/bridge/containers.rs",
+  "src/bridge/ext4_archive.rs",
+  "src/bridge/images.rs",
+  "src/bridge/network.rs",
+  "src/bridge/spec.rs",
+  "src/bridge/vm.rs",
+];
 
 /// Never copied into the staged package: SwiftPM's build directory, and glue
 /// this script regenerates.
@@ -212,7 +226,10 @@ fn link_swift_runtime() {
 
 fn main() {
   println!("cargo:rerun-if-changed=build.rs");
-  println!("cargo:rerun-if-changed={BRIDGE_MODULE}");
+
+  for module in BRIDGE_MODULES {
+    println!("cargo:rerun-if-changed={module}");
+  }
 
   if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
     return;
@@ -233,7 +250,9 @@ fn main() {
   // `OUT_DIR` survives between builds.
   let _ = std::fs::remove_dir_all(&glue);
 
-  swift_bridge_build::parse_bridges(vec![manifest_dir().join(BRIDGE_MODULE)]).write_all_concatenated(&glue, BRIDGE);
+  let modules = BRIDGE_MODULES.map(|module| manifest_dir().join(module));
+
+  swift_bridge_build::parse_bridges(modules).write_all_concatenated(&glue, BRIDGE);
   publish_bridge_shims(&glue);
   mirror(&glue, &staged.join("Sources").join(PACKAGE).join("generated"), &[]);
 

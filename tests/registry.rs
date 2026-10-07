@@ -16,7 +16,7 @@ const TAG: &str = "3";
 
 #[test]
 fn resolves_and_fetches_an_index() {
-  let client = cfw::containerization_oci::RegistryClient::new(support::store::IMAGE, false, None)
+  let client = cfw::containerization_oci::client::RegistryClient::new(support::store::IMAGE, false, None)
     .expect("a client for the suite's registry");
   let directory = tempfile::tempdir().expect("a temporary directory");
 
@@ -31,7 +31,7 @@ fn resolves_and_fetches_an_index() {
 
   assert_eq!(data.len() as i64, descriptor.size);
   assert_eq!(
-    cfw::containerization_oci::ContentWriter::new(directory.path())
+    cfw::containerization_oci::content::ContentWriter::new(directory.path())
       .expect("a writer")
       .write(&data)
       .expect("the data should write")
@@ -50,10 +50,10 @@ fn resolves_and_fetches_an_index() {
 
 #[test]
 fn makes_a_client_for_a_host() {
-  let client = cfw::containerization_oci::RegistryClient::with_host(
+  let client = cfw::containerization_oci::client::RegistryClient::with_host(
     "registry-1.docker.io",
-    cfw::containerization_oci::registry_client::HostOptions {
-      retry_options: Some(cfw::containerization_oci::RetryOptions::new(1, 1_000_000)),
+    cfw::containerization_oci::client::registry_client::HostOptions {
+      retry_options: Some(cfw::containerization_oci::client::RetryOptions::new(1, 1_000_000)),
       ..Default::default()
     },
   )
@@ -64,7 +64,7 @@ fn makes_a_client_for_a_host() {
 
 #[test]
 fn says_which_reference_it_could_not_make_a_client_for() {
-  let error = cfw::containerization_oci::RegistryClient::new("Not A Reference", false, None)
+  let error = cfw::containerization_oci::client::RegistryClient::new("Not A Reference", false, None)
     .err()
     .expect("a malformed reference");
 
@@ -76,7 +76,7 @@ const SECURITY_DOMAIN: &str = "dev.reflective.containerization-framework.tests";
 
 #[test]
 fn makes_a_basic_token() {
-  let auth = cfw::containerization_oci::Authentication::basic("user", "password").expect("an authentication");
+  let auth = cfw::containerization_oci::client::Authentication::basic("user", "password").expect("an authentication");
 
   assert_eq!(
     auth.token().expect("a token"),
@@ -93,7 +93,7 @@ fn makes_a_basic_token() {
 /// it wrote.
 #[test]
 fn saves_looks_up_lists_and_deletes_credentials() {
-  let helper = cfw::containerization_oci::KeychainHelper::new(SECURITY_DOMAIN, None);
+  let helper = cfw::containerization_oci::client::KeychainHelper::new(SECURITY_DOMAIN, None);
   let hostname = "registry.example.test";
 
   helper

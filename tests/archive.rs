@@ -480,7 +480,7 @@ fn unpacks_an_archive_into_a_filesystem() {
     .expect("the directory should archive");
   writer.finish_encoding().expect("the archive should finish");
 
-  cfw::containerization::Ext4Unpacker::new(64 * 1024 * 1024, None)
+  cfw::containerization::image::Ext4Unpacker::new(64 * 1024 * 1024, None)
     .unpack_archive(&archive, cfw::containerization_archive::Filter::Gzip, &at)
     .expect("the archive should unpack");
   cfw::containerization_ext4::ext4::Ext4Reader::new(&at)

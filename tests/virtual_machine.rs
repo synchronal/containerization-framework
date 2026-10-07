@@ -10,18 +10,18 @@ use containerization_framework as cfw;
 /// Holds a container open; the image's own `Cmd` would exit at once.
 const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
 
-fn keep_alive(configuration: &mut cfw::containerization::linux_container::Configuration) {
+fn keep_alive(configuration: &mut cfw::containerization::container::linux_container::Configuration) {
   configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
   configuration.cpus = support::TEST_CPUS;
   configuration.memory_in_bytes = support::TEST_MEMORY_IN_BYTES;
 }
 
 /// Runs `/bin/true` in `container`, returning its exit code.
-fn run_true(container: &cfw::containerization::LinuxContainer, id: &str) -> i32 {
+fn run_true(container: &cfw::containerization::container::LinuxContainer, id: &str) -> i32 {
   let process = container
     .exec(
       id,
-      cfw::containerization::LinuxProcessConfiguration::new(&["/bin/true"]),
+      cfw::containerization::process::LinuxProcessConfiguration::new(&["/bin/true"]),
     )
     .expect("/bin/true should exec");
 
@@ -36,12 +36,12 @@ fn run_true(container: &cfw::containerization::LinuxContainer, id: &str) -> i32 
 fn boots_a_virtual_machine_of_its_own() {
   let shared = tempfile::tempdir().expect("a temporary directory");
   let vmm = support::store::vmm();
-  let config = cfw::containerization::VmConfiguration {
+  let config = cfw::containerization::vm::VmConfiguration {
     cpus: support::TEST_CPUS,
     memory_in_bytes: support::vm().memory_in_bytes,
     mounts_by_id: [(
       "shared".to_string(),
-      vec![cfw::containerization::Mount::share(
+      vec![cfw::containerization::container::Mount::share(
         shared.path().display().to_string(),
         "/mnt/shared",
         &[],
@@ -56,11 +56,11 @@ fn boots_a_virtual_machine_of_its_own() {
 
   assert_eq!(
     instance.state(),
-    cfw::containerization::VirtualMachineInstanceState::Stopped
+    cfw::containerization::vm::VirtualMachineInstanceState::Stopped
   );
   assert_eq!(
     instance.virtiofs_layout(),
-    cfw::containerization::VirtiofsLayout::Unified
+    cfw::containerization::vm::VirtiofsLayout::Unified
   );
 
   let mounts = instance.mounts();
@@ -73,7 +73,7 @@ fn boots_a_virtual_machine_of_its_own() {
   instance.start().expect("the VM should start");
   assert_eq!(
     instance.state(),
-    cfw::containerization::VirtualMachineInstanceState::Running
+    cfw::containerization::vm::VirtualMachineInstanceState::Running
   );
 
   let listener = instance.listen(0x2000).expect("the VM should listen");
@@ -94,7 +94,7 @@ fn boots_a_virtual_machine_of_its_own() {
   listener.finish().expect("finishing again does nothing");
   assert!((&listener).next().is_none(), "a finished listener has no connections");
 
-  let block = cfw::containerization::Mount::block("ext4", "/nonexistent.ext4", "/data", &[], &[]);
+  let block = cfw::containerization::container::Mount::block("ext4", "/nonexistent.ext4", "/data", &[], &[]);
   assert!(
     instance.hotplug(block, "hotplugged").is_err(),
     "a VM without a hotplug provider can't hotplug"
@@ -106,7 +106,7 @@ fn boots_a_virtual_machine_of_its_own() {
   instance.stop().expect("the VM should stop");
   assert_eq!(
     instance.state(),
-    cfw::containerization::VirtualMachineInstanceState::Stopped
+    cfw::containerization::vm::VirtualMachineInstanceState::Stopped
   );
 }
 
@@ -117,8 +117,9 @@ fn pauses_and_resumes_a_container_on_its_own_manager() {
   let rootfs = support::store::unpack(&directory.path().join("rootfs.ext4"));
   let vmm = support::store::vmm();
 
-  let container = cfw::containerization::LinuxContainer::new_with(name, rootfs, None, &vmm, support::vm(), keep_alive)
-    .expect("a container should be made on the VM manager");
+  let container =
+    cfw::containerization::container::LinuxContainer::new_with(name, rootfs, None, &vmm, support::vm(), keep_alive)
+      .expect("a container should be made on the VM manager");
 
   container.create().expect("the container should create");
   container.start().expect("the container should start");
@@ -128,7 +129,7 @@ fn pauses_and_resumes_a_container_on_its_own_manager() {
     .with_virtual_machine_instance(|instance| {
       assert_eq!(
         instance.state(),
-        cfw::containerization::VirtualMachineInstanceState::Running
+        cfw::containerization::vm::VirtualMachineInstanceState::Running
       );
       assert!(
         instance.mounts().contains_key(name),
@@ -138,7 +139,7 @@ fn pauses_and_resumes_a_container_on_its_own_manager() {
       instance.pause()?;
       assert_eq!(
         instance.state(),
-        cfw::containerization::VirtualMachineInstanceState::Unknown,
+        cfw::containerization::vm::VirtualMachineInstanceState::Unknown,
         "Swift has no paused state"
       );
       instance.resume()
@@ -152,13 +153,13 @@ fn pauses_and_resumes_a_container_on_its_own_manager() {
 #[test]
 fn makes_a_container_from_a_configuration() {
   let vmm = support::store::vmm();
-  let rootfs = cfw::containerization::Mount::block("ext4", "/rootfs.ext4", "/", &[], &[]);
-  let configuration = cfw::containerization::linux_container::Configuration {
+  let rootfs = cfw::containerization::container::Mount::block("ext4", "/rootfs.ext4", "/", &[], &[]);
+  let configuration = cfw::containerization::container::linux_container::Configuration {
     hostname: Some("configured".to_string()),
     ..Default::default()
   };
 
-  let container = cfw::containerization::LinuxContainer::new(
+  let container = cfw::containerization::container::LinuxContainer::new(
     "cfw-test-vmm-configured",
     rootfs.clone(),
     None,
@@ -175,9 +176,9 @@ fn makes_a_container_from_a_configuration() {
     "a container has no VM before it's created"
   );
 
-  let not_a_block = cfw::containerization::Mount::any("tmpfs", "tmpfs", "/", &[], &[]);
+  let not_a_block = cfw::containerization::container::Mount::any("tmpfs", "tmpfs", "/", &[], &[]);
   assert!(
-    cfw::containerization::LinuxContainer::new(
+    cfw::containerization::container::LinuxContainer::new(
       "cfw-test-vmm-not-a-block",
       rootfs,
       Some(not_a_block),
@@ -193,12 +194,12 @@ fn makes_a_container_from_a_configuration() {
 #[test]
 fn makes_a_manager_on_the_default_store() {
   let vmm = support::store::vmm();
-  let manager =
-    cfw::containerization::ContainerManager::with_vmm(&vmm, None).expect("a manager should be made on the VM manager");
+  let manager = cfw::containerization::container::ContainerManager::with_vmm(&vmm, None)
+    .expect("a manager should be made on the VM manager");
 
   assert_eq!(
     manager.image_store().path(),
-    cfw::containerization::ImageStore::default_store()
+    cfw::containerization::image::ImageStore::default_store()
       .expect("the default store should open")
       .path()
   );

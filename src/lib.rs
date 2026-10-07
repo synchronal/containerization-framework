@@ -5,9 +5,12 @@
 //!
 //! The Rust API mirrors Containerization's Swift API, as much as possible.
 //! Modules are named after the Swift modules, types after the Swift types, and
-//! methods after their Swift methods, written in Rust's snake case. A Swift type
-//! nested in another, like `LinuxContainer.Configuration`, is found in a module
-//! named after its parent: `linux_container::Configuration`.
+//! methods after their Swift methods, written in Rust's snake case. Within a
+//! module, the types are grouped by what they work on, so `ImageStore` is in
+//! `containerization::image` and `LinuxContainer` is in
+//! `containerization::container`. A Swift type nested in another, like
+//! `LinuxContainer.Configuration`, is found in a module named after its parent,
+//! in the parent's group: `container::linux_container::Configuration`.
 //!
 //! Swift's `async` methods block until they finish, and errors they throw are
 //! returned as [`Error`].
@@ -16,16 +19,16 @@
 //! use containerization_framework as cfw;
 //! use cfw::containerization as cz;
 //! # fn main() -> Result<(), cfw::Error> {
-//! let store = cz::ImageStore::new("/path/to/store".as_ref())?;
-//! let kernel = cz::Kernel::new("/path/to/vmlinux", cz::SystemPlatform::LINUX_ARM);
-//! let mut manager = cz::ContainerManager::with_initfs_reference(
+//! let store = cz::image::ImageStore::new("/path/to/store".as_ref())?;
+//! let kernel = cz::vm::Kernel::new("/path/to/vmlinux", cz::vm::SystemPlatform::LINUX_ARM);
+//! let mut manager = cz::container::ContainerManager::with_initfs_reference(
 //!   &kernel,
 //!   "ghcr.io/apple/containerization/vminit:0.48.0",
 //!   &store,
 //!   Default::default(),
 //! )?;
 //! let image = store.get("docker.io/library/alpine:3", true)?;
-//! let options = cz::container_manager::CreateOptions {
+//! let options = cz::container::container_manager::CreateOptions {
 //!   networking: false,
 //!   ..Default::default()
 //! };
@@ -34,7 +37,7 @@
 //! })?;
 //! container.create()?;
 //! container.start()?;
-//! let process = container.exec("ls", cz::LinuxProcessConfiguration::new(&["/bin/ls", "/"]))?;
+//! let process = container.exec("ls", cz::process::LinuxProcessConfiguration::new(&["/bin/ls", "/"]))?;
 //! process.start()?;
 //! let status = process.wait(None)?;
 //! process.delete()?;
