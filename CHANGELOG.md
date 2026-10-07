@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.4.0
+
 This release binds most of the rest of Containerization's Swift API. Each
 module's types are now grouped into submodules by what they work on, such as
 `containerization::image` and `containerization::container`, and the entries

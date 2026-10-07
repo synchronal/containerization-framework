@@ -9,7 +9,7 @@ name = "containerization-framework"
 readme = "README.md"
 repository = "https://github.com/synchronal/containerization-framework"
 rust-version = "1.98"
-version = "0.3.0"
+version = "0.4.0"
 
 # The Swift package is an input to the build script, not a cargo target, so it
 # ships whole. `.build` and the generated glue are gitignored and so excluded
