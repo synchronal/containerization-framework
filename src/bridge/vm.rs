@@ -1,4 +1,5 @@
-//! The values a VM or pod is configured with, which Swift reads.
+//! The values a VM or pod is configured with, and the emulator its guest
+//! agent sets up, which Swift reads.
 
 use crate::containerization::container::Mount as RustMount;
 use crate::containerization::container::UnixSocketConfiguration as RustUnixSocketConfiguration;
@@ -12,6 +13,7 @@ use crate::containerization::vm::BootLog as RustBootLog;
 use crate::containerization::vm::Kernel as RustKernel;
 use crate::containerization::vm::SystemPlatform as RustSystemPlatform;
 use crate::containerization_oci::runtime::LinuxSeccomp as RustLinuxSeccomp;
+use crate::containerization_os::binfmt::Entry as RustBinfmtEntry;
 
 use super::ffi::BootLogKind;
 use super::ffi::PlatformArchitecture;
@@ -128,6 +130,17 @@ mod ffi {
     type RustSystemPlatform;
     fn os(self: &RustSystemPlatform) -> PlatformOs;
     fn architecture(self: &RustSystemPlatform) -> PlatformArchitecture;
+
+    // The emulator `Vminitd.setupEmulator` registers. (`type` is a Swift
+    // keyword.)
+    type RustBinfmtEntry;
+    fn name(self: &RustBinfmtEntry) -> &str;
+    #[swift_bridge(swift_name = "entryType")]
+    fn entry_type(self: &RustBinfmtEntry) -> &str;
+    fn offset(self: &RustBinfmtEntry) -> &str;
+    fn magic(self: &RustBinfmtEntry) -> &str;
+    fn mask(self: &RustBinfmtEntry) -> &str;
+    fn flags(self: &RustBinfmtEntry) -> &str;
 
     type RustKernel;
     fn path(self: &RustKernel) -> String;

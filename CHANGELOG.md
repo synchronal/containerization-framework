@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- `VzVirtualMachineInstance::dial_agent` returns the new
+  `containerization::vm::Vminitd`, the client of the agent running in the
+  guest. It can set up the guest, manage processes, mount filesystems,
+  configure networking, DNS and hosts, stat paths, relay sockets and read
+  container statistics. Its `writeFile` and `copy` aren't bound, because
+  Swift's `WriteFileFlags` has no public initializer and `copy` takes a
+  generated protobuf type.
+- `containerization_extras` has `InterfaceAddress`, `LinkRoute` and
+  `DefaultRoute`, which `Vminitd` configures an interface with.
+- `containerization_os::binfmt` has `Entry`, which `Vminitd::setup_emulator`
+  registers in the guest.
+
 ## v0.4.0
 
 This release binds most of the rest of Containerization's Swift API. Each

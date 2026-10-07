@@ -111,6 +111,56 @@ fn boots_a_virtual_machine_of_its_own() {
 }
 
 #[test]
+fn talks_to_the_guest_agent() {
+  let vmm = support::store::vmm();
+  let config = cfw::containerization::vm::VmConfiguration {
+    cpus: support::TEST_CPUS,
+    memory_in_bytes: support::vm().memory_in_bytes,
+    ..Default::default()
+  };
+  let instance = vmm.create(&config).expect("a VM should be created");
+  instance.start().expect("the VM should start");
+
+  let agent = instance
+    .dial_agent()
+    .expect("the guest agent should answer");
+  agent.standard_setup().expect("the guest should set up");
+
+  agent
+    .setenv("CFW_AGENT", "here")
+    .expect("the agent should set a variable");
+  assert_eq!(agent.getenv("CFW_AGENT").expect("the agent should read it"), "here");
+
+  agent
+    .mkdir("/tmp/cfw-agent/nested", true, 0o755)
+    .expect("the agent should make a directory");
+  let stat = agent
+    .stat("/", "/tmp/cfw-agent/nested")
+    .expect("the agent should stat the directory");
+  assert_eq!(stat.mode & 0o170000, 0o040000, "{stat:?} should be a directory");
+  assert_ne!(stat.ino, 0);
+
+  let missing = agent
+    .stat("/", "/tmp/cfw-agent/missing")
+    .expect_err("a missing path has no metadata");
+  assert!(
+    missing.is_code(cfw::containerization_error::Code::NotFound),
+    "{missing}"
+  );
+
+  agent
+    .up("lo", None)
+    .expect("the agent should bring the loopback up");
+  agent.sync().expect("the agent should sync");
+  agent
+    .kill(1, 0)
+    .expect("the agent should signal its own process");
+
+  agent.close().expect("the agent's connection should close");
+  instance.stop().expect("the VM should stop");
+}
+
+#[test]
 fn pauses_and_resumes_a_container_on_its_own_manager() {
   let name = "cfw-test-vmm-container";
   let directory = tempfile::tempdir().expect("a temporary directory");

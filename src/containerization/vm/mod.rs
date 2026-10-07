@@ -1,5 +1,5 @@
-//! Virtual machines: the kernel they boot, how they are configured, and the
-//! manager that creates them.
+//! Virtual machines: the kernel they boot, how they are configured, the
+//! manager that creates them, and the client of the agent running in them.
 
 mod attached_filesystem;
 mod boot_log;
@@ -8,6 +8,7 @@ pub mod system_platform;
 mod virtual_machine_instance;
 mod vm_configuration;
 mod vm_resources;
+mod vminitd;
 mod vsock_listener;
 mod vz_virtual_machine_instance;
 pub mod vz_virtual_machine_manager;
@@ -20,6 +21,7 @@ pub use self::virtual_machine_instance::VirtiofsLayout;
 pub use self::virtual_machine_instance::VirtualMachineInstanceState;
 pub use self::vm_configuration::VmConfiguration;
 pub use self::vm_resources::VmResources;
+pub use self::vminitd::Vminitd;
 pub use self::vsock_listener::VsockListener;
 pub use self::vz_virtual_machine_instance::VzVirtualMachineInstance;
 pub use self::vz_virtual_machine_manager::VzVirtualMachineManager;

@@ -1,6 +1,7 @@
 use super::AttachedFilesystem;
 use super::VirtiofsLayout;
 use super::VirtualMachineInstanceState;
+use super::Vminitd;
 use super::VsockListener;
 use crate::containerization::container::Mount;
 use crate::error::Error;
@@ -15,10 +16,9 @@ use std::os::fd::OwnedFd;
 /// [`super::VzVirtualMachineManager::create`], or reached through
 /// [`crate::containerization::container::LinuxContainer::with_virtual_machine_instance`].
 ///
-/// `dialAgent()` returns the guest agent's gRPC client, which isn't bound.
-/// Neither are `vzVirtualMachine`, `vmQueue`, `withMountRegistry`,
-/// `withInstanceLock`, `hotplugProvider`, nor the initializer taking a
-/// configuration closure.
+/// `vzVirtualMachine`, `vmQueue`, `withMountRegistry`, `withInstanceLock`,
+/// `hotplugProvider` and the initializer taking a configuration closure
+/// aren't bound.
 pub struct VzVirtualMachineInstance {
   pub(crate) handle: ffi::CzVirtualMachineInstance,
 }
@@ -61,6 +61,14 @@ impl VzVirtualMachineInstance {
   /// `VZVirtualMachineInstance.resume()`.
   pub fn resume(&self) -> Result<(), Error> {
     platform::outcome(self.handle.resume(), "resume the virtual machine").map(drop)
+  }
+
+  /// `VZVirtualMachineInstance.dialAgent()`: a client of the agent running in
+  /// the guest, connected on [`Vminitd::PORT`].
+  pub fn dial_agent(&self) -> Result<Vminitd, Error> {
+    platform::outcome(self.handle.dial_agent(), "dial the guest agent").map(|outcome| Vminitd {
+      handle: outcome.vminitd(),
+    })
   }
 
   /// `VZVirtualMachineInstance.dial(_:)`. Swift hands over the connection's

@@ -12,6 +12,7 @@ taken!(
   terminal_size_height -> u16,
   keychain_query_result -> containerization_os::keychain::KeychainQueryResult,
   file_info -> CzFileInfo,
+  stat -> containerization_os::Stat,
   registry_infos -> Vec<containerization_os::keychain::RegistryInfo>,
 );
 

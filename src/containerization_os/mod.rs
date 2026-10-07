@@ -2,6 +2,7 @@
 //! macOS host. The keychain types are in [`keychain`], as they are in Swift's
 //! `Keychain` directory.
 
+pub mod binfmt;
 mod capability_name;
 mod capability_set;
 pub mod file;

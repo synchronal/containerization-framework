@@ -60,6 +60,9 @@ use crate::containerization::vm::SystemPlatform as RustSystemPlatform;
 use crate::containerization::vm::VmConfiguration as RustVmConfiguration;
 use crate::containerization_archive::ArchiveWriterConfiguration as RustArchiveWriterConfiguration;
 use crate::containerization_ext4::ext4::formatter::FormatterOptions as RustFormatterOptions;
+use crate::containerization_extras::DefaultRoute as RustDefaultRoute;
+use crate::containerization_extras::InterfaceAddress as RustInterfaceAddress;
+use crate::containerization_extras::LinkRoute as RustLinkRoute;
 use crate::containerization_extras::address::IPv6Address as RustIPv6Address;
 use crate::containerization_extras::address::IpAddress as RustIpAddress;
 use crate::containerization_oci::image::Descriptor as RustDescriptor;
@@ -68,8 +71,10 @@ use crate::containerization_oci::image::Platform as RustPlatform;
 use crate::containerization_oci::runtime::Hook as RustHook;
 use crate::containerization_oci::runtime::LinuxCapabilities as RustOciLinuxCapabilities;
 use crate::containerization_oci::runtime::LinuxSeccomp as RustLinuxSeccomp;
+use crate::containerization_oci::runtime::Mount as RustOciMount;
 use crate::containerization_oci::runtime::Process as RustProcess;
 use crate::containerization_oci::runtime::Spec as RustSpec;
+use crate::containerization_os::binfmt::Entry as RustBinfmtEntry;
 use crate::platform::ConfigureContainer as RustConfigure;
 use crate::platform::ConfigurePod as RustConfigurePod;
 use crate::platform::ConfigurePodContainer as RustConfigurePodContainer;
@@ -307,6 +312,16 @@ pub(crate) mod ffi {
     type RustKernel;
     #[swift_bridge(already_declared)]
     type RustSpec;
+    #[swift_bridge(already_declared)]
+    type RustOciMount;
+    #[swift_bridge(already_declared)]
+    type RustInterfaceAddress;
+    #[swift_bridge(already_declared)]
+    type RustLinkRoute;
+    #[swift_bridge(already_declared)]
+    type RustDefaultRoute;
+    #[swift_bridge(already_declared)]
+    type RustBinfmtEntry;
     #[swift_bridge(already_declared)]
     type RustProcess;
     #[swift_bridge(already_declared)]
@@ -653,6 +668,7 @@ pub(crate) mod ffi {
     fn virtual_machine_manager(self: &CzOutcome) -> CzVirtualMachineManager;
     #[swift_bridge(swift_name = "virtualMachineInstance")]
     fn virtual_machine_instance(self: &CzOutcome) -> CzVirtualMachineInstance;
+    fn vminitd(self: &CzOutcome) -> CzVminitd;
     #[swift_bridge(swift_name = "vsockListener")]
     fn vsock_listener(self: &CzOutcome) -> CzVsockListener;
     #[swift_bridge(swift_name = "linuxPod")]
@@ -1887,6 +1903,20 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "isChar")]
     fn is_char(self: &CzFileInfo) -> bool;
 
+    // A held `Stat`: its unsigned fields in Swift's order (`dev` to `rdev`),
+    // then its signed ones (`size`, `blksize`, `blocks`, and each `TimeSpec`'s
+    // seconds and nanoseconds).
+    #[swift_bridge(swift_name = "statUnsigned")]
+    fn stat_unsigned(self: &CzOutcome) -> Vec<u64>;
+    #[swift_bridge(swift_name = "statSigned")]
+    fn stat_signed(self: &CzOutcome) -> Vec<i64>;
+    // For a unit test: `Binfmt.path`, and `Binfmt.Entry.amd64()`'s fields in
+    // Swift's order.
+    #[swift_bridge(swift_name = "binfmtPath")]
+    fn cz_binfmt_path() -> String;
+    #[swift_bridge(swift_name = "binfmtEntryAmd64")]
+    fn cz_binfmt_entry_amd64() -> Vec<String>;
+
     // `EXT4Unpacker.unpack(_:for:at:progress:)`, with the image as a
     // `duplicate()`.
     #[swift_bridge(swift_name = "unpackExt4")]
@@ -2451,6 +2481,122 @@ pub(crate) mod ffi {
     fn release_virtio_fs(self: &CzVirtualMachineInstance, id: &str) -> CzOutcome;
     #[swift_bridge(swift_name = "installRosetta")]
     fn cz_install_rosetta() -> CzOutcome;
+    // The outcome holds the `Vminitd`.
+    #[swift_bridge(swift_name = "dialAgent")]
+    fn dial_agent(self: &CzVirtualMachineInstance) -> CzOutcome;
+
+    // `Vminitd`. `createProcess` treats `options` as `nil` when
+    // `has_options` is false. `sysctl`'s settings cross as their keys and
+    // their values in the same order.
+    // `kill`'s and `startProcess`'s outcomes hold an `Int32`, `getenv`'s a
+    // `String`, `waitProcess`'s an `ExitStatus`, `containerStatistics`' a
+    // `[ContainerStatistics]` and `stat`'s a `Stat`.
+    type CzVminitd;
+    #[swift_bridge(swift_name = "standardSetup")]
+    fn standard_setup(self: &CzVminitd) -> CzOutcome;
+    fn close(self: &CzVminitd) -> CzOutcome;
+    #[swift_bridge(swift_name = "filesystemOperation")]
+    fn filesystem_operation(
+      self: &CzVminitd,
+      operation: FilesystemOperationKind,
+      path: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+    ) -> CzOutcome;
+    fn getenv(self: &CzVminitd, key: &str) -> CzOutcome;
+    fn setenv(self: &CzVminitd, key: &str, value: &str) -> CzOutcome;
+    fn mount(self: &CzVminitd, mount: RustOciMount) -> CzOutcome;
+    fn umount(self: &CzVminitd, path: &str, flags: i32) -> CzOutcome;
+    fn mkdir(self: &CzVminitd, path: &str, all: bool, perms: u32) -> CzOutcome;
+    fn kill(self: &CzVminitd, pid: i32, signal: i32) -> CzOutcome;
+    fn sync(self: &CzVminitd) -> CzOutcome;
+    #[swift_bridge(swift_name = "createProcess")]
+    fn create_process(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+      #[swift_bridge(label = "stdinPort")] stdin_port: Option<u32>,
+      #[swift_bridge(label = "stdoutPort")] stdout_port: Option<u32>,
+      #[swift_bridge(label = "stderrPort")] stderr_port: Option<u32>,
+      #[swift_bridge(label = "ociRuntimePath")] oci_runtime_path: Option<String>,
+      configuration: RustSpec,
+      #[swift_bridge(label = "hasOptions")] has_options: bool,
+      options: Vec<u8>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "startProcess")]
+    fn start_process(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "signalProcess")]
+    fn signal_process(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+      signal: i32,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "resizeProcess")]
+    fn resize_process(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+      columns: u32,
+      rows: u32,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "waitProcess")]
+    fn wait_process(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+      #[swift_bridge(label = "timeoutInSeconds")] timeout_in_seconds: Option<i64>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "deleteProcess")]
+    fn delete_process(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "closeProcessStdin")]
+    fn close_process_stdin(
+      self: &CzVminitd,
+      id: &str,
+      #[swift_bridge(label = "containerID")] container_id: Option<String>,
+    ) -> CzOutcome;
+    fn up(self: &CzVminitd, name: &str, mtu: Option<u32>) -> CzOutcome;
+    fn down(self: &CzVminitd, name: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "addressAdd")]
+    fn address_add(self: &CzVminitd, name: &str, address: RustInterfaceAddress) -> CzOutcome;
+    #[swift_bridge(swift_name = "routeAddLink")]
+    fn route_add_link(self: &CzVminitd, name: &str, route: RustLinkRoute) -> CzOutcome;
+    #[swift_bridge(swift_name = "routeAddDefault")]
+    fn route_add_default(self: &CzVminitd, name: &str, route: RustDefaultRoute) -> CzOutcome;
+    #[swift_bridge(swift_name = "configureDNS")]
+    fn configure_dns(self: &CzVminitd, config: RustDns, location: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "configureHosts")]
+    fn configure_hosts(self: &CzVminitd, config: RustHosts, location: &str) -> CzOutcome;
+    // `categories` is a `StatCategory`'s raw value.
+    #[swift_bridge(swift_name = "containerStatistics")]
+    fn container_statistics(
+      self: &CzVminitd,
+      #[swift_bridge(label = "containerIDs")] container_ids: Vec<String>,
+      categories: i64,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "setupEmulator")]
+    fn setup_emulator(
+      self: &CzVminitd,
+      #[swift_bridge(label = "binaryPath")] binary_path: &str,
+      configuration: RustBinfmtEntry,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "setTime")]
+    fn set_time(self: &CzVminitd, sec: i64, usec: i32) -> CzOutcome;
+    fn sysctl(self: &CzVminitd, keys: Vec<String>, values: Vec<String>) -> CzOutcome;
+    fn stat(self: &CzVminitd, root: &str, path: &str) -> CzOutcome;
+    #[swift_bridge(swift_name = "enableRosetta")]
+    fn enable_rosetta(self: &CzVminitd) -> CzOutcome;
+    #[swift_bridge(swift_name = "relaySocket")]
+    fn relay_socket(self: &CzVminitd, port: u32, configuration: RustUnixSocketConfiguration) -> CzOutcome;
+    #[swift_bridge(swift_name = "stopSocketRelay")]
+    fn stop_socket_relay(self: &CzVminitd, configuration: RustUnixSocketConfiguration) -> CzOutcome;
 
     // `next` blocks for a connection, and its outcome holds the descriptor,
     // which Rust then owns, or `Absent` once the listener is finished.
