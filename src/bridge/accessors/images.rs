@@ -3,17 +3,16 @@
 //! rootfs `create`'s options, and a `ProgressHandler`.
 
 use super::entry_at;
+use super::ext4;
+use super::present;
 use crate::bridge::ffi;
 use crate::containerization;
 use crate::containerization::container::container_manager;
 use crate::containerization::image;
 use crate::containerization::vm::kernel;
-use crate::containerization::vm::system_platform;
-use crate::containerization_ext4::ext4::journal_config::JournalMode;
 use crate::containerization_extras::ProgressEvent;
 use crate::containerization_oci;
 use crate::platform::Progress;
-use std::collections::BTreeMap;
 
 impl Progress {
   pub(crate) fn is_some(&self) -> bool {
@@ -62,10 +61,7 @@ impl containerization_oci::image::Platform {
   }
 
   pub(crate) fn os_features_at(&self, index: usize) -> &str {
-    &self
-      .os_features
-      .as_ref()
-      .expect("Swift asks for a feature only below the length")[index]
+    &present(&self.os_features)[index]
   }
 
   pub(crate) fn variant(&self) -> Option<&str> {
@@ -85,21 +81,6 @@ impl ffi::CzOutcome {
         .then(|| self.platform_os_features()),
       variant: self.platform_variant(),
     }
-  }
-
-  /// What an outcome holds, or `None` for `Absent`.
-  pub(super) fn optional<T>(&self, read: impl FnOnce(&Self) -> T) -> Option<T> {
-    self.is_some().then(|| read(self))
-  }
-
-  /// Each element of a held list.
-  pub(super) fn list<T>(&self, read: impl Fn(&Self) -> T) -> Vec<T> {
-    (0..self.len()).map(|index| read(&self.at(index))).collect()
-  }
-
-  /// A held `[String: String]`.
-  pub(super) fn map(&self) -> BTreeMap<String, String> {
-    self.map_keys().into_iter().zip(self.map_values()).collect()
   }
 
   /// The `Descriptor` an outcome holds, read field by field.
@@ -190,14 +171,8 @@ impl ffi::CzOutcome {
     containerization::vm::Kernel {
       path: self.kernel_path().into(),
       platform: containerization::vm::SystemPlatform {
-        os: match self.kernel_platform_os() {
-          ffi::PlatformOs::Linux => system_platform::Os::Linux,
-          ffi::PlatformOs::Darwin => system_platform::Os::Darwin,
-        },
-        architecture: match self.kernel_platform_architecture() {
-          ffi::PlatformArchitecture::Arm64 => system_platform::Architecture::Arm64,
-          ffi::PlatformArchitecture::Amd64 => system_platform::Architecture::Amd64,
-        },
+        os: self.kernel_platform_os().into(),
+        architecture: self.kernel_platform_architecture().into(),
       },
       command_line: kernel::CommandLine {
         kernel_args: self.kernel_kernel_args(),
@@ -229,10 +204,7 @@ impl containerization_oci::image::Descriptor {
   }
 
   pub(crate) fn urls_at(&self, index: usize) -> &str {
-    &self
-      .urls
-      .as_ref()
-      .expect("Swift asks for a URL only below the length")[index]
+    &present(&self.urls)[index]
   }
 
   pub(crate) fn has_annotations(&self) -> bool {
@@ -247,18 +219,11 @@ impl containerization_oci::image::Descriptor {
   }
 
   pub(crate) fn annotation_key_at(&self, index: usize) -> &str {
-    entry_at(self.annotations(), index).0
+    entry_at(present(&self.annotations), index).0
   }
 
   pub(crate) fn annotation_value_at(&self, index: usize) -> &str {
-    entry_at(self.annotations(), index).1
-  }
-
-  fn annotations(&self) -> &BTreeMap<String, String> {
-    self
-      .annotations
-      .as_ref()
-      .expect("Swift asks for an annotation only below the length")
+    entry_at(present(&self.annotations), index).1
   }
 
   pub(crate) fn has_platform(&self) -> bool {
@@ -266,10 +231,7 @@ impl containerization_oci::image::Descriptor {
   }
 
   pub(crate) fn platform(&self) -> &containerization_oci::image::Platform {
-    self
-      .platform
-      .as_ref()
-      .expect("Swift asks for the platform only after `has_platform`")
+    present(&self.platform)
   }
 
   pub(crate) fn artifact_type(&self) -> Option<&str> {
@@ -301,22 +263,11 @@ impl image::Ext4Unpacker {
   }
 
   pub(crate) fn has_journal_mode(&self) -> bool {
-    self
-      .journal
-      .and_then(|journal| journal.default_mode)
-      .is_some()
+    ext4::has_journal_mode(self.journal)
   }
 
   pub(crate) fn journal_mode(&self) -> ffi::JournalModeKind {
-    match self
-      .journal
-      .and_then(|journal| journal.default_mode)
-      .expect("Swift asks for the mode only after `has_journal_mode`")
-    {
-      JournalMode::Writeback => ffi::JournalModeKind::Writeback,
-      JournalMode::Ordered => ffi::JournalModeKind::Ordered,
-      JournalMode::Journal => ffi::JournalModeKind::Journal,
-    }
+    ext4::journal_mode(self.journal)
   }
 }
 
@@ -326,10 +277,7 @@ impl container_manager::RootfsCreateOptions {
   }
 
   pub(crate) fn writable_layer(&self) -> &containerization::container::Mount {
-    self
-      .writable_layer
-      .as_ref()
-      .expect("Swift asks for the writable layer only after `has_writable_layer`")
+    present(&self.writable_layer)
   }
 
   pub(crate) fn networking(&self) -> bool {

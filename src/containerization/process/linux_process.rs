@@ -32,22 +32,22 @@ impl LinuxProcess {
 
   /// `LinuxProcess.start()`.
   pub fn start(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.start(), format!("start {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.start(), format!("start {}", self.id())).map(drop)
   }
 
   /// `LinuxProcess.kill(_:)`.
   pub fn kill(&self, signal: Signal) -> Result<(), Error> {
-    platform::outcome(self.handle.kill(signal.raw_value), format!("signal {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.kill(signal.raw_value), format!("signal {}", self.id())).map(drop)
   }
 
   /// `LinuxProcess.resize(to:)`.
   pub fn resize(&self, to: terminal::Size) -> Result<(), Error> {
-    platform::outcome(self.handle.resize(to.width, to.height), format!("resize {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.resize(to.width, to.height), format!("resize {}", self.id())).map(drop)
   }
 
   /// `LinuxProcess.closeStdin()`.
   pub fn close_stdin(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.close_stdin(), format!("close {}'s stdin", self.id())).map(|_| ())
+    platform::outcome(self.handle.close_stdin(), format!("close {}'s stdin", self.id())).map(drop)
   }
 
   /// `LinuxProcess.wait(timeoutInSeconds:)`.
@@ -58,6 +58,6 @@ impl LinuxProcess {
 
   /// `LinuxProcess.delete()`.
   pub fn delete(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.delete(), format!("delete {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.delete(), format!("delete {}", self.id())).map(drop)
   }
 }

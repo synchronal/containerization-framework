@@ -128,15 +128,7 @@ impl ImageStore {
 
   /// `ImageStore.list()`.
   pub fn list(&self) -> Result<Vec<Image>, Error> {
-    let images = platform::outcome(self.handle.list(), "list images")?.images();
-
-    Ok(
-      (0..images.len())
-        .map(|index| Image {
-          handle: images.at(index),
-        })
-        .collect(),
-    )
+    platform::outcome(self.handle.list(), "list images").map(|outcome| images(&outcome))
   }
 
   /// `ImageStore.delete(reference:performCleanup:)`.
@@ -145,7 +137,7 @@ impl ImageStore {
       self.handle.delete(reference, perform_cleanup),
       format!("delete {reference}"),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `ImageStore.tag(existing:new:)`.
@@ -261,21 +253,13 @@ impl ImageStore {
 
   /// `ImageStore.load(from:progress:)`.
   pub fn load(&self, directory: &Path, progress: Option<ProgressHandler>) -> Result<Vec<Image>, Error> {
-    let images = platform::outcome(
+    platform::outcome(
       self
         .handle
         .load(&directory.display().to_string(), platform::Progress(progress)),
       format!("load images from {}", directory.display()),
-    )?
-    .images();
-
-    Ok(
-      (0..images.len())
-        .map(|index| Image {
-          handle: images.at(index),
-        })
-        .collect(),
     )
+    .map(|outcome| images(&outcome))
   }
 
   /// `ImageStore.cleanUpOrphanedBlobs()`: the digests deleted, and the bytes
@@ -291,4 +275,15 @@ impl ImageStore {
     platform::outcome(self.handle.calculate_orphaned_blobs_size(), "size orphaned blobs")
       .map(|outcome| outcome.number())
   }
+}
+
+/// The `[Image]` an outcome holds.
+fn images(outcome: &ffi::CzOutcome) -> Vec<Image> {
+  let images = outcome.images();
+
+  (0..images.len())
+    .map(|index| Image {
+      handle: images.at(index),
+    })
+    .collect()
 }

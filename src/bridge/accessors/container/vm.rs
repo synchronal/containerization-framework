@@ -145,13 +145,8 @@ impl vm::VmConfiguration {
     &self.mounts_by_id_entry(index).1[mount]
   }
 
-  fn mounts_by_id_entry(&self, index: usize) -> (&str, &[container::Mount]) {
-    self
-      .mounts_by_id
-      .iter()
-      .nth(index)
-      .map(|(id, mounts)| (id.as_str(), mounts.as_slice()))
-      .expect("Swift asks for an entry only below the length")
+  fn mounts_by_id_entry(&self, index: usize) -> (&str, &Vec<container::Mount>) {
+    accessors::entry_at(&self.mounts_by_id, index)
   }
 
   pub(crate) fn has_boot_log(&self) -> bool {
@@ -160,10 +155,7 @@ impl vm::VmConfiguration {
 
   /// Only when [`Self::has_boot_log`].
   pub(crate) fn boot_log(&self) -> &vm::BootLog {
-    self
-      .boot_log
-      .as_ref()
-      .expect("Swift asks for a boot log only after has_boot_log")
+    accessors::present(&self.boot_log)
   }
 
   pub(crate) fn nested_virtualization(&self) -> bool {
@@ -193,19 +185,49 @@ impl vm::AttachedFilesystem {
   }
 }
 
+impl From<system_platform::Os> for ffi::PlatformOs {
+  fn from(os: system_platform::Os) -> Self {
+    match os {
+      system_platform::Os::Linux => Self::Linux,
+      system_platform::Os::Darwin => Self::Darwin,
+    }
+  }
+}
+
+impl From<ffi::PlatformOs> for system_platform::Os {
+  fn from(os: ffi::PlatformOs) -> Self {
+    match os {
+      ffi::PlatformOs::Linux => Self::Linux,
+      ffi::PlatformOs::Darwin => Self::Darwin,
+    }
+  }
+}
+
+impl From<system_platform::Architecture> for ffi::PlatformArchitecture {
+  fn from(architecture: system_platform::Architecture) -> Self {
+    match architecture {
+      system_platform::Architecture::Arm64 => Self::Arm64,
+      system_platform::Architecture::Amd64 => Self::Amd64,
+    }
+  }
+}
+
+impl From<ffi::PlatformArchitecture> for system_platform::Architecture {
+  fn from(architecture: ffi::PlatformArchitecture) -> Self {
+    match architecture {
+      ffi::PlatformArchitecture::Arm64 => Self::Arm64,
+      ffi::PlatformArchitecture::Amd64 => Self::Amd64,
+    }
+  }
+}
+
 impl vm::SystemPlatform {
   pub(crate) fn os(&self) -> ffi::PlatformOs {
-    match self.os {
-      system_platform::Os::Linux => ffi::PlatformOs::Linux,
-      system_platform::Os::Darwin => ffi::PlatformOs::Darwin,
-    }
+    self.os.into()
   }
 
   pub(crate) fn architecture(&self) -> ffi::PlatformArchitecture {
-    match self.architecture {
-      system_platform::Architecture::Arm64 => ffi::PlatformArchitecture::Arm64,
-      system_platform::Architecture::Amd64 => ffi::PlatformArchitecture::Amd64,
-    }
+    self.architecture.into()
   }
 }
 

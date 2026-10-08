@@ -208,11 +208,8 @@ impl WriteEntry {
   }
 
   pub fn set_xattrs(&mut self, xattrs: &BTreeMap<String, Vec<u8>>) {
-    // The values cross joined into one, with each one's length.
-    self.handle.set_xattrs(
-      xattrs.keys().cloned().collect(),
-      xattrs.values().map(|value| value.len() as u64).collect(),
-      xattrs.values().flatten().copied().collect(),
-    );
+    let (names, lengths, values) = platform::xattrs(xattrs);
+
+    self.handle.set_xattrs(names, lengths, values);
   }
 }

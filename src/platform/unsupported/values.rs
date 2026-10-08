@@ -44,47 +44,20 @@ taken!(
   int32_map -> BTreeMap<String, i32>,
 );
 
-pub(crate) fn cz_platform_current() -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_platform_parse(_platform: &str) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_platform_description(_platform: containerization_oci::image::Platform) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_platform_equals(
-  _lhs: containerization_oci::image::Platform,
-  _rhs: containerization_oci::image::Platform,
-) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_platform_matches(
-  _lhs: containerization_oci::image::Platform,
-  _rhs: containerization_oci::image::Platform,
-) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_progress_event_event(_kind: ProgressKind, _value: i64) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_proxy_from_environment(
-  _scheme: Option<String>,
-  _host: &str,
-  _has_env: bool,
-  _env_keys: Vec<String>,
-  _env_values: Vec<String>,
-) -> CzOutcome {
-  CzOutcome
-}
-
 failing!(
+  cz_platform_current(),
+  cz_platform_parse(&str),
+  cz_platform_description(containerization_oci::image::Platform),
+  cz_platform_equals(
+    containerization_oci::image::Platform,
+    containerization_oci::image::Platform
+  ),
+  cz_platform_matches(
+    containerization_oci::image::Platform,
+    containerization_oci::image::Platform
+  ),
+  cz_progress_event_event(ProgressKind, i64),
+  cz_proxy_from_environment(Option<String>, &str, bool, Vec<String>, Vec<String>),
   cz_process_from_image_config(containerization_oci::image::ImageConfig),
   cz_process_description(containerization_oci::runtime::Process),
   cz_hook_description(containerization_oci::runtime::Hook),

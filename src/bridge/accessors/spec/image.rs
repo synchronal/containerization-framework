@@ -1,7 +1,7 @@
 //! The OCI image's configuration.
 
-use super::present;
 use crate::bridge::accessors::entry_at;
+use crate::bridge::accessors::present;
 use crate::containerization_oci::image;
 use std::collections::BTreeMap;
 

@@ -234,22 +234,22 @@ impl LinuxContainer {
 
   /// `LinuxContainer.create()`.
   pub fn create(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.create(), format!("create {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.create(), format!("create {}", self.id())).map(drop)
   }
 
   /// `LinuxContainer.start()`.
   pub fn start(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.start(), format!("start {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.start(), format!("start {}", self.id())).map(drop)
   }
 
   /// `LinuxContainer.stop()`.
   pub fn stop(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.stop(), format!("stop {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.stop(), format!("stop {}", self.id())).map(drop)
   }
 
   /// `LinuxContainer.kill(_:)`.
   pub fn kill(&self, signal: Signal) -> Result<(), Error> {
-    platform::outcome(self.handle.kill(signal.raw_value), format!("signal {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.kill(signal.raw_value), format!("signal {}", self.id())).map(drop)
   }
 
   /// `LinuxContainer.wait(timeoutInSeconds:)`.
@@ -260,7 +260,7 @@ impl LinuxContainer {
 
   /// `LinuxContainer.resize(to:)`.
   pub fn resize(&self, to: terminal::Size) -> Result<(), Error> {
-    platform::outcome(self.handle.resize(to.width, to.height), format!("resize {}", self.id())).map(|_| ())
+    platform::outcome(self.handle.resize(to.width, to.height), format!("resize {}", self.id())).map(drop)
   }
 
   /// `LinuxContainer.exec(_:configuration:)`.
@@ -325,7 +325,7 @@ impl LinuxContainer {
 
   /// `LinuxContainer.closeStdin()`.
   pub fn close_stdin(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.close_stdin(), format!("close {}'s stdin", self.id())).map(|_| ())
+    platform::outcome(self.handle.close_stdin(), format!("close {}'s stdin", self.id())).map(drop)
   }
 
   /// `LinuxContainer.statistics(categories:)`.
@@ -343,7 +343,7 @@ impl LinuxContainer {
       self.handle.filesystem_operation(operation.into(), path),
       format!("{operation:?} {path} in {}", self.id()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `LinuxContainer.copyIn(from:to:mode:createParents:chunkSize:)`, from a
@@ -359,7 +359,7 @@ impl LinuxContainer {
       ),
       format!("copy {} into {}", source.display(), self.id()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `LinuxContainer.copyOut(from:to:createParents:chunkSize:)`, from a guest
@@ -374,7 +374,7 @@ impl LinuxContainer {
       ),
       format!("copy {} out of {}", source.display(), self.id()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `LinuxContainer.defaultMounts()`.

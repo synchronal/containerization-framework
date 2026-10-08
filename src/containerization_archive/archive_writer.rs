@@ -24,10 +24,7 @@ impl Default for FileOptions {
   fn default() -> Self {
     Self {
       options: Vec::new(),
-      locales: ArchiveWriterConfiguration::DEFAULT_LOCALES
-        .iter()
-        .map(|locale| locale.to_string())
-        .collect(),
+      locales: ArchiveWriterConfiguration::default_locales(),
     }
   }
 }
@@ -78,7 +75,7 @@ impl ArchiveWriter {
       self.handle.open(&file.display().to_string()),
       format!("open {} for an archive", file.display()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `ArchiveWriter.open(fileDescriptor:)`. The caller keeps `file_descriptor`
@@ -88,12 +85,12 @@ impl ArchiveWriter {
       self.handle.open_with_file_descriptor(file_descriptor),
       format!("open file descriptor {file_descriptor} for an archive"),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `ArchiveWriter.finishEncoding()`.
   pub fn finish_encoding(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.finish_encoding(), "finish an archive").map(|_| ())
+    platform::outcome(self.handle.finish_encoding(), "finish an archive").map(drop)
   }
 
   /// `ArchiveWriter.makeTransactionWriter()`.
@@ -114,7 +111,7 @@ impl ArchiveWriter {
       ),
       format!("write {} to an archive", entry.path().unwrap_or_default()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `ArchiveWriter.archiveDirectory(_:)`.
@@ -123,7 +120,7 @@ impl ArchiveWriter {
       self.handle.archive_directory(&dir.display().to_string()),
       format!("archive {}", dir.display()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `ArchiveWriter.archive(_:base:)`.
@@ -138,7 +135,7 @@ impl ArchiveWriter {
       ),
       format!("archive paths under {}", base.display()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 }
 
@@ -158,16 +155,16 @@ impl ArchiveWriterTransaction {
       self.handle.write_header(entry.handle.duplicate()),
       format!("write the header of {} to an archive", entry.path().unwrap_or_default()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `ArchiveWriterTransaction.writeChunk(data:)`.
   pub fn write_chunk(&self, data: &[u8]) -> Result<(), Error> {
-    platform::outcome(self.handle.write_chunk(data.to_vec()), "write a chunk to an archive").map(|_| ())
+    platform::outcome(self.handle.write_chunk(data.to_vec()), "write a chunk to an archive").map(drop)
   }
 
   /// `ArchiveWriterTransaction.finish()`.
   pub fn finish(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.finish(), "finish an archive entry").map(|_| ())
+    platform::outcome(self.handle.finish(), "finish an archive entry").map(drop)
   }
 }

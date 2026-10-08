@@ -54,11 +54,8 @@ pub(crate) fn cz_archive_reader_with_file_handle(_format: &str, _filter: &str, f
   CzOutcome
 }
 
-pub(crate) fn cz_ext4_reader_new(_block_device: &str) -> CzOutcome {
-  CzOutcome
-}
-
 failing!(
+  cz_ext4_reader_new(&str),
   cz_ext4_unpack_archive(image::Ext4Unpacker, &str, &str, &str),
   cz_ext4_reader_read_inline_extended_attributes(Vec<u8>),
   cz_ext4_reader_read_block_extended_attributes(Vec<u8>),

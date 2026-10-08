@@ -3,11 +3,11 @@
 
 use crate::bridge::ffi;
 use crate::containerization_ext4::ext4;
-use crate::containerization_ext4::ext4::formatter::FormatterOptions;
-use crate::containerization_ext4::ext4::journal_config::JournalMode;
+use crate::containerization_ext4::ext4::formatter;
+use crate::containerization_ext4::ext4::journal_config;
 use crate::platform;
 
-impl FormatterOptions {
+impl formatter::FormatterOptions {
   pub(crate) fn block_size(&self) -> u32 {
     self.block_size
   }
@@ -25,22 +25,29 @@ impl FormatterOptions {
   }
 
   pub(crate) fn has_journal_mode(&self) -> bool {
-    self
-      .journal
-      .and_then(|journal| journal.default_mode)
-      .is_some()
+    has_journal_mode(self.journal)
   }
 
   pub(crate) fn journal_mode(&self) -> ffi::JournalModeKind {
-    match self
-      .journal
-      .and_then(|journal| journal.default_mode)
-      .expect("Swift asks for the mode only after `has_journal_mode`")
-    {
-      JournalMode::Writeback => ffi::JournalModeKind::Writeback,
-      JournalMode::Ordered => ffi::JournalModeKind::Ordered,
-      JournalMode::Journal => ffi::JournalModeKind::Journal,
-    }
+    journal_mode(self.journal)
+  }
+}
+
+// What the formatter's and the unpacker's options share, read the same way.
+
+pub(super) fn has_journal_mode(journal: Option<journal_config::JournalConfig>) -> bool {
+  journal.and_then(|journal| journal.default_mode).is_some()
+}
+
+/// Only when [`has_journal_mode`].
+pub(super) fn journal_mode(journal: Option<journal_config::JournalConfig>) -> ffi::JournalModeKind {
+  match journal
+    .and_then(|journal| journal.default_mode)
+    .expect("Swift asks for the mode only after `has_journal_mode`")
+  {
+    journal_config::JournalMode::Writeback => ffi::JournalModeKind::Writeback,
+    journal_config::JournalMode::Ordered => ffi::JournalModeKind::Ordered,
+    journal_config::JournalMode::Journal => ffi::JournalModeKind::Journal,
   }
 }
 

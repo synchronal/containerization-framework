@@ -69,10 +69,15 @@ impl ArchiveWriterConfiguration {
       format,
       filter,
       options: Vec::new(),
-      locales: Self::DEFAULT_LOCALES
-        .iter()
-        .map(|locale| locale.to_string())
-        .collect(),
+      locales: Self::default_locales(),
     }
+  }
+
+  /// [`Self::DEFAULT_LOCALES`], owned.
+  pub(super) fn default_locales() -> Vec<String> {
+    Self::DEFAULT_LOCALES
+      .iter()
+      .map(|locale| locale.to_string())
+      .collect()
   }
 }

@@ -1,8 +1,8 @@
 //! The OCI runtime spec's Linux section: its namespaces, ID mappings, devices
 //! and personality.
 
-use super::present;
 use crate::bridge::accessors::entry_at;
+use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
 use std::collections::BTreeMap;

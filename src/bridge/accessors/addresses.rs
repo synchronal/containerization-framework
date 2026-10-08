@@ -1,6 +1,7 @@
 //! Getters for the addresses, interface addresses and routes Swift reads, and
 //! the addresses, prefixes and CIDR blocks Rust builds from an outcome.
 
+use super::present;
 use crate::bridge::ffi;
 use crate::containerization_extras;
 use crate::containerization_extras::address;
@@ -66,10 +67,7 @@ impl containerization_extras::InterfaceAddress {
   }
 
   fn ipv6(&self) -> &address::CIDRv6 {
-    self
-      .ipv6_address
-      .as_ref()
-      .expect("Swift asks for the IPv6 address only after `has_ipv6_address`")
+    present(&self.ipv6_address)
   }
 }
 
@@ -87,10 +85,7 @@ impl containerization_extras::LinkRoute {
   }
 
   pub(crate) fn ipv6_destination(&self) -> &address::IPv6Address {
-    self
-      .ipv6_destination
-      .as_ref()
-      .expect("Swift asks for the IPv6 destination only after `has_ipv6_destination`")
+    present(&self.ipv6_destination)
   }
 
   pub(crate) fn has_ipv6_source(&self) -> bool {
@@ -98,10 +93,7 @@ impl containerization_extras::LinkRoute {
   }
 
   pub(crate) fn ipv6_source(&self) -> &address::IPv6Address {
-    self
-      .ipv6_source
-      .as_ref()
-      .expect("Swift asks for the IPv6 source only after `has_ipv6_source`")
+    present(&self.ipv6_source)
   }
 }
 
@@ -115,10 +107,7 @@ impl containerization_extras::DefaultRoute {
   }
 
   pub(crate) fn ipv6_gateway(&self) -> &address::IPv6Address {
-    self
-      .ipv6_gateway
-      .as_ref()
-      .expect("Swift asks for the IPv6 gateway only after `has_ipv6_gateway`")
+    present(&self.ipv6_gateway)
   }
 }
 

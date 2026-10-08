@@ -46,19 +46,10 @@ handles!(
   CzRegistryClient,
 );
 
-pub(crate) fn cz_local_content_store_new(_path: &str) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_image_store_new(_path: &str) -> CzOutcome {
-  CzOutcome
-}
-
-pub(crate) fn cz_content_writer_new(_base: &str) -> CzOutcome {
-  CzOutcome
-}
-
 failing!(
+  cz_local_content_store_new(&str),
+  cz_image_store_new(&str),
+  cz_content_writer_new(&str),
   cz_registry_client_new(&str, bool, CzAuthentication),
   cz_registry_client_with_host(
     &str,

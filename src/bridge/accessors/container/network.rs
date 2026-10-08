@@ -1,5 +1,6 @@
 //! Getters and setters for network interfaces, DNS and hosts.
 
+use crate::bridge::accessors;
 use crate::bridge::ffi;
 use crate::containerization::network;
 use crate::containerization::network::hosts;
@@ -62,10 +63,7 @@ impl network::NatInterface {
   }
 
   fn ipv6_cidr(&self) -> &address::CIDRv6 {
-    self
-      .ipv6_address
-      .as_ref()
-      .expect("Swift asks for an IPv6 address only after has_ipv6_address")
+    accessors::present(&self.ipv6_address)
   }
 
   pub(crate) fn has_ipv6_gateway(&self) -> bool {
@@ -74,10 +72,7 @@ impl network::NatInterface {
 
   /// Only when [`Self::has_ipv6_gateway`].
   pub(crate) fn ipv6_gateway(&self) -> &address::IPv6Address {
-    self
-      .ipv6_gateway
-      .as_ref()
-      .expect("Swift asks for an IPv6 gateway only after has_ipv6_gateway")
+    accessors::present(&self.ipv6_gateway)
   }
 
   pub(crate) fn mac_address(&self) -> Option<u64> {

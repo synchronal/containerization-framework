@@ -1,9 +1,8 @@
 //! The OCI runtime spec's cgroup resources: memory, CPU, block I/O, device
 //! rules and the rest.
 
-use super::nth;
-use super::present;
 use crate::bridge::accessors::entry_at;
+use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
 use std::collections::BTreeMap;
@@ -191,15 +190,15 @@ impl runtime::LinuxResources {
   }
 
   pub(crate) fn rdma_key_at(&self, index: usize) -> &str {
-    nth(present(&self.rdma), index).0
+    entry_at(present(&self.rdma), index).0
   }
 
   pub(crate) fn rdma_hcs_handles_at(&self, index: usize) -> Option<u32> {
-    nth(present(&self.rdma), index).1.hcs_handles
+    entry_at(present(&self.rdma), index).1.hcs_handles
   }
 
   pub(crate) fn rdma_hca_objects_at(&self, index: usize) -> Option<u32> {
-    nth(present(&self.rdma), index).1.hca_objects
+    entry_at(present(&self.rdma), index).1.hca_objects
   }
 
   pub(crate) fn has_unified(&self) -> bool {

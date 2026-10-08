@@ -24,18 +24,3 @@ pub(super) use network::set_ipv6_gateway;
 pub(super) use network::vmnet;
 pub(super) use network::vmnet_interface;
 pub(super) use vm::boot_log_file;
-
-use crate::bridge::ffi;
-use std::collections::BTreeMap;
-
-impl ffi::CzOutcome {
-  /// The `Int32?` an outcome holds.
-  pub(crate) fn optional_int32(&self) -> Option<i32> {
-    self.optional(Self::int32)
-  }
-
-  /// A held `[String: Int32]`.
-  pub(crate) fn int32_map(&self) -> BTreeMap<String, i32> {
-    self.map_of(Self::int32)
-  }
-}

@@ -58,6 +58,6 @@ impl Ext4Unpacker {
       ),
       format!("unpack {} to {}", archive.display(), at.display()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 }

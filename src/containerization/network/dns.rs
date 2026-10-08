@@ -21,7 +21,7 @@ impl Dns {
   /// `DNS.validate()`, which fails on a nameserver that isn't an IPv4 or IPv6
   /// address.
   pub fn validate(&self) -> Result<(), Error> {
-    platform::outcome(ffi::cz_dns_validate(self.clone()), "validate DNS").map(|_| ())
+    platform::outcome(ffi::cz_dns_validate(self.clone()), "validate DNS").map(drop)
   }
 
   /// `DNS.resolvConf`: the configuration as `/etc/resolv.conf` text.

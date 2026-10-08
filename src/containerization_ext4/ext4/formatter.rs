@@ -113,9 +113,13 @@ impl Formatter {
   /// `EXT4.Formatter.create(path:link:mode:ts:buf:uid:gid:xattrs:recursion:)`.
   pub fn create(&self, path: &Path, mode: u16, options: CreateOptions<'_>) -> Result<(), Error> {
     let ts = options.ts;
-    let xattrs = options.xattrs.as_ref();
+    let has_xattrs = options.xattrs.is_some();
+    let (xattr_names, xattr_lengths, xattr_values) = options
+      .xattrs
+      .as_ref()
+      .map(platform::xattrs)
+      .unwrap_or_default();
 
-    // The xattrs' values cross joined into one, with each one's length.
     platform::outcome(
       self.handle.create(
         &path.display().to_string(),
@@ -129,16 +133,10 @@ impl Formatter {
         options.buf.unwrap_or_default().to_vec(),
         options.uid,
         options.gid,
-        xattrs.is_some(),
-        xattrs
-          .map(|xattrs| xattrs.keys().cloned().collect())
-          .unwrap_or_default(),
-        xattrs
-          .map(|xattrs| xattrs.values().map(|value| value.len() as u64).collect())
-          .unwrap_or_default(),
-        xattrs
-          .map(|xattrs| xattrs.values().flatten().copied().collect())
-          .unwrap_or_default(),
+        has_xattrs,
+        xattr_names,
+        xattr_lengths,
+        xattr_values,
         options.recursion,
       ),
       format!("create {}", path.display()),

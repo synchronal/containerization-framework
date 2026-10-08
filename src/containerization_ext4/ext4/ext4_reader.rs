@@ -106,7 +106,7 @@ impl Ext4Reader {
       self.handle.export(&archive.display().to_string()),
       format!("export the filesystem to {}", archive.display()),
     )
-    .map(|_| ())
+    .map(drop)
   }
 
   /// `EXT4.EXT4Reader.readInlineExtendedAttributes(from:)`. Like Swift's, it

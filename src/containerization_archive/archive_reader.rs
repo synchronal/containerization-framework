@@ -82,7 +82,7 @@ impl ArchiveReader {
 
   /// `ArchiveReader.throwIfStreamFailed()`.
   pub fn throw_if_stream_failed(&self) -> Result<(), Error> {
-    platform::outcome(self.handle.throw_if_stream_failed(), "read an archive").map(|_| ())
+    platform::outcome(self.handle.throw_if_stream_failed(), "read an archive").map(drop)
   }
 
   /// `ArchiveReader.extractContents(to:)`: the member paths it rejected.

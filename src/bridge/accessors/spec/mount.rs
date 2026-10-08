@@ -1,6 +1,6 @@
 //! The OCI runtime spec's mounts.
 
-use super::present;
+use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
 

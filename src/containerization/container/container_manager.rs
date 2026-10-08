@@ -262,12 +262,12 @@ impl ContainerManager {
 
   /// `ContainerManager.releaseNetwork(_:)`.
   pub fn release_network(&mut self, id: &str) -> Result<(), Error> {
-    platform::outcome(self.handle.release_network(id), format!("release {id}'s network")).map(|_| ())
+    platform::outcome(self.handle.release_network(id), format!("release {id}'s network")).map(drop)
   }
 
   /// `ContainerManager.delete(_:)`.
   pub fn delete(&mut self, id: &str) -> Result<(), Error> {
-    platform::outcome(self.handle.delete(id), format!("delete {id}")).map(|_| ())
+    platform::outcome(self.handle.delete(id), format!("delete {id}")).map(drop)
   }
 }
 

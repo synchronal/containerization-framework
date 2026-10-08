@@ -115,9 +115,24 @@ impl container::UnixSocketConfiguration {
   }
 
   pub(crate) fn direction(&self) -> ffi::SocketDirection {
-    match self.direction {
-      unix_socket_configuration::Direction::Into => ffi::SocketDirection::Into,
-      unix_socket_configuration::Direction::OutOf => ffi::SocketDirection::OutOf,
+    self.direction.into()
+  }
+}
+
+impl From<unix_socket_configuration::Direction> for ffi::SocketDirection {
+  fn from(direction: unix_socket_configuration::Direction) -> Self {
+    match direction {
+      unix_socket_configuration::Direction::Into => Self::Into,
+      unix_socket_configuration::Direction::OutOf => Self::OutOf,
+    }
+  }
+}
+
+impl From<ffi::SocketDirection> for unix_socket_configuration::Direction {
+  fn from(direction: ffi::SocketDirection) -> Self {
+    match direction {
+      ffi::SocketDirection::Into => Self::Into,
+      ffi::SocketDirection::OutOf => Self::OutOf,
     }
   }
 }
@@ -229,10 +244,7 @@ impl linux_container::Configuration {
       source: PathBuf::from(source),
       destination: PathBuf::from(destination),
       permissions,
-      direction: match direction {
-        ffi::SocketDirection::Into => unix_socket_configuration::Direction::Into,
-        ffi::SocketDirection::OutOf => unix_socket_configuration::Direction::OutOf,
-      },
+      direction: direction.into(),
     });
   }
 
@@ -370,10 +382,7 @@ impl linux_container::Configuration {
 
   /// Only when [`Self::has_dns`].
   pub(crate) fn dns(&self) -> &network::Dns {
-    self
-      .dns
-      .as_ref()
-      .expect("Swift asks for DNS only after has_dns")
+    accessors::present(&self.dns)
   }
 
   pub(crate) fn has_hosts(&self) -> bool {
@@ -382,10 +391,7 @@ impl linux_container::Configuration {
 
   /// Only when [`Self::has_hosts`].
   pub(crate) fn hosts(&self) -> &network::Hosts {
-    self
-      .hosts
-      .as_ref()
-      .expect("Swift asks for hosts only after has_hosts")
+    accessors::present(&self.hosts)
   }
 
   pub(crate) fn virtualization(&self) -> bool {
@@ -398,10 +404,7 @@ impl linux_container::Configuration {
 
   /// Only when [`Self::has_boot_log`].
   pub(crate) fn boot_log(&self) -> &vm::BootLog {
-    self
-      .boot_log
-      .as_ref()
-      .expect("Swift asks for a boot log only after has_boot_log")
+    accessors::present(&self.boot_log)
   }
 
   pub(crate) fn oci_runtime_path(&self) -> Option<&str> {

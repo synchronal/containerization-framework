@@ -3,6 +3,7 @@
 
 use super::container;
 use super::entry_at;
+use super::present;
 use crate::bridge::ffi;
 use crate::containerization;
 use crate::containerization::container::linux_pod;
@@ -170,10 +171,7 @@ impl linux_pod::Configuration {
 
   /// Only when [`Self::has_boot_log`].
   pub(crate) fn boot_log(&self) -> &containerization::vm::BootLog {
-    self
-      .boot_log
-      .as_ref()
-      .expect("Swift asks for a boot log only after has_boot_log")
+    present(&self.boot_log)
   }
 
   pub(crate) fn share_process_namespace(&self) -> bool {
@@ -190,10 +188,7 @@ impl linux_pod::Configuration {
 
   /// Only when [`Self::has_dns`].
   pub(crate) fn dns(&self) -> &containerization::network::Dns {
-    self
-      .dns
-      .as_ref()
-      .expect("Swift asks for DNS only after has_dns")
+    present(&self.dns)
   }
 
   pub(crate) fn has_hosts(&self) -> bool {
@@ -202,10 +197,7 @@ impl linux_pod::Configuration {
 
   /// Only when [`Self::has_hosts`].
   pub(crate) fn hosts(&self) -> &containerization::network::Hosts {
-    self
-      .hosts
-      .as_ref()
-      .expect("Swift asks for hosts only after has_hosts")
+    present(&self.hosts)
   }
 
   pub(crate) fn volumes_len(&self) -> usize {
@@ -347,10 +339,7 @@ impl linux_pod::ContainerConfiguration {
 
   /// Only when [`Self::has_dns`].
   pub(crate) fn dns(&self) -> &containerization::network::Dns {
-    self
-      .dns
-      .as_ref()
-      .expect("Swift asks for DNS only after has_dns")
+    present(&self.dns)
   }
 
   pub(crate) fn has_hosts(&self) -> bool {
@@ -359,10 +348,7 @@ impl linux_pod::ContainerConfiguration {
 
   /// Only when [`Self::has_hosts`].
   pub(crate) fn hosts(&self) -> &containerization::network::Hosts {
-    self
-      .hosts
-      .as_ref()
-      .expect("Swift asks for hosts only after has_hosts")
+    present(&self.hosts)
   }
 
   pub(crate) fn has_seccomp_profile(&self) -> bool {
@@ -380,10 +366,7 @@ impl linux_pod::ContainerConfiguration {
   }
 
   fn own_seccomp_profile(&self) -> &containerization::container::linux_container::SeccompProfile {
-    self
-      .seccomp_profile
-      .as_ref()
-      .expect("Swift asks for a seccomp profile only after has_seccomp_profile")
+    present(&self.seccomp_profile)
   }
 
   pub(crate) fn use_init(&self) -> bool {

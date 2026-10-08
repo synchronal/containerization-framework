@@ -19,6 +19,7 @@ use crate::containerization::process;
 use crate::containerization_error;
 use crate::containerization_extras::ProgressHandler;
 use crate::error::Error;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
@@ -157,6 +158,16 @@ pub(crate) fn seconds(time: SystemTime) -> f64 {
     Ok(after) => after.as_secs_f64(),
     Err(before) => -before.duration().as_secs_f64(),
   }
+}
+
+/// A `[String: Data]` of extended attributes as it crosses to Swift: the
+/// names, each value's length, and the values joined into one.
+pub(crate) fn xattrs(xattrs: &BTreeMap<String, Vec<u8>>) -> (Vec<String>, Vec<u64>, Vec<u8>) {
+  (
+    xattrs.keys().cloned().collect(),
+    xattrs.values().map(|value| value.len() as u64).collect(),
+    xattrs.values().flatten().copied().collect(),
+  )
 }
 
 #[cfg(test)]

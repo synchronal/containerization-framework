@@ -13,26 +13,13 @@ mod process;
 mod resources;
 mod seccomp;
 
-use super::entry_at;
+use crate::bridge::accessors::entry_at;
+use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
 use std::collections::BTreeMap;
 
 impl ffi::CzOutcome {
-  /// What an outcome holds as text, or `None` for `Absent`.
-  pub(crate) fn optional_text(&self) -> Option<String> {
-    self.optional(Self::text)
-  }
-
-  /// A held `[String: T]`, each value read by `read`.
-  pub(super) fn map_of<T>(&self, read: impl Fn(&Self) -> T) -> BTreeMap<String, T> {
-    self
-      .entry_keys()
-      .into_iter()
-      .zip(self.entry_values().list(read))
-      .collect()
-  }
-
   /// The `Spec` an outcome holds, read field by field.
   pub(crate) fn spec(&self) -> runtime::Spec {
     runtime::Spec {
@@ -63,22 +50,6 @@ impl ffi::CzOutcome {
       dev: self.runtime_spec_version_dev(),
     }
   }
-}
-
-/// What an optional field holds. Swift asks for it only after `has_`.
-fn present<T>(value: &Option<T>) -> &T {
-  value
-    .as_ref()
-    .expect("Swift asks for an optional field only after its `has_` getter")
-}
-
-/// The `index`th entry of a sorted map of values other than strings.
-fn nth<T>(map: &BTreeMap<String, T>, index: usize) -> (&str, &T) {
-  map
-    .iter()
-    .nth(index)
-    .map(|(key, value)| (key.as_str(), value))
-    .expect("Swift asks for an entry only below the length")
 }
 
 impl runtime::Spec {
