@@ -2,8 +2,7 @@
 
 use crate::bridge::ffi;
 use crate::containerization_os::keychain;
-use std::time::Duration;
-use std::time::SystemTime;
+use crate::platform;
 
 impl ffi::CzOutcome {
   /// The `[RegistryInfo]` an outcome holds, its dates crossing as seconds
@@ -12,12 +11,8 @@ impl ffi::CzOutcome {
     self.list(|info| keychain::RegistryInfo {
       hostname: info.registry_info_hostname(),
       username: info.registry_info_username(),
-      modified_date: date(info.registry_info_modified_date()),
-      created_date: date(info.registry_info_created_date()),
+      modified_date: platform::system_time(info.registry_info_modified_date()),
+      created_date: platform::system_time(info.registry_info_created_date()),
     })
   }
-}
-
-fn date(seconds: f64) -> SystemTime {
-  SystemTime::UNIX_EPOCH + Duration::from_secs_f64(seconds.max(0.0))
 }

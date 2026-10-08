@@ -151,7 +151,7 @@ fn error(_outcome: &ffi::CzOutcome, action: impl Into<String>, message: String) 
 pub(crate) fn exit_status(outcome: &ffi::CzOutcome) -> process::ExitStatus {
   process::ExitStatus {
     exit_code: outcome.exit_code(),
-    exited_at: SystemTime::UNIX_EPOCH + Duration::from_secs_f64(outcome.exited_at().max(0.0)),
+    exited_at: system_time(outcome.exited_at()),
   }
 }
 

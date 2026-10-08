@@ -47,6 +47,11 @@
 - `Error` is `#[non_exhaustive]`, and `Error::unavailable` is no longer
   public. `Error` now implements `Clone`, `PartialEq` and `Eq`.
 
+### Fixes
+
+- A process's `exited_at` and a keychain `RegistryInfo`'s dates now keep
+  dates before 1970 instead of becoming 1970.
+
 ## v0.4.0
 
 This release binds most of the rest of Containerization's Swift API. Each
