@@ -58,7 +58,10 @@ and stops when that process exits.
   which resolves Containerization and its dependencies through SwiftPM. Versions
   are pinned by the `Package.resolved` that ships with this crate.
 
-On non-macOS platforms, this crate compiles but returns errors on every call.
+On other platforms this crate compiles, so a cross-platform workspace builds,
+but every call that would reach Swift returns `Error::Unavailable`. Values
+built purely in Rust, such as `IPv4Address::new` or `Descriptor::new`, work as
+usual.
 
 ## Codesigning
 
@@ -104,7 +107,8 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 - `containerization`, in five groups. `image`: `ImageStore`, `Image`,
   `image::Description`, `InitImage`, `KernelImage`, `Ext4Unpacker`. `vm`:
   `Kernel`, `SystemPlatform`, `VmConfiguration`, `VmResources`, `BootLog`,
-  `VzVirtualMachineManager`, `VzVirtualMachineInstance`. `network`:
+  `VzVirtualMachineManager`, `VzVirtualMachineInstance`, `Vminitd`,
+  `VsockListener`. `network`:
   `VmnetNetwork`, `NatInterface`, `Interface`, `Dns`, `Hosts`. `container`:
   `ContainerManager`, `LinuxContainer`, `LinuxPod`, `Mount`, and the
   configuration types they take (`linux_container::Configuration`, ...).
@@ -112,16 +116,22 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
   `LinuxCapabilities`, `ExitStatus`. Their defaults match Containerization's.
 - `containerization_oci`, in four groups. `content`: `LocalContentStore`,
   `Content`, `ContentWriter`. `image`: `Descriptor`, `Platform`, `Reference`,
-  `Manifest`. `client`: `RegistryClient`, `Authentication`. `runtime`: `Spec`,
-  `Bundle`, `User`.
+  `Manifest`. `client`: `RegistryClient`, `Authentication`, `KeychainHelper`.
+  `runtime`: `Spec` and the types it holds, `Bundle`, `State`, `User`.
+- `containerization_archive`: `ArchiveReader`, `ArchiveWriter`, `WriteEntry`,
+  and the formats and filters they take.
+- `containerization_error`: the `Code` that a thrown `ContainerizationError`
+  carries, which `Error::is_code` checks.
 - `containerization_ext4`: `ext4::Formatter`, `ext4::Ext4Reader`,
   `ext4::SuperBlock`, `ext4::Inode`, `ext4::JournalConfig`,
   `FileTimestamps`.
 - `containerization_extras`: in `address`, `IPv4Address`, `IPv6Address`,
-  `IpAddress`, `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr` and `MACAddress`; and
-  `ProgressEvent` and `ProgressHandler` at the root.
+  `IpAddress`, `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr` and `MACAddress`; at the
+  root, `InterfaceAddress`, `LinkRoute`, `DefaultRoute`, `ProgressEvent` and
+  `ProgressHandler`; and `proxy_utils`.
 - `containerization_io`: `ReadStream`.
-- `containerization_os`: `terminal::Size` and `keychain::KeychainQuery`.
+- `containerization_os`: `Terminal`, `CapabilityName`, `CapabilitySet`,
+  `binfmt`, `sysctl`, `file`, and `keychain::KeychainQuery`.
 
 A few things work differently because Rust can't express them the way Swift
 does:
@@ -151,16 +161,12 @@ does:
   `CIDRv4`, `CIDRv6` and `MACAddress`, only Swift makes one, so their fields
   are read through getters.
 
-## Unimplemented
+## OCI runtimes
 
-The framework is larger than these bindings. Not exposed: `LinuxPod`, a
-`Network` for `ContainerManager`, `VZVirtualMachineManager` and
-`LinuxContainer`'s own initializers, container statistics, filesystem
-operations, file copy between host and guest, vsock, registry authentication,
-push, and OCI layout save.
-
-An OCI runtime (and so seccomp) is configurable, but requires an init image with
-`runc`, which Apple does not publish.
+An OCI runtime, and with it a seccomp profile, can be configured. Swift refuses
+a seccomp profile without an OCI runtime path, and the runtime has to be in the
+init image. The init image Apple publishes has no `runc`, so such a container
+fails to start unless you build an init image with one.
 
 ## Versioning
 
@@ -171,19 +177,29 @@ the caller chooses the kernel and the init image.
 
 ## Testing
 
-`cargo nextest run` runs the unit tests.
+`cargo nextest run` runs the unit tests. They also check Rust's copies of Swift
+values, such as raw values, defaults and struct layouts, against Swift.
 
-The suite in `tests/` boots real containers, so it sits behind the `integration`
-feature and runs through `bin/dev/test-integration`, which signs each test binary
-with `containerization.entitlements` first — the entitlement is checked against the
-calling process.
+The suites in `tests/` call into the real framework, so they sit behind the
+`integration` feature and run through `bin/dev/test-integration`. Some only ask
+Swift for values, while others boot real containers and VMs. The script signs
+each test binary with `containerization.entitlements` first, because the
+entitlement is checked against the calling process. Run the suites only through
+the script: a test binary that cargo rebuilds after the script signed it has no
+entitlement, and its VMs fail to start.
 
 Those tests share an image store at `~/.cache/containerization-framework-tests`,
-kept between runs. Before the tests that boot a VM, nextest runs
+which is kept between runs. Before the tests that boot a VM, nextest runs
 `bin/dev/prepare-integration` as a setup script, which downloads the kernel into
-the store. The tests then pull the init image and `alpine:3` themselves. A first
-run therefore needs the network, and later runs reuse the store. This directory
-can be deleted.
+the store. The tests then pull the init image and `alpine:3` themselves, and
+the registry tests talk to Docker Hub. A first run therefore needs the network,
+and later runs reuse the store. The store's directory can be deleted at any
+time.
+
+Two tests open Containerization's default image store, and in doing so create
+`~/Library/Application Support/com.apple.containerization` if it is missing.
+The tests that need a vmnet network pass without checking anything on a host
+whose process lacks the vmnet entitlement, and say so in their output.
 
 ## License
 
