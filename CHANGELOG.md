@@ -53,6 +53,9 @@
   dates before 1970 instead of becoming 1970.
 - `VsockListener`'s iterator panics if the bridge fails. Before, the failure
   looked like the end of the connections.
+- The build script no longer rewrites the staged FFI glue on every run, so
+  SwiftPM doesn't recompile an unchanged bridge. A change to
+  `swift/Package.resolved` now reruns the build script.
 
 ## v0.4.0
 

@@ -10,7 +10,8 @@
 //! a copy per fingerprint costs ~2 GiB and a full rebuild of Containerization.
 //!
 //! macOS only. On other platforms the bridge is a stand-in
-//! (`src/platform/unsupported.rs`) that compiles, but fails every constructor.
+//! (`src/platform/unsupported`) that compiles, but fails every call that would
+//! reach Swift.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -108,14 +109,16 @@ fn publish_bridge_shims(generated: &Path) {
 }
 
 /// Mirrors `from` onto `to`, skipping unchanged files and removing anything
-/// this run didn't write. SwiftPM keys off mtimes.
+/// this run didn't write. SwiftPM keys off mtimes. Entries named in `skip` are
+/// neither copied nor removed, since something else owns them.
 fn mirror(from: &Path, to: &Path, skip: &[&str]) {
   std::fs::create_dir_all(to).expect("the destination should be creatable");
 
   for entry in std::fs::read_dir(to).expect("the destination was just created") {
     let entry = entry.expect("a readable directory entry");
+    let name = entry.file_name();
 
-    if from.join(entry.file_name()).exists() {
+    if skip.iter().any(|skipped| name == *skipped) || from.join(&name).exists() {
       continue;
     }
 
@@ -239,6 +242,10 @@ fn main() {
   println!(
     "cargo:rerun-if-changed={}",
     source_package_dir().join("Package.swift").display()
+  );
+  println!(
+    "cargo:rerun-if-changed={}",
+    source_package_dir().join("Package.resolved").display()
   );
 
   let staged = staged_package_dir();
