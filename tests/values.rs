@@ -249,7 +249,7 @@ fn configures_a_process_from_an_empty_image() {
 
 #[test]
 fn sets_a_processs_terminal() {
-  let (parent, _child) = cfw::containerization_os::terminal::Terminal::create(None).expect("a pty");
+  let (parent, _child) = cfw::containerization_os::Terminal::create(None).expect("a pty");
   let mut process = cfw::containerization::process::LinuxProcessConfiguration {
     stderr: Some(2),
     ..cfw::containerization::process::LinuxProcessConfiguration::new(&["/bin/sh"])
@@ -354,9 +354,13 @@ fn converts_host_signals_to_linuxs() {
 }
 
 #[test]
-fn renders_system_platforms_raw_values() {
+fn renders_system_platforms_as_swift_does() {
   let platform = cfw::containerization::vm::SystemPlatform::LINUX_AMD;
 
   assert_eq!(platform.os.as_str(), "linux");
   assert_eq!(platform.architecture.as_str(), "amd64");
+  assert_eq!(
+    platform.oci_platform().expect("a platform"),
+    cfw::containerization_oci::image::Platform::parse("linux/amd64").expect("a platform")
+  );
 }

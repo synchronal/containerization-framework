@@ -60,8 +60,9 @@
 //! `containerization.entitlements` in this crate is the file to pass to
 //! `codesign --entitlements`.
 //!
-//! Elsewhere this crate compiles, and every constructor fails with
-//! [`Error::Unavailable`], so a cross-platform workspace still builds.
+//! Elsewhere this crate compiles, so a cross-platform workspace builds, but
+//! every call that would reach Swift fails with [`Error::Unavailable`]. Values
+//! built purely in Rust work as usual.
 //!
 //! [Containerization]: https://github.com/apple/containerization
 

@@ -9,15 +9,10 @@ use containerization_framework as cfw;
 /// Well formed, and the hash of nothing this suite stores.
 const ABSENT: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
-fn content_store() -> cfw::containerization_oci::content::LocalContentStore {
-  cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
-    .expect("the suite's content store should open")
-}
-
 #[test]
 fn gets_each_blob_an_image_is_made_of() {
   let image = support::store::image(&support::store::image_store());
-  let store = content_store();
+  let store = support::store::content_store();
 
   let digests = image
     .referenced_digests()
@@ -58,7 +53,12 @@ fn reads_part_of_a_blob() {
 
 #[test]
 fn finds_no_blob_the_store_never_held() {
-  assert!(content_store().get(ABSENT).expect("a lookup").is_none());
+  assert!(
+    support::store::content_store()
+      .get(ABSENT)
+      .expect("a lookup")
+      .is_none()
+  );
 }
 
 /// A file outside any ingest directory, and a store of its own.
@@ -224,7 +224,7 @@ fn says_which_directory_a_content_writer_could_not_write_into() {
 
 #[test]
 fn says_which_blob_it_could_not_get() {
-  let error = content_store()
+  let error = support::store::content_store()
     .get("not-a-digest")
     .err()
     .expect("a malformed digest");

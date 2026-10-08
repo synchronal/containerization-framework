@@ -326,18 +326,37 @@ fn refuses_seccomp_without_an_oci_runtime() {
   assert!(error.to_string().contains("seccomp"), "{error}");
 }
 
-/// The profile crosses to Swift and back, so the container gets as far as
-/// starting `runc`.
+/// The profile crosses to Swift and back whole, and the container gets as far
+/// as starting `runc`.
 #[test]
 fn carries_a_seccomp_profile_of_its_own() {
-  let profile = cfw::containerization_oci::runtime::LinuxSeccomp::default_profile(
+  let profile = cfw::containerization::container::linux_container::SeccompProfile::Profile(
+    cfw::containerization_oci::runtime::LinuxSeccomp::default_profile(
+      None,
+      cfw::containerization_oci::runtime::Arch::current_verified().expect("a seccomp architecture"),
+    )
+    .expect("the default profile"),
+  );
+
+  // Never created, so the rootfs needn't exist.
+  let carried = cfw::containerization::container::LinuxContainer::new(
+    "cfw-test-config-seccomp-profile-carried",
+    cfw::containerization::container::Mount::block("ext4", "/rootfs.ext4", "/", &[], &[]),
     None,
-    cfw::containerization_oci::runtime::Arch::current_verified().expect("a seccomp architecture"),
+    &support::store::vmm(),
+    support::vm(),
+    cfw::containerization::container::linux_container::Configuration {
+      oci_runtime_path: Some("/sbin/runc".into()),
+      seccomp_profile: profile.clone(),
+      ..Default::default()
+    },
   )
-  .expect("the default profile");
+  .expect("a container should be made from a configuration");
+  assert_eq!(carried.config().seccomp_profile, profile);
+
   let refused = Container::try_boot_with("cfw-test-config-seccomp-profile", |configuration| {
     configuration.oci_runtime_path = Some("/sbin/runc".into());
-    configuration.seccomp_profile = cfw::containerization::container::linux_container::SeccompProfile::Profile(profile);
+    configuration.seccomp_profile = profile;
   });
 
   let error = refused.err().expect("the stock init image has no runc");

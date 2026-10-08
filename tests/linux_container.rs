@@ -133,7 +133,7 @@ fn execs_with_a_closure_on_swifts_defaults() {
 }
 
 #[test]
-fn reports_statistics_and_reaches_into_the_guest() {
+fn reports_statistics_and_refuses_a_port_nothing_listens_on() {
   let booted = Container::boot("cfw-test-container-statistics");
   let container = booted.container();
 
@@ -160,7 +160,7 @@ fn reports_statistics_and_reaches_into_the_guest() {
 }
 
 #[test]
-fn copies_files_in_and_out() {
+fn copies_files_in_and_out_and_freezes_the_filesystem() {
   let booted = Container::boot("cfw-test-container-copy");
   let container = booted.container();
   let directory = tempfile::tempdir().expect("a temporary directory");

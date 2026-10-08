@@ -3,7 +3,6 @@
 //! ContainerizationOS: `Terminal`, `CapabilityName`, `CapabilitySet`,
 //! `KeychainQuery`, `Sysctl` and `File`.
 
-use cfw::containerization_os::terminal::Size;
 use containerization_framework as cfw;
 use std::io::IsTerminal;
 use std::io::Read;
@@ -67,10 +66,16 @@ fn parses_capability_sets_as_swift_does() {
 
 #[test]
 fn creates_a_pty_of_the_size_asked_for() {
-  let (parent, child) =
-    cfw::containerization_os::Terminal::create(Some(Size { width: 80, height: 24 })).expect("a pty");
+  let (parent, child) = cfw::containerization_os::Terminal::create(Some(cfw::containerization_os::terminal::Size {
+    width: 80,
+    height: 24,
+  }))
+  .expect("a pty");
 
-  assert_eq!(child.size().expect("the child's size"), Size { width: 80, height: 24 });
+  assert_eq!(
+    child.size().expect("the child's size"),
+    cfw::containerization_os::terminal::Size { width: 80, height: 24 }
+  );
 
   parent.close().expect("the parent should close");
   child.close().expect("the child should close");
@@ -80,7 +85,10 @@ fn creates_a_pty_of_the_size_asked_for() {
 fn creates_a_pty_of_swifts_default_size() {
   let (parent, child) = cfw::containerization_os::Terminal::create(None).expect("a pty");
 
-  assert_eq!(child.size().expect("the child's size"), Size { width: 120, height: 40 });
+  assert_eq!(
+    child.size().expect("the child's size"),
+    cfw::containerization_os::terminal::Size { width: 120, height: 40 }
+  );
 
   parent.close().expect("the parent should close");
   child.close().expect("the child should close");
@@ -90,10 +98,14 @@ fn creates_a_pty_of_swifts_default_size() {
 fn resizes_a_pty() {
   let (parent, child) = cfw::containerization_os::Terminal::create(None).expect("a pty");
   let (other_parent, other_child) =
-    cfw::containerization_os::Terminal::create(Some(Size { width: 33, height: 11 })).expect("another pty");
+    cfw::containerization_os::Terminal::create(Some(cfw::containerization_os::terminal::Size {
+      width: 33,
+      height: 11,
+    }))
+    .expect("another pty");
 
   parent
-    .resize(Size { width: 100, height: 30 })
+    .resize(cfw::containerization_os::terminal::Size { width: 100, height: 30 })
     .expect("a resize to a size");
   let resized = child.size().expect("the size after a resize");
   parent
@@ -108,9 +120,18 @@ fn resizes_a_pty() {
   for terminal in [parent, child, other_parent, other_child] {
     terminal.close().expect("the terminal should close");
   }
-  assert_eq!(resized, Size { width: 100, height: 30 });
-  assert_eq!(resized_to_width_and_height, Size { width: 90, height: 20 });
-  assert_eq!(resized_from, Size { width: 33, height: 11 });
+  assert_eq!(
+    resized,
+    cfw::containerization_os::terminal::Size { width: 100, height: 30 }
+  );
+  assert_eq!(
+    resized_to_width_and_height,
+    cfw::containerization_os::terminal::Size { width: 90, height: 20 }
+  );
+  assert_eq!(
+    resized_from,
+    cfw::containerization_os::terminal::Size { width: 33, height: 11 }
+  );
 }
 
 #[test]

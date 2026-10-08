@@ -8,29 +8,8 @@ mod support;
 use containerization_framework as cfw;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 const CAPACITY_IN_BYTES: u64 = 512 * 1024 * 1024;
-
-/// Every event a handler is called with, in order.
-fn recorded() -> (
-  Arc<Mutex<Vec<cfw::containerization_extras::ProgressEvent>>>,
-  cfw::containerization_extras::ProgressHandler,
-) {
-  let events = Arc::new(Mutex::new(Vec::new()));
-  let recording = Arc::clone(&events);
-
-  (
-    events,
-    Box::new(move |batch| {
-      recording
-        .lock()
-        .expect("a recording")
-        .extend_from_slice(batch)
-    }),
-  )
-}
 
 #[test]
 fn unpacks_an_image_and_reports_its_progress() {
@@ -38,7 +17,7 @@ fn unpacks_an_image_and_reports_its_progress() {
   let at = directory.path().join("rootfs.ext4");
   let image = support::store::image(&support::store::image_store());
   let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
-  let (events, handler) = recorded();
+  let (events, handler) = support::recorded();
 
   let mount = cfw::containerization::image::Ext4Unpacker::new(CAPACITY_IN_BYTES, None)
     .unpack(&image, &platform, &at, Some(handler))
@@ -86,7 +65,11 @@ fn unpacks_with_a_journal() {
     .unpack(&image, &platform, &at, None)
     .expect("the image should unpack");
 
-  assert!(at.is_file(), "{}", at.display());
+  let super_block = cfw::containerization_ext4::ext4::Ext4Reader::new(&at)
+    .expect("the filesystem should read")
+    .super_block();
+
+  assert_ne!(super_block.journal_inum, 0, "the filesystem has a journal");
 }
 
 #[test]
@@ -395,7 +378,7 @@ fn unpacks_an_archive_and_reports_its_progress() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let archive = archive(directory.path());
   let at = directory.path().join("unpacked.ext4");
-  let (events, handler) = recorded();
+  let (events, handler) = support::recorded();
   let (size, items) = cfw::containerization_ext4::ext4::Formatter::scan_archive_headers(
     cfw::containerization_archive::Format::PaxRestricted,
     cfw::containerization_archive::Filter::Gzip,

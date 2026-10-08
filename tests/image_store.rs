@@ -6,8 +6,6 @@ mod support;
 
 use containerization_framework as cfw;
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 #[test]
 fn gets_lists_tags_and_deletes_images() {
@@ -39,8 +37,7 @@ fn gets_lists_tags_and_deletes_images() {
 #[test]
 fn shares_a_content_store() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
-    .expect("the suite's content store should open");
+  let content_store = support::store::content_store();
   let store =
     cfw::containerization::image::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
       .expect("an image store sharing the suite's content store");
@@ -67,26 +64,19 @@ fn shares_a_content_store() {
 #[test]
 fn pulls_one_platform_and_reports_its_progress() {
   let directory = tempfile::tempdir().expect("a temporary directory");
-  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
-    .expect("the suite's content store should open");
+  let content_store = support::store::content_store();
   let store =
     cfw::containerization::image::ImageStore::with_content_store(&directory.path().join("images"), &content_store)
       .expect("an image store sharing the suite's content store");
   let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
-  let events = Arc::new(Mutex::new(Vec::new()));
-  let recording = Arc::clone(&events);
+  let (events, handler) = support::recorded();
 
   let image = store
     .pull(
       support::store::IMAGE,
       cfw::containerization::image::image_store::PullOptions {
         platform: Some(platform.clone()),
-        progress: Some(Box::new(move |batch| {
-          recording
-            .lock()
-            .expect("a recording")
-            .extend_from_slice(batch)
-        })),
+        progress: Some(handler),
         ..Default::default()
       },
     )
@@ -287,19 +277,10 @@ fn loads_an_oci_layout_and_reports_its_progress() {
 
   let directory = tempfile::tempdir().expect("a temporary directory");
   let store = cfw::containerization::image::ImageStore::new(directory.path()).expect("a new image store should open");
-  let events = Arc::new(Mutex::new(Vec::new()));
-  let recording = Arc::clone(&events);
+  let (events, handler) = support::recorded();
 
   let loaded = store
-    .load(
-      layout.path(),
-      Some(Box::new(move |batch| {
-        recording
-          .lock()
-          .expect("a recording")
-          .extend_from_slice(batch)
-      })),
-    )
+    .load(layout.path(), Some(handler))
     .expect("the layout should load");
 
   assert_eq!(loaded.len(), 1);
@@ -317,8 +298,7 @@ fn loads_an_oci_layout_and_reports_its_progress() {
 #[test]
 fn makes_an_image_from_its_description() {
   let image = support::store::image(&support::store::image_store());
-  let content_store = cfw::containerization_oci::content::LocalContentStore::new(&support::store::content_store_path())
-    .expect("the suite's content store should open");
+  let content_store = support::store::content_store();
 
   let made = cfw::containerization::image::Image::new(&image.description(), &content_store);
 

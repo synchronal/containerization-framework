@@ -7,7 +7,7 @@ use std::io::Read;
 use std::os::fd::AsRawFd;
 
 /// Holds a container open; the image's own `Cmd` would exit at once.
-const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
+pub const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
 
 /// A created and started container, and the manager that made it.
 ///
@@ -151,17 +151,7 @@ impl Container {
       .exec(id, configuration)
       .unwrap_or_else(|error| panic!("{arguments:?} should exec in {name}: {error}"));
 
-    process
-      .start()
-      .unwrap_or_else(|error| panic!("{arguments:?} should start in {name}: {error}"));
-
-    let status = process
-      .wait(None)
-      .unwrap_or_else(|error| panic!("{arguments:?} should finish in {name}: {error}"));
-
-    let _ = process.delete();
-
-    status.exit_code
+    finish(&process, &format!("{arguments:?} in {name}"))
   }
 
   /// Runs a command with nothing attached, reporting its exit code.
@@ -229,8 +219,24 @@ fn suite_configuration(
   }
 }
 
+/// Starts an unstarted process, waits for it to exit, deletes it, and returns
+/// its exit code. `what` names it in a failure.
+pub fn finish(process: &cfw::containerization::process::LinuxProcess, what: &str) -> i32 {
+  process
+    .start()
+    .unwrap_or_else(|error| panic!("{what} should start: {error}"));
+
+  let status = process
+    .wait(None)
+    .unwrap_or_else(|error| panic!("{what} should finish: {error}"));
+
+  let _ = process.delete();
+
+  status.exit_code
+}
+
 /// A process that holds the container open, in the suite's limits.
-fn keep_alive(configuration: &mut cfw::containerization::container::linux_container::Configuration) {
+pub fn keep_alive(configuration: &mut cfw::containerization::container::linux_container::Configuration) {
   configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
   configuration.cpus = super::TEST_CPUS;
   configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;

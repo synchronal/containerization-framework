@@ -41,6 +41,12 @@ pub fn content_store_path() -> PathBuf {
   root().join("content")
 }
 
+/// The suite's content store, which [`image_store`] keeps its blobs in.
+pub fn content_store() -> cfw::containerization_oci::content::LocalContentStore {
+  cfw::containerization_oci::content::LocalContentStore::new(&content_store_path())
+    .expect("the suite's content store should open")
+}
+
 /// [`IMAGE`], pulled on a first run. The lock keeps concurrent first runs from
 /// pulling it at once.
 pub fn image(store: &cfw::containerization::image::ImageStore) -> cfw::containerization::image::Image {

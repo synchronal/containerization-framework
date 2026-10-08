@@ -21,7 +21,8 @@ filter = 'binary(linux_container) | binary(configuration) | binary(container_man
 test-group = 'containers'
 slow-timeout = { period = "300s", terminate-after = 4 }
 
-# A cold store pulls an image and the init image.
+# A cold store pulls an image and the init image, and the registry and OCI
+# suites reach the registry the image is pulled from.
 [[profile.default.overrides]]
-filter = 'binary(content) | binary(image_store) | binary(ext4)'
+filter = 'binary(content) | binary(image_store) | binary(ext4) | binary(oci) | binary(registry)'
 slow-timeout = { period = "300s", terminate-after = 4 }

@@ -7,15 +7,6 @@ mod support;
 
 use containerization_framework as cfw;
 
-/// Holds a container open; the image's own `Cmd` would exit at once.
-const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
-
-fn keep_alive(configuration: &mut cfw::containerization::container::linux_container::Configuration) {
-  configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
-  configuration.cpus = support::TEST_CPUS;
-  configuration.memory_in_bytes = support::TEST_MEMORY_IN_BYTES;
-}
-
 /// Runs `/bin/true` in `container`, returning its exit code.
 fn run_true(container: &cfw::containerization::container::LinuxContainer, id: &str) -> i32 {
   let process = container
@@ -25,11 +16,7 @@ fn run_true(container: &cfw::containerization::container::LinuxContainer, id: &s
     )
     .expect("/bin/true should exec");
 
-  process.start().expect("/bin/true should start");
-  let status = process.wait(None).expect("/bin/true should finish");
-  let _ = process.delete();
-
-  status.exit_code
+  support::container::finish(&process, "/bin/true")
 }
 
 #[test]
@@ -167,9 +154,15 @@ fn pauses_and_resumes_a_container_on_its_own_manager() {
   let rootfs = support::store::unpack(&directory.path().join("rootfs.ext4"));
   let vmm = support::store::vmm();
 
-  let container =
-    cfw::containerization::container::LinuxContainer::new_with(name, rootfs, None, &vmm, support::vm(), keep_alive)
-      .expect("a container should be made on the VM manager");
+  let container = cfw::containerization::container::LinuxContainer::new_with(
+    name,
+    rootfs,
+    None,
+    &vmm,
+    support::vm(),
+    support::container::keep_alive,
+  )
+  .expect("a container should be made on the VM manager");
 
   container.create().expect("the container should create");
   container.start().expect("the container should start");

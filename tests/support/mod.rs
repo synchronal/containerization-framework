@@ -14,6 +14,8 @@ pub mod network;
 pub mod store;
 
 use containerization_framework as cfw;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 /// Enough to run a shell; `.config/nextest.toml` caps how many run at once.
 pub const TEST_CPUS: u32 = 1;
@@ -29,4 +31,23 @@ pub fn vm() -> cfw::containerization::vm::VmResources {
     cpus: TEST_CPUS,
     memory_in_bytes: TEST_MEMORY_IN_BYTES + cfw::containerization::vm::VmResources::GUEST_MEMORY_OVERHEAD,
   }
+}
+
+/// A progress handler, and every event it is called with, in order.
+pub fn recorded() -> (
+  Arc<Mutex<Vec<cfw::containerization_extras::ProgressEvent>>>,
+  cfw::containerization_extras::ProgressHandler,
+) {
+  let events = Arc::new(Mutex::new(Vec::new()));
+  let recording = Arc::clone(&events);
+
+  (
+    events,
+    Box::new(move |batch| {
+      recording
+        .lock()
+        .expect("a recording")
+        .extend_from_slice(batch)
+    }),
+  )
 }

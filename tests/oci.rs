@@ -106,8 +106,7 @@ fn reads_a_pulled_images_index_manifest_and_config() {
 
   let manifest = image.manifest(&platform).expect("the arm64 manifest");
   assert!(!manifest.layers.is_empty());
-  let content_store =
-    oci::content::LocalContentStore::new(&support::store::content_store_path()).expect("the content store");
+  let content_store = support::store::content_store();
   for layer in &manifest.layers {
     assert!(
       content_store

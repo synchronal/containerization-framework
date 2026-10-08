@@ -7,9 +7,6 @@ mod support;
 use containerization_framework as cfw;
 use std::os::fd::AsRawFd;
 
-/// Holds a container open; the image's own `Cmd` would exit at once.
-const KEEPALIVE: [&str; 3] = ["/bin/sh", "-c", "while :; do sleep 86400; done"];
-
 /// Runs a `/bin/sh` script in `container`, returning its exit code and what
 /// it wrote to stdout.
 fn sh(pod: &cfw::containerization::container::LinuxPod, container: &str, id: &str, script: &str) -> (i32, String) {
@@ -24,12 +21,10 @@ fn sh(pod: &cfw::containerization::container::LinuxPod, container: &str, id: &st
     })
     .unwrap_or_else(|error| panic!("{id} should exec in {container}: {error}"));
 
-  process.start().expect("the process should start");
-  let status = process.wait(None).expect("the process should finish");
-  let _ = process.delete();
+  let code = support::container::finish(&process, &format!("{id} in {container}"));
   drop(write);
 
-  (status.exit_code, support::container::drain(&mut read))
+  (code, support::container::drain(&mut read))
 }
 
 #[test]
@@ -60,7 +55,7 @@ fn shares_a_volume_between_its_containers() {
 
     pod
       .add_container(name, rootfs, |configuration| {
-        configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
+        configuration.process.arguments = support::container::KEEPALIVE.map(String::from).to_vec();
         configuration.cpus = support::TEST_CPUS;
         configuration.memory_in_bytes = support::TEST_MEMORY_IN_BYTES;
         configuration
