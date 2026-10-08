@@ -1,4 +1,4 @@
-use super::NatInterface;
+use super::NATInterface;
 use super::vmnet_network;
 use crate::containerization_extras;
 
@@ -8,7 +8,7 @@ use crate::containerization_extras;
 /// macOS 26 takes a `vmnet_network_ref`, which Rust can't make.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Interface {
-  Nat(NatInterface),
+  Nat(NATInterface),
   Vmnet(vmnet_network::Interface),
 }
 

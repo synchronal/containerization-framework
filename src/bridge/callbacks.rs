@@ -27,23 +27,26 @@ mod ffi {
     #[swift_bridge(already_declared)]
     type RustPodContainerConfiguration;
 
-    // A `(inout LinuxContainer.Configuration) -> Void`: Swift calls it once,
-    // with the configuration it seeded.
+    // Each `call` returns whether Rust's closure threw, and Rust keeps what
+    // it threw.
+
+    // A `(inout LinuxContainer.Configuration) throws -> Void`: Swift calls
+    // it once, with the configuration it seeded.
     type RustConfigure;
-    fn call(self: &RustConfigure, configuration: &mut RustLinuxContainerConfiguration);
+    fn call(self: &RustConfigure, configuration: &mut RustLinuxContainerConfiguration) -> bool;
 
-    // A `(inout LinuxProcessConfiguration) -> Void`: Swift calls it once,
-    // with the configuration it filled.
+    // A `(inout LinuxProcessConfiguration) throws -> Void`: Swift calls it
+    // once, with the configuration it filled.
     type RustConfigureProcess;
-    fn call(self: &RustConfigureProcess, process: &mut RustLinuxProcessConfiguration);
+    fn call(self: &RustConfigureProcess, process: &mut RustLinuxProcessConfiguration) -> bool;
 
-    // A `(inout LinuxPod.Configuration) -> Void`, which takes what Swift
-    // filled, and a `(inout LinuxPod.ContainerConfiguration) -> Void`, which
-    // Swift calls once on Rust's default, which is Swift's.
+    // A `(inout LinuxPod.Configuration) throws -> Void`, which takes what
+    // Swift filled, and a `(inout LinuxPod.ContainerConfiguration) throws ->
+    // Void`, which Swift calls once on Rust's default, which is Swift's.
     type RustConfigurePod;
-    fn call(self: &RustConfigurePod, configuration: &mut RustPodConfiguration);
+    fn call(self: &RustConfigurePod, configuration: &mut RustPodConfiguration) -> bool;
     type RustConfigurePodContainer;
-    fn call(self: &RustConfigurePodContainer, configuration: &mut RustPodContainerConfiguration);
+    fn call(self: &RustConfigurePodContainer, configuration: &mut RustPodContainerConfiguration) -> bool;
 
     // A `ProgressHandler?`. Swift asks `is_some` before calling it.
     type RustProgressHandler;

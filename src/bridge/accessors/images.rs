@@ -10,11 +10,11 @@ use crate::containerization;
 use crate::containerization::container::container_manager;
 use crate::containerization::image;
 use crate::containerization::vm::kernel;
-use crate::containerization_extras::ProgressEvent;
+use crate::containerization_extras;
 use crate::containerization_oci;
-use crate::platform::Progress;
+use crate::platform;
 
-impl Progress {
+impl platform::Progress {
   pub(crate) fn is_some(&self) -> bool {
     self.0.is_some()
   }
@@ -24,14 +24,14 @@ impl Progress {
     let Some(handler) = &self.0 else {
       return;
     };
-    let events: Vec<ProgressEvent> = kinds
+    let events: Vec<containerization_extras::ProgressEvent> = kinds
       .into_iter()
       .zip(values)
       .map(|(kind, value)| match kind {
-        ffi::ProgressKind::Items => ProgressEvent::AddItems(value as isize),
-        ffi::ProgressKind::TotalItems => ProgressEvent::AddTotalItems(value as isize),
-        ffi::ProgressKind::Size => ProgressEvent::AddSize(value),
-        ffi::ProgressKind::TotalSize => ProgressEvent::AddTotalSize(value),
+        ffi::ProgressKind::Items => containerization_extras::ProgressEvent::AddItems(value as isize),
+        ffi::ProgressKind::TotalItems => containerization_extras::ProgressEvent::AddTotalItems(value as isize),
+        ffi::ProgressKind::Size => containerization_extras::ProgressEvent::AddSize(value),
+        ffi::ProgressKind::TotalSize => containerization_extras::ProgressEvent::AddTotalSize(value),
       })
       .collect();
 
@@ -249,7 +249,7 @@ impl image::Description {
   }
 }
 
-impl image::Ext4Unpacker {
+impl image::EXT4Unpacker {
   pub(crate) fn capacity_in_bytes(&self) -> u64 {
     self.capacity_in_bytes
   }
@@ -271,7 +271,7 @@ impl image::Ext4Unpacker {
   }
 }
 
-impl container_manager::RootfsCreateOptions {
+impl container_manager::CreateWithRootfsOptions {
   pub(crate) fn has_writable_layer(&self) -> bool {
     self.writable_layer.is_some()
   }

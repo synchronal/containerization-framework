@@ -3,11 +3,18 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 
 /// `FileInfo`. Each getter reads Swift's.
 pub struct FileInfo {
   handle: ffi::CzFileInfo,
+}
+
+impl fmt::Debug for FileInfo {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("FileInfo").finish_non_exhaustive()
+  }
 }
 
 // Swift's `FileInfo` is `Sendable`.

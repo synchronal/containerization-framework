@@ -111,6 +111,7 @@ fn execs_with_a_closure_on_swifts_defaults() {
     .exec_with("defaults", move |configuration| {
       *slot.lock().unwrap() = Some(configuration.clone());
       configuration.arguments = vec!["/bin/true".into()];
+      Ok(())
     })
     .expect("exec_with should exec");
 
@@ -130,6 +131,16 @@ fn execs_with_a_closure_on_swifts_defaults() {
     Some(cfw::containerization::process::LinuxProcessConfiguration::default()),
     "the closure should change a LinuxProcessConfiguration()"
   );
+
+  let thrown = cfw::Error::failed("configure throws", "on purpose");
+  let returned = container
+    .exec_with("throws", {
+      let thrown = thrown.clone();
+      move |_| Err(thrown)
+    })
+    .expect_err("a closure that throws should fail the exec");
+
+  assert_eq!(returned, thrown, "the closure's own error should come back");
 }
 
 #[test]

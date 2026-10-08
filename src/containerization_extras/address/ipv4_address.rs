@@ -89,7 +89,7 @@ impl IPv4Address {
 }
 
 impl PartialOrd for IPv4Address {
-  /// `IPv4Address.<`. `None` off macOS, where Swift can't be asked.
+  /// `IPv4Address.<`. It panics off macOS, where Swift can't be asked.
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
     ordering(self, other, |lhs, rhs| {
       boolean(

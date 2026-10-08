@@ -3,22 +3,34 @@
 use crate::containerization_error;
 use std::fmt;
 
-#[derive(Debug)]
+/// An error thrown by Swift, or a call that could not reach Swift at all.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
-  /// Attempted and failed. The message is whatever Containerization said,
-  /// which is the only account of a failure inside the VM. The code is the
-  /// thrown `ContainerizationError`'s, if it was one.
+  /// The call was attempted and failed.
   Failed {
+    /// What was attempted, such as `pull docker.io/library/alpine:3`.
     action: String,
+    /// What Containerization said, which is the only account of a failure
+    /// inside the VM.
     message: String,
+    /// The code of the thrown `ContainerizationError`, if Swift threw one.
     code: Option<containerization_error::Code>,
   },
-  /// Couldn't be attempted: a prerequisite is missing or unreadable. The fix
-  /// is to provision it, not to debug a failure.
-  Unavailable { action: String, message: String },
+  /// The call was not attempted, because Containerization runs only on
+  /// macOS.
+  Unavailable {
+    /// What would have been attempted.
+    action: String,
+    /// Why it could not be attempted.
+    message: String,
+  },
 }
 
 impl Error {
+  /// A failure of `action` with no `ContainerizationError` code. A
+  /// configuration closure returns one of these to throw, as a Swift closure
+  /// would.
   pub fn failed(action: impl Into<String>, message: impl fmt::Display) -> Self {
     Self::Failed {
       action: action.into(),
@@ -40,7 +52,9 @@ impl Error {
     }
   }
 
-  pub fn unavailable(action: impl Into<String>, message: impl fmt::Display) -> Self {
+  /// A call that could not be attempted off macOS.
+  #[cfg_attr(target_os = "macos", allow(dead_code))]
+  pub(crate) fn unavailable(action: impl Into<String>, message: impl fmt::Display) -> Self {
     Self::Unavailable {
       action: action.into(),
       message: message.to_string(),

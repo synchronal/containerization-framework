@@ -11,11 +11,7 @@ use crate::containerization::container;
 use crate::containerization::process;
 use crate::containerization::vm;
 use crate::containerization_oci;
-use crate::platform::ConfigureContainer;
-use crate::platform::ConfigurePod;
-use crate::platform::ConfigurePodContainer;
-use crate::platform::ConfigureProcess;
-use crate::platform::Progress;
+use crate::platform;
 use std::convert::Infallible;
 
 taken!(
@@ -63,9 +59,13 @@ failing!(
   cz_linux_process_configuration_from_image_config(
     containerization_oci::image::ImageConfig,
     process::LinuxProcessConfiguration,
-    ConfigureProcess,
+    platform::ConfigureProcess,
   ),
-  cz_linux_process_configuration_set_terminal_io(process::LinuxProcessConfiguration, CzTerminal, ConfigureProcess,),
+  cz_linux_process_configuration_set_terminal_io(
+    process::LinuxProcessConfiguration,
+    CzTerminal,
+    platform::ConfigureProcess,
+  ),
   cz_signal_parse(&str),
   cz_signal_parse_from(&str, Vec<String>, Vec<i32>),
   cz_signal_linux(),
@@ -84,9 +84,9 @@ impl CzContainerManager {
     _id: &str,
     _reference: &str,
     _options: container::container_manager::CreateOptions,
-    _progress: Progress,
+    _progress: platform::Progress,
     _seed: container::linux_container::Configuration,
-    _configuration: ConfigureContainer,
+    _configuration: platform::ConfigureContainer,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -96,9 +96,9 @@ impl CzContainerManager {
     _id: &str,
     _image: CzImage,
     _options: container::container_manager::CreateOptions,
-    _progress: Progress,
+    _progress: platform::Progress,
     _seed: container::linux_container::Configuration,
-    _configuration: ConfigureContainer,
+    _configuration: platform::ConfigureContainer,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -108,9 +108,9 @@ impl CzContainerManager {
     _id: &str,
     _image: CzImage,
     _rootfs: container::Mount,
-    _options: container::container_manager::RootfsCreateOptions,
+    _options: container::container_manager::CreateWithRootfsOptions,
     _seed: container::linux_container::Configuration,
-    _configuration: ConfigureContainer,
+    _configuration: platform::ConfigureContainer,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -141,7 +141,11 @@ impl CzLinuxContainer {
     match self.0 {}
   }
 
-  pub(crate) fn config(&self, _seed: container::linux_container::Configuration, _receive: ConfigureContainer) {
+  pub(crate) fn config(
+    &self,
+    _seed: container::linux_container::Configuration,
+    _receive: platform::ConfigureContainer,
+  ) {
     match self.0 {}
   }
 
@@ -157,7 +161,7 @@ impl CzLinuxContainer {
     &self,
     _id: &str,
     _seed: process::LinuxProcessConfiguration,
-    _configuration: ConfigureProcess,
+    _configuration: platform::ConfigureProcess,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -233,7 +237,7 @@ impl CzLinuxPod {
     match self.0 {}
   }
 
-  pub(crate) fn config(&self, _seed: container::linux_pod::Configuration, _receive: ConfigurePod) {
+  pub(crate) fn config(&self, _seed: container::linux_pod::Configuration, _receive: platform::ConfigurePod) {
     match self.0 {}
   }
 
@@ -250,7 +254,7 @@ impl CzLinuxPod {
     _id: &str,
     _rootfs: container::Mount,
     _seed: container::linux_pod::ContainerConfiguration,
-    _configuration: ConfigurePodContainer,
+    _configuration: platform::ConfigurePodContainer,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -288,7 +292,7 @@ impl CzLinuxPod {
     _id: &str,
     _process_id: &str,
     _seed: process::LinuxProcessConfiguration,
-    _configuration: ConfigureProcess,
+    _configuration: platform::ConfigureProcess,
   ) -> CzOutcome {
     match self.0 {}
   }

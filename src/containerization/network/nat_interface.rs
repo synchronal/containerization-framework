@@ -2,7 +2,7 @@ use crate::containerization_extras;
 
 /// `NATInterface`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NatInterface {
+pub struct NATInterface {
   pub ipv4_address: containerization_extras::address::CIDRv4,
   pub ipv4_gateway: Option<containerization_extras::address::IPv4Address>,
   pub ipv6_address: Option<containerization_extras::address::CIDRv6>,
@@ -11,7 +11,7 @@ pub struct NatInterface {
   pub mtu: u32,
 }
 
-impl NatInterface {
+impl NATInterface {
   /// `NATInterface(ipv4Address:ipv4Gateway:)`, its other arguments at their
   /// defaults.
   pub fn new(

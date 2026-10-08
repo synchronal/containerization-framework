@@ -4,25 +4,23 @@
 use super::Description;
 use super::Image;
 use super::InitImage;
-use crate::containerization_extras::ProgressHandler;
+use crate::containerization_extras;
 use crate::containerization_oci;
-use crate::containerization_oci::client::Authentication;
 use crate::containerization_oci::client::authentication;
-use crate::containerization_oci::content::LocalContentStore;
-use crate::containerization_oci::image::Platform;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
 /// `ImageStore.pull(reference:...)`'s defaulted arguments. [`Default`] is
 /// Swift's defaults.
 pub struct PullOptions {
-  pub platform: Option<Platform>,
+  pub platform: Option<containerization_oci::image::Platform>,
   pub insecure: bool,
-  pub auth: Option<Authentication>,
-  pub progress: Option<ProgressHandler>,
+  pub auth: Option<containerization_oci::client::Authentication>,
+  pub progress: Option<containerization_extras::ProgressHandler>,
   pub max_concurrent_downloads: usize,
 }
 
@@ -38,24 +36,49 @@ impl Default for PullOptions {
   }
 }
 
+/// Leaves out the progress handler, which is a closure.
+impl fmt::Debug for PullOptions {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("PullOptions")
+      .field("platform", &self.platform)
+      .field("insecure", &self.insecure)
+      .field("auth", &self.auth)
+      .field("max_concurrent_downloads", &self.max_concurrent_downloads)
+      .finish_non_exhaustive()
+  }
+}
+
 /// `ImageStore.push(reference:...)`'s defaulted arguments. [`Default`] is
 /// Swift's defaults.
 #[derive(Default)]
 pub struct PushOptions {
-  pub platform: Option<Platform>,
+  pub platform: Option<containerization_oci::image::Platform>,
   pub insecure: bool,
-  pub auth: Option<Authentication>,
-  pub progress: Option<ProgressHandler>,
+  pub auth: Option<containerization_oci::client::Authentication>,
+  pub progress: Option<containerization_extras::ProgressHandler>,
+}
+
+/// Leaves out the progress handler, which is a closure.
+impl fmt::Debug for PushOptions {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("PushOptions")
+      .field("platform", &self.platform)
+      .field("insecure", &self.insecure)
+      .field("auth", &self.auth)
+      .finish_non_exhaustive()
+  }
 }
 
 /// `ImageStore.push(references:...)`'s defaulted arguments. [`Default`] is
 /// Swift's defaults.
 pub struct PushAllOptions {
-  pub platform: Option<Platform>,
+  pub platform: Option<containerization_oci::image::Platform>,
   pub insecure: bool,
-  pub auth: Option<Authentication>,
+  pub auth: Option<containerization_oci::client::Authentication>,
   pub max_concurrent_uploads: usize,
-  pub progress: Option<ProgressHandler>,
+  pub progress: Option<containerization_extras::ProgressHandler>,
 }
 
 impl Default for PushAllOptions {
@@ -70,9 +93,28 @@ impl Default for PushAllOptions {
   }
 }
 
+/// Leaves out the progress handler, which is a closure.
+impl fmt::Debug for PushAllOptions {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("PushAllOptions")
+      .field("platform", &self.platform)
+      .field("insecure", &self.insecure)
+      .field("auth", &self.auth)
+      .field("max_concurrent_uploads", &self.max_concurrent_uploads)
+      .finish_non_exhaustive()
+  }
+}
+
 /// `ImageStore`.
 pub struct ImageStore {
   pub(crate) handle: ffi::CzImageStore,
+}
+
+impl fmt::Debug for ImageStore {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("ImageStore").finish_non_exhaustive()
+  }
 }
 
 // Swift's `ImageStore` is an actor.
@@ -101,7 +143,10 @@ impl ImageStore {
   }
 
   /// `ImageStore(path:contentStore:)`.
-  pub fn with_content_store(path: &Path, content_store: &LocalContentStore) -> Result<Self, Error> {
+  pub fn with_content_store(
+    path: &Path,
+    content_store: &containerization_oci::content::LocalContentStore,
+  ) -> Result<Self, Error> {
     let outcome = platform::outcome(
       content_store
         .handle
@@ -207,8 +252,8 @@ impl ImageStore {
   pub fn get_init_image(
     &self,
     reference: &str,
-    auth: Option<&Authentication>,
-    progress: Option<ProgressHandler>,
+    auth: Option<&containerization_oci::client::Authentication>,
+    progress: Option<containerization_extras::ProgressHandler>,
   ) -> Result<InitImage, Error> {
     platform::outcome(
       self
@@ -222,7 +267,12 @@ impl ImageStore {
   }
 
   /// `ImageStore.save(references:out:platform:)`.
-  pub fn save(&self, references: &[&str], out: &Path, platform: Option<&Platform>) -> Result<(), Error> {
+  pub fn save(
+    &self,
+    references: &[&str],
+    out: &Path,
+    platform: Option<&containerization_oci::image::Platform>,
+  ) -> Result<(), Error> {
     let (has_platform, platform) = containerization_oci::image::platform::crossing(platform);
 
     platform::outcome(
@@ -252,7 +302,11 @@ impl ImageStore {
   }
 
   /// `ImageStore.load(from:progress:)`.
-  pub fn load(&self, directory: &Path, progress: Option<ProgressHandler>) -> Result<Vec<Image>, Error> {
+  pub fn load(
+    &self,
+    directory: &Path,
+    progress: Option<containerization_extras::ProgressHandler>,
+  ) -> Result<Vec<Image>, Error> {
     platform::outcome(
       self
         .handle

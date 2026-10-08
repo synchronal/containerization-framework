@@ -121,7 +121,7 @@ impl IPv6Address {
 }
 
 impl PartialOrd for IPv6Address {
-  /// `IPv6Address.<`. `None` off macOS, where Swift can't be asked. Swift
+  /// `IPv6Address.<`. It panics off macOS, where Swift can't be asked. Swift
   /// orders an absent zone as an empty one, so two addresses that differ only
   /// in that way are unordered.
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

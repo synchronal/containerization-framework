@@ -35,7 +35,7 @@ macro_rules! raw_values {
 
 raw_values!(
   /// `SystemPlatform.OS`.
-  Os { Linux = "linux", Darwin = "darwin" }
+  OS { Linux = "linux", Darwin = "darwin" }
 );
 
 raw_values!(
@@ -46,20 +46,20 @@ raw_values!(
 /// `SystemPlatform`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SystemPlatform {
-  pub os: Os,
+  pub os: OS,
   pub architecture: Architecture,
 }
 
 impl SystemPlatform {
   /// `SystemPlatform.linuxArm`.
   pub const LINUX_ARM: Self = Self {
-    os: Os::Linux,
+    os: OS::Linux,
     architecture: Architecture::Arm64,
   };
 
   /// `SystemPlatform.linuxAmd`.
   pub const LINUX_AMD: Self = Self {
-    os: Os::Linux,
+    os: OS::Linux,
     architecture: Architecture::Amd64,
   };
 
@@ -79,12 +79,12 @@ mod tests {
 
   #[test]
   fn reads_back_every_raw_value_it_writes() {
-    for os in Os::ALL_CASES {
-      assert_eq!(Os::from_raw_value(os.as_str()), Some(*os));
+    for os in OS::ALL_CASES {
+      assert_eq!(OS::from_raw_value(os.as_str()), Some(*os));
     }
     for architecture in Architecture::ALL_CASES {
       assert_eq!(Architecture::from_raw_value(architecture.as_str()), Some(*architecture));
     }
-    assert_eq!(Os::from_raw_value("Linux"), None, "raw values are case sensitive");
+    assert_eq!(OS::from_raw_value("Linux"), None, "raw values are case sensitive");
   }
 }

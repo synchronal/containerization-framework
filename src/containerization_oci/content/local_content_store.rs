@@ -2,6 +2,7 @@ use super::Content;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -11,6 +12,14 @@ use std::sync::PoisonError;
 /// `LocalContentStore`.
 pub struct LocalContentStore {
   pub(crate) handle: ffi::CzLocalContentStore,
+}
+
+impl fmt::Debug for LocalContentStore {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("LocalContentStore")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `LocalContentStore` is an actor.

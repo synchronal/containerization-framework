@@ -6,7 +6,7 @@ use crate::containerization::container;
 use crate::containerization::image;
 use crate::containerization::vm;
 use crate::containerization_oci;
-use crate::platform::Progress;
+use crate::platform;
 use std::convert::Infallible;
 
 taken!(
@@ -79,11 +79,11 @@ failing!(
 );
 
 pub(crate) fn cz_ext4_unpack(
-  _unpacker: image::Ext4Unpacker,
+  _unpacker: image::EXT4Unpacker,
   image: CzImage,
   _platform: containerization_oci::image::Platform,
   _at: &str,
-  _progress: Progress,
+  _progress: platform::Progress,
 ) -> CzOutcome {
   match image.0 {}
 }
@@ -148,7 +148,7 @@ impl CzRegistryClient {
     _name: &str,
     _descriptor: containerization_oci::image::Descriptor,
     _into: &str,
-    _progress: Progress,
+    _progress: platform::Progress,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -305,7 +305,7 @@ impl CzImageStore {
     _platform: containerization_oci::image::Platform,
     _insecure: bool,
     _auth: CzAuthentication,
-    _progress: Progress,
+    _progress: platform::Progress,
     _max_concurrent_downloads: usize,
   ) -> CzOutcome {
     match self.0 {}
@@ -318,7 +318,7 @@ impl CzImageStore {
     _platform: containerization_oci::image::Platform,
     _insecure: bool,
     _auth: CzAuthentication,
-    _progress: Progress,
+    _progress: platform::Progress,
   ) -> CzOutcome {
     match self.0 {}
   }
@@ -331,12 +331,17 @@ impl CzImageStore {
     _insecure: bool,
     _auth: CzAuthentication,
     _max_concurrent_uploads: usize,
-    _progress: Progress,
+    _progress: platform::Progress,
   ) -> CzOutcome {
     match self.0 {}
   }
 
-  pub(crate) fn get_init_image(&self, _reference: &str, _auth: CzAuthentication, _progress: Progress) -> CzOutcome {
+  pub(crate) fn get_init_image(
+    &self,
+    _reference: &str,
+    _auth: CzAuthentication,
+    _progress: platform::Progress,
+  ) -> CzOutcome {
     match self.0 {}
   }
 
@@ -362,7 +367,7 @@ impl CzImageStore {
     match self.0 {}
   }
 
-  pub(crate) fn load(&self, _from: &str, _progress: Progress) -> CzOutcome {
+  pub(crate) fn load(&self, _from: &str, _progress: platform::Progress) -> CzOutcome {
     match self.0 {}
   }
 

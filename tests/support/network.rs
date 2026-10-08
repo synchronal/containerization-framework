@@ -10,8 +10,8 @@ const FIRST_HOST: u32 = 2;
 const LAST_HOST: u32 = 250;
 
 /// Resolve through the NAT's gateway.
-pub fn gateway_dns() -> cfw::containerization::network::Dns {
-  cfw::containerization::network::Dns {
+pub fn gateway_dns() -> cfw::containerization::network::DNS {
+  cfw::containerization::network::DNS {
     nameservers: vec![GATEWAY.to_string()],
     ..Default::default()
   }
@@ -21,7 +21,7 @@ pub fn gateway_dns() -> cfw::containerization::network::Dns {
 ///
 /// Nothing hands out leases, so the caller allocates. Hashed from the name:
 /// stable per container, distinct between concurrent ones.
-pub fn interface(name: &str) -> cfw::containerization::network::NatInterface {
+pub fn interface(name: &str) -> cfw::containerization::network::NATInterface {
   // FNV-1a: short and well spread.
   let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
 
@@ -39,5 +39,5 @@ pub fn interface(name: &str) -> cfw::containerization::network::NatInterface {
     .expect("Swift parses the container's address");
   let gateway = cfw::containerization_extras::address::IPv4Address::parse(GATEWAY).expect("Swift parses the gateway");
 
-  cfw::containerization::network::NatInterface::new(address, Some(gateway))
+  cfw::containerization::network::NATInterface::new(address, Some(gateway))
 }

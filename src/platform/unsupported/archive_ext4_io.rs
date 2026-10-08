@@ -4,7 +4,7 @@ use super::CzOutcome;
 use crate::containerization::image;
 use crate::containerization_archive;
 use crate::containerization_ext4::ext4;
-use crate::platform::Progress;
+use crate::platform;
 use std::convert::Infallible;
 
 taken!(
@@ -56,7 +56,7 @@ pub(crate) fn cz_archive_reader_with_file_handle(_format: &str, _filter: &str, f
 
 failing!(
   cz_ext4_reader_new(&str),
-  cz_ext4_unpack_archive(image::Ext4Unpacker, &str, &str, &str),
+  cz_ext4_unpack_archive(image::EXT4Unpacker, &str, &str, &str),
   cz_ext4_reader_read_inline_extended_attributes(Vec<u8>),
   cz_ext4_reader_read_block_extended_attributes(Vec<u8>),
   cz_ext4_inode_root(),
@@ -137,11 +137,17 @@ impl CzExt4Formatter {
     match self.0 {}
   }
 
-  pub(crate) fn unpack(&self, _source: &str, _format: &str, _compression: &str, _progress: Progress) -> CzOutcome {
+  pub(crate) fn unpack(
+    &self,
+    _source: &str,
+    _format: &str,
+    _compression: &str,
+    _progress: platform::Progress,
+  ) -> CzOutcome {
     match self.0 {}
   }
 
-  pub(crate) fn unpack_reader(&self, _reader: CzArchiveReader, _progress: Progress) -> CzOutcome {
+  pub(crate) fn unpack_reader(&self, _reader: CzArchiveReader, _progress: platform::Progress) -> CzOutcome {
     match self.0 {}
   }
 }

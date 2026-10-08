@@ -66,7 +66,7 @@ impl Container {
     let image = store::image(&image_store);
     let mut manager = store::manager_with(
       &image_store,
-      cfw::containerization::container::container_manager::ManagerOptions {
+      cfw::containerization::container::container_manager::ContainerManagerOptions {
         network: Some(network),
         ..Default::default()
       },
@@ -101,7 +101,7 @@ impl Container {
     // Left by a run that died before dropping its container.
     let _ = manager.delete(name);
 
-    let options = cfw::containerization::container::container_manager::RootfsCreateOptions {
+    let options = cfw::containerization::container::container_manager::CreateWithRootfsOptions {
       networking: false,
       vm: super::vm(),
       ..Default::default()
@@ -207,15 +207,18 @@ impl Container {
 fn suite_configuration(
   name: &str,
   configure: impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static,
-) -> impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static {
+) -> impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) -> Result<(), cfw::Error>
++ Send
++ 'static {
   let interface = network::interface(name);
 
   move |configuration| {
-    keep_alive(configuration);
+    keep_alive(configuration)?;
     configuration.interfaces = vec![cfw::containerization::network::Interface::Nat(interface)];
     configuration.dns = Some(network::gateway_dns());
 
     configure(configuration);
+    Ok(())
   }
 }
 
@@ -236,10 +239,13 @@ pub fn finish(process: &cfw::containerization::process::LinuxProcess, what: &str
 }
 
 /// A process that holds the container open, in the suite's limits.
-pub fn keep_alive(configuration: &mut cfw::containerization::container::linux_container::Configuration) {
+pub fn keep_alive(
+  configuration: &mut cfw::containerization::container::linux_container::Configuration,
+) -> Result<(), cfw::Error> {
   configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
   configuration.cpus = super::TEST_CPUS;
   configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;
+  Ok(())
 }
 
 /// Everything already in the pipe, stopping where a read would block.

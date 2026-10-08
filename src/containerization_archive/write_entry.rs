@@ -3,6 +3,7 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::time::SystemTime;
 
 raw_values!(
@@ -27,6 +28,12 @@ raw_values!(
 /// before 1970 one second later.
 pub struct WriteEntry {
   pub(crate) handle: ffi::CzWriteEntry,
+}
+
+impl fmt::Debug for WriteEntry {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("WriteEntry").finish_non_exhaustive()
+  }
 }
 
 // Swift's `WriteEntry` is a class that isn't `Sendable`; Rust's isn't `Sync`,

@@ -1,17 +1,17 @@
-//! `RegistryClient`, the options for its host init: [`HostOptions`], and the
-//! [`RetryOptions`] they take.
+//! `RegistryClient`, the options for its host init:
+//! [`RegistryClientOptions`], and the [`RetryOptions`] they take.
 //!
 //! Neither init takes Swift's `tlsConfiguration` or `logger`, which are
 //! swift-nio and swift-log types.
 
 use super::Authentication;
 use super::authentication;
-use crate::containerization_extras::ProgressHandler;
-use crate::containerization_oci::image::Descriptor;
-use crate::containerization_oci::image::Index;
+use crate::containerization_extras;
+use crate::containerization_oci::image;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 
 /// `RetryOptions`, without its `shouldRetry` closure, which takes an
@@ -36,7 +36,7 @@ impl RetryOptions {
 /// `RegistryClient(host:...)`'s defaulted arguments. [`Default`] is Swift's
 /// defaults.
 #[derive(Clone, Debug)]
-pub struct HostOptions {
+pub struct RegistryClientOptions {
   pub scheme: Option<String>,
   pub port: Option<u16>,
   pub authentication: Option<Authentication>,
@@ -45,7 +45,7 @@ pub struct HostOptions {
   pub buffer_size: usize,
 }
 
-impl Default for HostOptions {
+impl Default for RegistryClientOptions {
   fn default() -> Self {
     Self {
       scheme: Some("https".to_string()),
@@ -61,6 +61,14 @@ impl Default for HostOptions {
 /// `RegistryClient`. Every method talks to the registry.
 pub struct RegistryClient {
   handle: ffi::CzRegistryClient,
+}
+
+impl fmt::Debug for RegistryClient {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("RegistryClient")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `RegistryClient` is `Sendable`.
@@ -83,7 +91,7 @@ impl RegistryClient {
   /// `RegistryClient(host:scheme:port:authentication:clientID:retryOptions:bufferSize:)`.
   /// Rust has no overloading, and the suffix names the argument label that
   /// tells it apart from [`Self::new`].
-  pub fn with_host(host: &str, options: HostOptions) -> Result<Self, Error> {
+  pub fn with_host(host: &str, options: RegistryClientOptions) -> Result<Self, Error> {
     platform::outcome(
       ffi::cz_registry_client_with_host(
         host,
@@ -113,13 +121,13 @@ impl RegistryClient {
   }
 
   /// `RegistryClient.resolve(name:tag:)`.
-  pub fn resolve(&self, name: &str, tag: &str) -> Result<Descriptor, Error> {
+  pub fn resolve(&self, name: &str, tag: &str) -> Result<image::Descriptor, Error> {
     platform::outcome(self.handle.resolve(name, tag), format!("resolve {name}:{tag}"))
       .map(|outcome| outcome.descriptor())
   }
 
   /// `RegistryClient.fetchData(name:descriptor:)`.
-  pub fn fetch_data(&self, name: &str, descriptor: &Descriptor) -> Result<Vec<u8>, Error> {
+  pub fn fetch_data(&self, name: &str, descriptor: &image::Descriptor) -> Result<Vec<u8>, Error> {
     platform::outcome(
       self.handle.fetch_data(name, descriptor.clone()),
       format!("fetch {} from {name}", descriptor.digest),
@@ -132,9 +140,9 @@ impl RegistryClient {
   pub fn fetch_blob(
     &self,
     name: &str,
-    descriptor: &Descriptor,
+    descriptor: &image::Descriptor,
     into: &Path,
-    progress: Option<ProgressHandler>,
+    progress: Option<containerization_extras::ProgressHandler>,
   ) -> Result<(i64, String), Error> {
     let outcome = platform::outcome(
       self.handle.fetch_blob(
@@ -159,7 +167,7 @@ impl RegistryClient {
   }
 
   /// `RegistryClient.referrers(name:digest:artifactType:)`.
-  pub fn referrers(&self, name: &str, digest: &str, artifact_type: Option<&str>) -> Result<Index, Error> {
+  pub fn referrers(&self, name: &str, digest: &str, artifact_type: Option<&str>) -> Result<image::Index, Error> {
     platform::outcome(
       self
         .handle

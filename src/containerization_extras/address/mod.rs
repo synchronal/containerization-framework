@@ -12,10 +12,10 @@ mod ipv6_address;
 mod mac_address;
 mod prefix;
 
-pub use self::cidr::Cidr;
+pub use self::cidr::CIDR;
 pub use self::cidr_v4::CIDRv4;
 pub use self::cidr_v6::CIDRv6;
-pub use self::ip_address::IpAddress;
+pub use self::ip_address::IPAddress;
 pub use self::ipv4_address::IPv4Address;
 pub use self::ipv6_address::IPv6Address;
 pub use self::mac_address::MACAddress;
@@ -36,12 +36,15 @@ fn description(outcome: ffi::CzOutcome, action: &str) -> Result<String, Error> {
   platform::outcome(outcome, action).map(|outcome| outcome.text())
 }
 
-/// Swift's `<`, asked both ways, as Rust's partial order. `None` when Swift
-/// can't be asked, as off macOS, or when neither is less but the two differ.
+/// Swift's `<`, asked both ways, as Rust's partial order. `None` when neither
+/// is less but the two differ. Off macOS, where Swift can't be asked, it
+/// panics.
 fn ordering<T: PartialEq>(lhs: &T, rhs: &T, less: impl Fn(&T, &T) -> Result<bool, Error>) -> Option<Ordering> {
-  if less(lhs, rhs).ok()? {
+  let less = |lhs, rhs| less(lhs, rhs).unwrap_or_else(|error| panic!("{error}"));
+
+  if less(lhs, rhs) {
     Some(Ordering::Less)
-  } else if less(rhs, lhs).ok()? {
+  } else if less(rhs, lhs) {
     Some(Ordering::Greater)
   } else if lhs == rhs {
     Some(Ordering::Equal)

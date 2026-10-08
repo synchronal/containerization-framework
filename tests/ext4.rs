@@ -19,7 +19,7 @@ fn unpacks_an_image_and_reports_its_progress() {
   let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
   let (events, handler) = support::recorded();
 
-  let mount = cfw::containerization::image::Ext4Unpacker::new(CAPACITY_IN_BYTES, None)
+  let mount = cfw::containerization::image::EXT4Unpacker::new(CAPACITY_IN_BYTES, None)
     .unpack(&image, &platform, &at, Some(handler))
     .expect("the image should unpack");
 
@@ -61,11 +61,11 @@ fn unpacks_with_a_journal() {
     default_mode: Some(cfw::containerization_ext4::ext4::journal_config::JournalMode::Ordered),
   };
 
-  cfw::containerization::image::Ext4Unpacker::new(CAPACITY_IN_BYTES, Some(journal))
+  cfw::containerization::image::EXT4Unpacker::new(CAPACITY_IN_BYTES, Some(journal))
     .unpack(&image, &platform, &at, None)
     .expect("the image should unpack");
 
-  let super_block = cfw::containerization_ext4::ext4::Ext4Reader::new(&at)
+  let super_block = cfw::containerization_ext4::ext4::EXT4Reader::new(&at)
     .expect("the filesystem should read")
     .super_block();
 
@@ -79,7 +79,7 @@ fn exports_an_unpacked_filesystem_as_a_tar() {
   let archive = directory.path().join("rootfs.tar");
   support::store::unpack(&at);
 
-  cfw::containerization_ext4::ext4::Ext4Reader::new(&at)
+  cfw::containerization_ext4::ext4::EXT4Reader::new(&at)
     .expect("the unpacked filesystem should read")
     .export(&archive)
     .expect("the filesystem should export");
@@ -101,7 +101,7 @@ fn exports_an_unpacked_filesystem_as_a_tar() {
 
 #[test]
 fn says_which_block_device_it_could_not_read() {
-  let error = cfw::containerization_ext4::ext4::Ext4Reader::new("/nowhere/rootfs.ext4".as_ref())
+  let error = cfw::containerization_ext4::ext4::EXT4Reader::new("/nowhere/rootfs.ext4".as_ref())
     .err()
     .expect("a filesystem that doesn't exist");
 
@@ -187,7 +187,7 @@ fn archive(directory: &Path) -> std::path::PathBuf {
 
 /// What `archive` holds, read back from a filesystem it was unpacked into.
 fn assert_unpacked(at: &Path) {
-  let reader = cfw::containerization_ext4::ext4::Ext4Reader::new(at).expect("the filesystem should read");
+  let reader = cfw::containerization_ext4::ext4::EXT4Reader::new(at).expect("the filesystem should read");
 
   assert_eq!(
     reader
@@ -215,7 +215,7 @@ fn formats_a_filesystem_and_reads_it_back() {
   let at = directory.path().join("formatted.ext4");
   format(&at);
 
-  let reader = cfw::containerization_ext4::ext4::Ext4Reader::new(&at).expect("the filesystem should read");
+  let reader = cfw::containerization_ext4::ext4::EXT4Reader::new(&at).expect("the filesystem should read");
   let super_block = reader.super_block();
 
   assert_eq!(super_block.magic, cfw::containerization_ext4::ext4::SUPER_BLOCK_MAGIC);
@@ -258,7 +258,7 @@ fn stats_files_links_and_symlinks() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let at = directory.path().join("formatted.ext4");
   format(&at);
-  let reader = cfw::containerization_ext4::ext4::Ext4Reader::new(&at).expect("the filesystem should read");
+  let reader = cfw::containerization_ext4::ext4::EXT4Reader::new(&at).expect("the filesystem should read");
 
   let (number, inode) = reader
     .stat("/etc/hello.txt".as_ref(), true)
@@ -285,7 +285,7 @@ fn stats_files_links_and_symlinks() {
   assert!(reader.exists("/hello".as_ref(), false));
   assert!(!reader.exists("/nowhere".as_ref(), true));
   assert_eq!(
-    cfw::containerization_ext4::ext4::Ext4Reader::read_inline_extended_attributes(&inode.inline_xattrs)
+    cfw::containerization_ext4::ext4::EXT4Reader::read_inline_extended_attributes(&inode.inline_xattrs)
       .expect("the file's inline extended attributes")
       .len(),
     2,
@@ -298,7 +298,7 @@ fn says_which_path_it_could_not_read() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let at = directory.path().join("formatted.ext4");
   format(&at);
-  let reader = cfw::containerization_ext4::ext4::Ext4Reader::new(&at).expect("the filesystem should read");
+  let reader = cfw::containerization_ext4::ext4::EXT4Reader::new(&at).expect("the filesystem should read");
 
   let error = reader
     .read_file("/nowhere.txt".as_ref(), Default::default())
@@ -328,7 +328,7 @@ fn unlinks_a_file() {
     .expect("the file should unlink");
   formatter.close().expect("the filesystem should close");
 
-  let reader = cfw::containerization_ext4::ext4::Ext4Reader::new(&at).expect("the filesystem should read");
+  let reader = cfw::containerization_ext4::ext4::EXT4Reader::new(&at).expect("the filesystem should read");
 
   assert!(!reader.exists("/gone.txt".as_ref(), true));
 }
@@ -366,7 +366,7 @@ fn formats_with_a_journal() {
     .close()
     .expect("the filesystem should close");
 
-  let super_block = cfw::containerization_ext4::ext4::Ext4Reader::new(&at)
+  let super_block = cfw::containerization_ext4::ext4::EXT4Reader::new(&at)
     .expect("the filesystem should read")
     .super_block();
 
@@ -463,7 +463,7 @@ fn compresses_extended_attribute_names() {
 
 #[test]
 fn rejects_extended_attributes_without_a_header() {
-  let error = cfw::containerization_ext4::ext4::Ext4Reader::read_block_extended_attributes(&[0; 32])
+  let error = cfw::containerization_ext4::ext4::EXT4Reader::read_block_extended_attributes(&[0; 32])
     .err()
     .expect("a buffer with no header");
 

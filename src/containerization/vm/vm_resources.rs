@@ -3,18 +3,18 @@ use crate::containerization::MIB;
 
 /// The VM a container runs in. `VMResources`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct VmResources {
+pub struct VMResources {
   pub cpus: u32,
   pub memory_in_bytes: u64,
 }
 
-impl VmResources {
+impl VMResources {
   /// `VMResources.guestMemoryOverhead`.
   pub const GUEST_MEMORY_OVERHEAD: u64 = 128 * MIB;
 }
 
 /// `VMResources.default`: 4 CPUs and 1024 MiB.
-impl Default for VmResources {
+impl Default for VMResources {
   fn default() -> Self {
     Self {
       cpus: 4,

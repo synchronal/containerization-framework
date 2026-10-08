@@ -25,7 +25,7 @@ impl address::IPv6Address {
   }
 }
 
-impl address::IpAddress {
+impl address::IPAddress {
   pub(crate) fn holds_v6(&self) -> bool {
     matches!(self, Self::V6(_))
   }
@@ -120,11 +120,11 @@ impl ffi::CzOutcome {
     address::IPv6Address::from_halves(self.ipv6_high(), self.ipv6_low(), self.ipv6_zone())
   }
 
-  pub(crate) fn ip_address(&self) -> address::IpAddress {
+  pub(crate) fn ip_address(&self) -> address::IPAddress {
     if self.is_ipv6() {
-      address::IpAddress::V6(self.ipv6_address())
+      address::IPAddress::V6(self.ipv6_address())
     } else {
-      address::IpAddress::V4(self.ipv4_address())
+      address::IPAddress::V4(self.ipv4_address())
     }
   }
 
@@ -148,11 +148,11 @@ impl ffi::CzOutcome {
     }
   }
 
-  pub(crate) fn cidr(&self) -> address::Cidr {
+  pub(crate) fn cidr(&self) -> address::CIDR {
     if self.is_ipv6() {
-      address::Cidr::V6(self.ipv6_address(), self.prefix())
+      address::CIDR::V6(self.ipv6_address(), self.prefix())
     } else {
-      address::Cidr::V4(self.ipv4_address(), self.prefix())
+      address::CIDR::V4(self.ipv4_address(), self.prefix())
     }
   }
 

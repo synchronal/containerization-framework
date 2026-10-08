@@ -18,6 +18,7 @@ fn sh(pod: &cfw::containerization::container::LinuxPod, container: &str, id: &st
     .exec_in_container(container, id, move |process| {
       process.arguments = vec!["/bin/sh".into(), "-c".into(), script];
       process.stdout = Some(stdout);
+      Ok(())
     })
     .unwrap_or_else(|error| panic!("{id} should exec in {container}: {error}"));
 
@@ -42,6 +43,7 @@ fn shares_a_volume_between_its_containers() {
     cfw::containerization::container::LinuxPod::new("cfw-test-pod", &vmm, support::vm(), move |configuration| {
       configuration.hostname = Some("pod".to_string());
       configuration.volumes = vec![configured];
+      Ok(())
     })
     .expect("a pod should be made");
 
@@ -65,6 +67,7 @@ fn shares_a_volume_between_its_containers() {
             "/shared",
             &[],
           ));
+        Ok(())
       })
       .unwrap_or_else(|error| panic!("{name} should be added: {error}"));
   }

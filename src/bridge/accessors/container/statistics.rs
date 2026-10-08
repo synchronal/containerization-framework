@@ -63,7 +63,7 @@ impl ffi::CzOutcome {
           throttled_periods,
           throttled_time_usec,
         ] = cpu.statistics_fields();
-        container_statistics::CpuStatistics {
+        container_statistics::CPUStatistics {
           usage_usec,
           user_usec,
           system_usec,
@@ -72,10 +72,10 @@ impl ffi::CzOutcome {
           throttled_time_usec,
         }
       }),
-      block_io: part(container::StatCategory::BLOCK_IO).optional(|devices| container_statistics::BlockIoStatistics {
+      block_io: part(container::StatCategory::BLOCK_IO).optional(|devices| container_statistics::BlockIOStatistics {
         devices: devices.list(|device| {
           let [major, minor, read_bytes, write_bytes, read_operations, write_operations] = device.statistics_fields();
-          container_statistics::BlockIoDevice {
+          container_statistics::BlockIODevice {
             major,
             minor,
             read_bytes,

@@ -138,7 +138,8 @@ func linuxProcessConfigurationFromImageConfig(
 
   return CzOutcome {
     fill(seed, from: LinuxProcessConfiguration(from: config))
-    return receive.call(seed)
+    _ = receive.call(seed)
+    return ()
   }
 }
 
@@ -151,7 +152,8 @@ func linuxProcessConfigurationSetTerminalIO(
     var configuration = try LinuxProcessConfiguration(process)
     configuration.setTerminalIO(terminal: terminal.terminal)
     fill(process, from: configuration)
-    return receive.call(process)
+    _ = receive.call(process)
+    return ()
   }
 }
 

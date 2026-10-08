@@ -13,7 +13,6 @@ use crate::containerization::container;
 use crate::containerization::network;
 use crate::containerization::vm;
 use crate::containerization_extras;
-use crate::containerization_extras::address::IPv6Address;
 use crate::containerization_oci;
 use crate::containerization_os;
 use std::collections::BTreeMap;
@@ -44,14 +43,14 @@ handles!(
 );
 
 failing!(
-  cz_vmnet_network_new(VmnetMode, Option<u32>, u8, bool, IPv6Address, u8),
+  cz_vmnet_network_new(VmnetMode, Option<u32>, u8, bool, containerization_extras::address::IPv6Address, u8),
   cz_virtual_machine_manager_new(vm::Kernel, container::Mount, bool, bool),
   cz_install_rosetta(),
   cz_kernel_command_line_add_debug(Vec<String>, Vec<String>),
   cz_kernel_command_line_add_panic(Vec<String>, Vec<String>, i64),
   cz_kernel_command_line_set_agent_log_level(Vec<String>, Vec<String>, LogLevel),
-  cz_dns_validate(network::Dns),
-  cz_dns_resolv_conf(network::Dns),
+  cz_dns_validate(network::DNS),
+  cz_dns_resolv_conf(network::DNS),
   cz_hosts_file(network::Hosts),
   cz_hosts_entry_rendered(network::hosts::Entry),
   cz_hosts_entry_named(HostsEntryName, Option<String>),
@@ -131,7 +130,7 @@ impl CzVirtualMachineManager {
     match self.0 {}
   }
 
-  pub(crate) fn create(&self, _config: vm::VmConfiguration) -> CzOutcome {
+  pub(crate) fn create(&self, _config: vm::VMConfiguration) -> CzOutcome {
     match self.0 {}
   }
 }
@@ -319,7 +318,7 @@ impl CzVminitd {
     match self.0 {}
   }
 
-  pub(crate) fn configure_dns(&self, _config: network::Dns, _location: &str) -> CzOutcome {
+  pub(crate) fn configure_dns(&self, _config: network::DNS, _location: &str) -> CzOutcome {
     match self.0 {}
   }
 

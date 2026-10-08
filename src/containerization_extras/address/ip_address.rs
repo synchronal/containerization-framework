@@ -8,12 +8,12 @@ use crate::platform::ffi;
 
 /// `IPAddress`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum IpAddress {
+pub enum IPAddress {
   V4(IPv4Address),
   V6(IPv6Address),
 }
 
-impl IpAddress {
+impl IPAddress {
   /// `IPAddress(_ string: String)`.
   pub fn parse(string: &str) -> Result<Self, Error> {
     platform::outcome(

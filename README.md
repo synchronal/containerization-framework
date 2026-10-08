@@ -32,8 +32,9 @@ let gateway = cz_extras::address::IPv4Address::parse("192.168.64.1")?;
 let options = cz::container::container_manager::CreateOptions { networking: false, ..Default::default() };
 let container = manager.create("example", &image, options, move |config| {
     config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
-    config.interfaces = vec![cz::network::Interface::Nat(cz::network::NatInterface::new(address, Some(gateway)))];
-    config.dns = Some(cz::network::Dns { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
+    config.interfaces = vec![cz::network::Interface::Nat(cz::network::NATInterface::new(address, Some(gateway)))];
+    config.dns = Some(cz::network::DNS { nameservers: vec!["192.168.64.1".into()], ..Default::default() });
+    Ok(())
 })?;
 container.create()?;
 container.start()?;
@@ -105,11 +106,11 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
 ## Shape
 
 - `containerization`, in five groups. `image`: `ImageStore`, `Image`,
-  `image::Description`, `InitImage`, `KernelImage`, `Ext4Unpacker`. `vm`:
-  `Kernel`, `SystemPlatform`, `VmConfiguration`, `VmResources`, `BootLog`,
-  `VzVirtualMachineManager`, `VzVirtualMachineInstance`, `Vminitd`,
+  `image::Description`, `InitImage`, `KernelImage`, `EXT4Unpacker`. `vm`:
+  `Kernel`, `SystemPlatform`, `VMConfiguration`, `VMResources`, `BootLog`,
+  `VZVirtualMachineManager`, `VZVirtualMachineInstance`, `Vminitd`,
   `VsockListener`. `network`:
-  `VmnetNetwork`, `NatInterface`, `Interface`, `Dns`, `Hosts`. `container`:
+  `VmnetNetwork`, `NATInterface`, `Interface`, `DNS`, `Hosts`. `container`:
   `ContainerManager`, `LinuxContainer`, `LinuxPod`, `Mount`, and the
   configuration types they take (`linux_container::Configuration`, ...).
   `process`: `LinuxProcess`, `LinuxProcessConfiguration`, `Signal`,
@@ -122,11 +123,11 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
   and the formats and filters they take.
 - `containerization_error`: the `Code` that a thrown `ContainerizationError`
   carries, which `Error::is_code` checks.
-- `containerization_ext4`: `ext4::Formatter`, `ext4::Ext4Reader`,
+- `containerization_ext4`: `ext4::Formatter`, `ext4::EXT4Reader`,
   `ext4::SuperBlock`, `ext4::Inode`, `ext4::JournalConfig`,
   `FileTimestamps`.
 - `containerization_extras`: in `address`, `IPv4Address`, `IPv6Address`,
-  `IpAddress`, `Prefix`, `CIDRv4`, `CIDRv6`, `Cidr` and `MACAddress`; at the
+  `IPAddress`, `Prefix`, `CIDRv4`, `CIDRv6`, `CIDR` and `MACAddress`; at the
   root, `InterfaceAddress`, `LinkRoute`, `DefaultRoute`, `ProgressEvent` and
   `ProgressHandler`; and `proxy_utils`.
 - `containerization_io`: `ReadStream`.
@@ -138,11 +139,15 @@ does:
 
 - Rust has no default arguments, so `ContainerManager.create`'s optional
   arguments are fields of `container::container_manager::CreateOptions`. Its
-  `Default` uses the same values as Swift.
+  `Default` uses the same values as Swift. An initializer's options struct is
+  named after its type, such as `ContainerManagerOptions`, and a method's is
+  named after the Rust method, such as `CreateWithRootfsOptions`.
 - Rust has no overloading either. Where Swift overloads a name, the second
   Rust method adds a suffix naming the argument that tells them apart:
   `ContainerManager.create(_:image:rootfs:...)` is `create_with_rootfs`, and
-  `ImageStore(path:contentStore:)` is `ImageStore::with_content_store`.
+  `ImageStore(path:contentStore:)` is `ImageStore::with_content_store`. Where
+  the overloads differ only in taking a closure, as with
+  `LinuxContainer.exec`, the one taking a closure ends in `_with`.
 - Where Swift takes a `ReaderStream` or `Writer` for a process's `stdin`,
   `stdout` and `stderr`, Rust takes a file descriptor. Swift uses a duplicate
   of it, so you keep yours open and close it yourself.
@@ -150,13 +155,16 @@ does:
   configuration the manager has prepared and runs on a Swift thread, so it
   must be `Send + 'static`. So must `LocalContentStore.ingest`'s body and a
   `ProgressHandler`, and a `ProgressHandler` must also be `Sync`.
+- Swift's configuration closures can throw, so Rust's return
+  `Result<(), Error>`. To throw, return `Err(Error::failed(...))`. An error
+  the closure returns is the one the call returns.
 - `Content.decode()` is generic over Swift's `Decodable`, which Rust can't
   call. Read `Content::data` and decode the bytes yourself.
 - Swift computes everything about an address, from parsing it to its
   `description` and `isLoopback`. Each of those calls Swift and returns a
   `Result`, which is why addresses have a `description` method rather than
-  `Display`. For the same reason, their ordering is `PartialOrd`, which asks
-  Swift's `<` and gives `None` where Swift can't be asked.
+  `Display`. Their `PartialOrd` and `Platform`'s `PartialEq` call Swift's
+  operators too, so off macOS, comparing them panics.
 - Where Swift's initializer checks or changes a value, as with `Prefix`,
   `CIDRv4`, `CIDRv6` and `MACAddress`, only Swift makes one, so their fields
   are read through getters.

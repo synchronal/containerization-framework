@@ -106,7 +106,7 @@ fn tells_block_mounts_from_others() {
 
 #[test]
 fn renders_and_validates_dns() {
-  let dns = cfw::containerization::network::Dns {
+  let dns = cfw::containerization::network::DNS {
     nameservers: strings(&["1.1.1.1", "2606:4700:4700::1111"]),
     domain: Some("example.com".into()),
     search_domains: strings(&["example.com", "internal"]),
@@ -119,7 +119,7 @@ fn renders_and_validates_dns() {
     "nameserver 1.1.1.1\nnameserver 2606:4700:4700::1111\ndomain example.com\nsearch example.com internal\noptions ndots:2\n"
   );
 
-  let invalid = cfw::containerization::network::Dns {
+  let invalid = cfw::containerization::network::DNS {
     nameservers: strings(&["dns.example.com"]),
     ..Default::default()
   };
@@ -196,7 +196,7 @@ fn parses_rlimit_kinds_by_their_oci_names() {
 #[test]
 fn makes_capability_sets() {
   let chown = cfw::containerization_os::CapabilityName::Chown;
-  let capabilities = cfw::containerization::process::LinuxCapabilities::with(vec![chown]);
+  let capabilities = cfw::containerization::process::LinuxCapabilities::with_capabilities(vec![chown]);
 
   assert_eq!(
     capabilities,

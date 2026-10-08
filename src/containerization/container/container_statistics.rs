@@ -7,8 +7,8 @@ pub struct ContainerStatistics {
   pub id: String,
   pub process: Option<ProcessStatistics>,
   pub memory: Option<MemoryStatistics>,
-  pub cpu: Option<CpuStatistics>,
-  pub block_io: Option<BlockIoStatistics>,
+  pub cpu: Option<CPUStatistics>,
+  pub block_io: Option<BlockIOStatistics>,
   pub networks: Option<Vec<NetworkStatistics>>,
   pub memory_events: Option<MemoryEventStatistics>,
   pub filesystem: Option<Vec<FilesystemStatistics>>,
@@ -44,7 +44,7 @@ pub struct MemoryStatistics {
 
 /// `ContainerStatistics.CPUStatistics`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CpuStatistics {
+pub struct CPUStatistics {
   pub usage_usec: u64,
   pub user_usec: u64,
   pub system_usec: u64,
@@ -55,13 +55,13 @@ pub struct CpuStatistics {
 
 /// `ContainerStatistics.BlockIOStatistics`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BlockIoStatistics {
-  pub devices: Vec<BlockIoDevice>,
+pub struct BlockIOStatistics {
+  pub devices: Vec<BlockIODevice>,
 }
 
 /// `ContainerStatistics.BlockIODevice`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct BlockIoDevice {
+pub struct BlockIODevice {
   pub major: u64,
   pub minor: u64,
   pub read_bytes: u64,

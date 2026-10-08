@@ -1,15 +1,9 @@
-use crate::containerization::container::ContainerStatistics;
-use crate::containerization::container::FilesystemOperation;
-use crate::containerization::container::StatCategory;
-use crate::containerization::container::UnixSocketConfiguration;
-use crate::containerization::network::Dns;
-use crate::containerization::network::Hosts;
-use crate::containerization::process::ExitStatus;
-use crate::containerization_extras::DefaultRoute;
-use crate::containerization_extras::InterfaceAddress;
-use crate::containerization_extras::LinkRoute;
+use crate::containerization::container;
+use crate::containerization::network;
+use crate::containerization::process;
+use crate::containerization_extras;
 use crate::containerization_oci::runtime;
-use crate::containerization_os::Stat;
+use crate::containerization_os;
 use crate::containerization_os::binfmt;
 use crate::error::Error;
 use crate::platform;
@@ -18,7 +12,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 /// `Vminitd`, the client of the agent running in the guest. Made by
-/// [`super::VzVirtualMachineInstance::dial_agent`].
+/// [`super::VZVirtualMachineInstance::dial_agent`].
 ///
 /// Like Swift's, it keeps its connection until [`Vminitd::close`] closes it.
 /// `init(connection:group:)` takes a NIO event loop group and isn't bound;
@@ -52,7 +46,7 @@ impl Vminitd {
   /// `containerID` defaults to `nil`.
   pub fn filesystem_operation(
     &self,
-    operation: FilesystemOperation,
+    operation: container::FilesystemOperation,
     path: &str,
     container_id: Option<&str>,
   ) -> Result<(), Error> {
@@ -180,7 +174,7 @@ impl Vminitd {
     id: &str,
     container_id: Option<&str>,
     timeout_in_seconds: Option<i64>,
-  ) -> Result<ExitStatus, Error> {
+  ) -> Result<process::ExitStatus, Error> {
     platform::outcome(
       self
         .handle
@@ -223,7 +217,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.addressAdd(name:address:)`.
-  pub fn address_add(&self, name: &str, address: &InterfaceAddress) -> Result<(), Error> {
+  pub fn address_add(&self, name: &str, address: &containerization_extras::InterfaceAddress) -> Result<(), Error> {
     platform::outcome(
       self.handle.address_add(name, address.clone()),
       format!("add an address to {name} in the guest"),
@@ -232,7 +226,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.routeAddLink(name:route:)`.
-  pub fn route_add_link(&self, name: &str, route: &LinkRoute) -> Result<(), Error> {
+  pub fn route_add_link(&self, name: &str, route: &containerization_extras::LinkRoute) -> Result<(), Error> {
     platform::outcome(
       self.handle.route_add_link(name, route.clone()),
       format!("add a link route to {name} in the guest"),
@@ -241,7 +235,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.routeAddDefault(name:route:)`.
-  pub fn route_add_default(&self, name: &str, route: &DefaultRoute) -> Result<(), Error> {
+  pub fn route_add_default(&self, name: &str, route: &containerization_extras::DefaultRoute) -> Result<(), Error> {
     platform::outcome(
       self.handle.route_add_default(name, route.clone()),
       format!("add a default route to {name} in the guest"),
@@ -250,7 +244,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.configureDNS(config:location:)`.
-  pub fn configure_dns(&self, config: &Dns, location: &str) -> Result<(), Error> {
+  pub fn configure_dns(&self, config: &network::DNS, location: &str) -> Result<(), Error> {
     platform::outcome(
       self.handle.configure_dns(config.clone(), location),
       format!("configure DNS at {location} in the guest"),
@@ -259,7 +253,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.configureHosts(config:location:)`.
-  pub fn configure_hosts(&self, config: &Hosts, location: &str) -> Result<(), Error> {
+  pub fn configure_hosts(&self, config: &network::Hosts, location: &str) -> Result<(), Error> {
     platform::outcome(
       self.handle.configure_hosts(config.clone(), location),
       format!("configure hosts at {location} in the guest"),
@@ -271,8 +265,8 @@ impl Vminitd {
   pub fn container_statistics(
     &self,
     container_ids: &[&str],
-    categories: StatCategory,
-  ) -> Result<Vec<ContainerStatistics>, Error> {
+    categories: container::StatCategory,
+  ) -> Result<Vec<container::ContainerStatistics>, Error> {
     platform::outcome(
       self.handle.container_statistics(
         container_ids.iter().map(|id| id.to_string()).collect(),
@@ -312,7 +306,7 @@ impl Vminitd {
 
   /// `Vminitd.stat(root:path:)`: `path`'s metadata, resolved as if `root`
   /// were the guest's root directory.
-  pub fn stat(&self, root: &str, path: &str) -> Result<Stat, Error> {
+  pub fn stat(&self, root: &str, path: &str) -> Result<containerization_os::Stat, Error> {
     platform::outcome(self.handle.stat(root, path), format!("stat {path} in the guest")).map(|outcome| outcome.stat())
   }
 
@@ -322,7 +316,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.relaySocket(port:configuration:)`.
-  pub fn relay_socket(&self, port: u32, configuration: &UnixSocketConfiguration) -> Result<(), Error> {
+  pub fn relay_socket(&self, port: u32, configuration: &container::UnixSocketConfiguration) -> Result<(), Error> {
     platform::outcome(
       self.handle.relay_socket(port, configuration.clone()),
       format!("relay a socket over vsock port {port}"),
@@ -331,7 +325,7 @@ impl Vminitd {
   }
 
   /// `Vminitd.stopSocketRelay(configuration:)`.
-  pub fn stop_socket_relay(&self, configuration: &UnixSocketConfiguration) -> Result<(), Error> {
+  pub fn stop_socket_relay(&self, configuration: &container::UnixSocketConfiguration) -> Result<(), Error> {
     platform::outcome(
       self.handle.stop_socket_relay(configuration.clone()),
       "stop a socket relay",

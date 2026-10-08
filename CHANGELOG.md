@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- `VzVirtualMachineInstance::dial_agent` returns the new
+- Every public type implements `Debug`.
+- `VZVirtualMachineInstance::dial_agent` returns the new
   `containerization::vm::Vminitd`, the client of the agent running in the
   guest. It can set up the guest, manage processes, mount filesystems,
   configure networking, DNS and hosts, stat paths, relay sockets and read
@@ -13,6 +14,38 @@
   `DefaultRoute`, which `Vminitd` configures an interface with.
 - `containerization_os::binfmt` has `Entry`, which `Vminitd::setup_emulator`
   registers in the guest.
+
+### Breaking changes
+
+- Types that mirror a Swift type now take Swift's exact name.
+  `BlockIoDevice`, `BlockIoStatistics`, `Cidr`, `CpuStatistics`, `Dns`,
+  `Ext4Reader`, `Ext4Unpacker`, `IpAddress`, `NatInterface`,
+  `VmConfiguration`, `VmResources`, `VzVirtualMachineInstance`,
+  `VzVirtualMachineManager` and `system_platform::Os` are now
+  `BlockIODevice`, `BlockIOStatistics`, `CIDR`, `CPUStatistics`, `DNS`,
+  `EXT4Reader`, `EXT4Unpacker`, `IPAddress`, `NATInterface`,
+  `VMConfiguration`, `VMResources`, `VZVirtualMachineInstance`,
+  `VZVirtualMachineManager` and `OS`.
+- The structs that stand in for an initializer's default arguments are named
+  after its type. `container_manager::ManagerOptions` is now
+  `ContainerManagerOptions`, `vz_virtual_machine_manager::ManagerOptions` is
+  `VZVirtualMachineManagerOptions`, `reference::NewOptions` is
+  `ReferenceOptions`, `registry_client::HostOptions` is
+  `RegistryClientOptions`, and `archive_writer::FileOptions` is
+  `ArchiveWriterOptions`. A method's struct is named after the method, so
+  `RootfsCreateOptions` is now `CreateWithRootfsOptions`.
+- `ContainerManager::create_from_reference` is now `create_with_reference`,
+  and `LinuxCapabilities::with` is now `with_capabilities`.
+- Configuration closures return `Result<(), Error>`, as Swift's can throw.
+  An error the closure returns is the one the call returns. This covers
+  `ContainerManager`'s `create` methods, `LinuxContainer::new_with` and
+  `exec_with`, and `LinuxPod`'s `new`, `add_container` and
+  `exec_in_container`.
+- Off macOS, comparing two `Platform`s or ordering two addresses now panics,
+  since only Swift can answer. Before, `Platform` compared every field, and
+  addresses had no order.
+- `Error` is `#[non_exhaustive]`, and `Error::unavailable` is no longer
+  public. `Error` now implements `Clone`, `PartialEq` and `Eq`.
 
 ## v0.4.0
 

@@ -35,7 +35,7 @@ impl From<vmnet_network::Mode> for ffi::VmnetMode {
   }
 }
 
-impl network::NatInterface {
+impl network::NATInterface {
   pub(crate) fn ipv4_address_value(&self) -> u32 {
     self.ipv4_address.address.value
   }
@@ -84,7 +84,7 @@ impl network::NatInterface {
   }
 }
 
-impl network::Dns {
+impl network::DNS {
   pub(crate) fn nameservers_len(&self) -> usize {
     self.nameservers.len()
   }
@@ -156,7 +156,7 @@ pub(in super::super) fn interface_kind(interface: &network::Interface) -> ffi::I
   }
 }
 
-pub(in super::super) fn nat_interface(interface: &network::Interface) -> &network::NatInterface {
+pub(in super::super) fn nat_interface(interface: &network::Interface) -> &network::NATInterface {
   match interface {
     network::Interface::Nat(interface) => interface,
     network::Interface::Vmnet(_) => unreachable!("Swift asks for a NAT interface only of its kind"),
@@ -179,7 +179,7 @@ pub(in super::super) fn nat(
   mac_address: Option<u64>,
   mtu: u32,
 ) -> network::Interface {
-  network::Interface::Nat(network::NatInterface {
+  network::Interface::Nat(network::NATInterface {
     ipv4_address: address::CIDRv4 {
       address: address::IPv4Address::new(ipv4_address),
       prefix: address::Prefix { length: ipv4_prefix },
@@ -218,7 +218,7 @@ pub(in super::super) fn set_ipv6_gateway(
   last_nat(interfaces).ipv6_gateway = Some(address::IPv6Address::from_halves(high, low, zone));
 }
 
-fn last_nat(interfaces: &mut [network::Interface]) -> &mut network::NatInterface {
+fn last_nat(interfaces: &mut [network::Interface]) -> &mut network::NATInterface {
   match interfaces.last_mut() {
     Some(network::Interface::Nat(interface)) => interface,
     _ => unreachable!("Swift sets an interface's IPv6 addresses only after push_interface"),
@@ -230,8 +230,8 @@ pub(in super::super) fn dns(
   domain: Option<String>,
   search_domains: Vec<String>,
   options: Vec<String>,
-) -> network::Dns {
-  network::Dns {
+) -> network::DNS {
+  network::DNS {
     nameservers,
     domain,
     search_domains,

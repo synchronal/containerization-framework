@@ -335,7 +335,7 @@ impl linux_container::Configuration {
   }
 
   /// Only when [`Self::interface_kind_at`] is `Nat`.
-  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NatInterface {
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NATInterface {
     nat_interface(&self.interfaces[index])
   }
 
@@ -381,7 +381,7 @@ impl linux_container::Configuration {
   }
 
   /// Only when [`Self::has_dns`].
-  pub(crate) fn dns(&self) -> &network::Dns {
+  pub(crate) fn dns(&self) -> &network::DNS {
     accessors::present(&self.dns)
   }
 

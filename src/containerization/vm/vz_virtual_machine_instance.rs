@@ -3,7 +3,7 @@ use super::VirtiofsLayout;
 use super::VirtualMachineInstanceState;
 use super::Vminitd;
 use super::VsockListener;
-use crate::containerization::container::Mount;
+use crate::containerization::container;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -13,21 +13,21 @@ use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 
 /// `VZVirtualMachineInstance`. Made by
-/// [`super::VzVirtualMachineManager::create`], or reached through
+/// [`super::VZVirtualMachineManager::create`], or reached through
 /// [`crate::containerization::container::LinuxContainer::with_virtual_machine_instance`].
 ///
 /// `vzVirtualMachine`, `vmQueue`, `withMountRegistry`, `withInstanceLock`,
 /// `hotplugProvider` and the initializer taking a configuration closure
 /// aren't bound.
-pub struct VzVirtualMachineInstance {
+pub struct VZVirtualMachineInstance {
   pub(crate) handle: ffi::CzVirtualMachineInstance,
 }
 
 // Swift's `VZVirtualMachineInstance` is `Sendable`.
-unsafe impl Send for VzVirtualMachineInstance {}
-unsafe impl Sync for VzVirtualMachineInstance {}
+unsafe impl Send for VZVirtualMachineInstance {}
+unsafe impl Sync for VZVirtualMachineInstance {}
 
-impl VzVirtualMachineInstance {
+impl VZVirtualMachineInstance {
   /// `VZVirtualMachineInstance.state`.
   pub fn state(&self) -> VirtualMachineInstanceState {
     self.handle.state().into()
@@ -89,7 +89,7 @@ impl VzVirtualMachineInstance {
 
   /// `VZVirtualMachineInstance.hotplug(_:id:)`. It fails unless the instance
   /// has a hotplug provider, which isn't bound.
-  pub fn hotplug(&self, block: Mount, id: &str) -> Result<AttachedFilesystem, Error> {
+  pub fn hotplug(&self, block: container::Mount, id: &str) -> Result<AttachedFilesystem, Error> {
     platform::outcome(self.handle.hotplug(block, id), format!("hotplug a block for {id}"))
       .map(|outcome| outcome.attached_filesystem())
   }
@@ -100,7 +100,7 @@ impl VzVirtualMachineInstance {
     &self,
     id: &str,
     rootfs: AttachedFilesystem,
-    additional_mounts: Vec<Mount>,
+    additional_mounts: Vec<container::Mount>,
   ) -> Result<(), Error> {
     platform::outcome(
       self.handle.register_mounts(id, rootfs, additional_mounts),
@@ -117,7 +117,7 @@ impl VzVirtualMachineInstance {
 
   /// `VZVirtualMachineInstance.hotplugVirtioFS(_:id:)`. Without a hotplug
   /// provider it does nothing.
-  pub fn hotplug_virtio_fs(&self, mounts: Vec<Mount>, id: &str) -> Result<(), Error> {
+  pub fn hotplug_virtio_fs(&self, mounts: Vec<container::Mount>, id: &str) -> Result<(), Error> {
     platform::outcome(
       self.handle.hotplug_virtio_fs(mounts, id),
       format!("hotplug {id}'s shares"),
@@ -138,10 +138,10 @@ impl VzVirtualMachineInstance {
   }
 }
 
-impl fmt::Debug for VzVirtualMachineInstance {
+impl fmt::Debug for VZVirtualMachineInstance {
   fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
     formatter
-      .debug_struct("VzVirtualMachineInstance")
+      .debug_struct("VZVirtualMachineInstance")
       .field("state", &self.state())
       .finish_non_exhaustive()
   }

@@ -41,7 +41,7 @@ final class CzLinuxPod: Sendable {
 
   func config(seed: RustPodConfiguration, receive: RustConfigurePod) {
     fill(seed, from: pod.config)
-    receive.call(seed)
+    _ = receive.call(seed)
   }
 
   func vmCpus() -> UInt32 {
@@ -70,7 +70,7 @@ final class CzLinuxPod: Sendable {
     return CzOutcome {
       try blocking {
         try await pod.addContainer(id, rootfs: rootfs) { config in
-          configuration.call(seed)
+          if configuration.call(seed) { throw RustClosureThrew() }
           config = try LinuxPod.ContainerConfiguration(seed)
         }
       }

@@ -2,7 +2,7 @@
 //! reads.
 
 use crate::containerization::image::Description as RustImageDescription;
-use crate::containerization::image::Ext4Unpacker as RustExt4Unpacker;
+use crate::containerization::image::EXT4Unpacker as RustExt4Unpacker;
 use crate::containerization_oci::image::Descriptor as RustDescriptor;
 use crate::containerization_oci::image::ImageConfig as RustImageConfig;
 use crate::containerization_oci::image::Platform as RustPlatform;

@@ -113,11 +113,11 @@ fn orders_ipv6_addresses_as_swift_does() {
 
 #[test]
 fn reads_an_ip_address_of_either_family() {
-  let v4 = extras::address::IpAddress::parse("10.0.0.2").expect("an IPv4 address");
-  let v6 = extras::address::IpAddress::parse("::1").expect("an IPv6 address");
+  let v4 = extras::address::IPAddress::parse("10.0.0.2").expect("an IPv4 address");
+  let v6 = extras::address::IPAddress::parse("::1").expect("an IPv6 address");
 
-  assert_eq!(v4, extras::address::IpAddress::V4(ipv4("10.0.0.2")));
-  assert_eq!(v6, extras::address::IpAddress::V6(ipv6("::1")));
+  assert_eq!(v4, extras::address::IPAddress::V4(ipv4("10.0.0.2")));
+  assert_eq!(v6, extras::address::IPAddress::V6(ipv6("::1")));
   assert_eq!(v4.description().expect("a description"), "10.0.0.2");
   assert!(v4.is_v4().expect("an answer"));
   assert!(!v4.is_v6().expect("an answer"));
@@ -128,7 +128,7 @@ fn reads_an_ip_address_of_either_family() {
   assert!(v6.is_loopback().expect("an answer"));
   assert!(!v4.is_multicast().expect("an answer"));
   assert!(!v4.is_unspecified().expect("an answer"));
-  assert!(extras::address::IpAddress::parse("nowhere").is_err());
+  assert!(extras::address::IPAddress::parse("nowhere").is_err());
 }
 
 #[test]
@@ -214,31 +214,31 @@ fn reads_an_ipv6_block() {
 
 #[test]
 fn reads_a_block_of_either_family() {
-  let v4 = extras::address::Cidr::parse("10.0.0.2/24").expect("a valid block");
-  let v6 = extras::address::Cidr::parse("fd00::5/64").expect("a valid block");
+  let v4 = extras::address::CIDR::parse("10.0.0.2/24").expect("a valid block");
+  let v6 = extras::address::CIDR::parse("fd00::5/64").expect("a valid block");
 
-  assert_eq!(v4, extras::address::Cidr::V4(ipv4("10.0.0.2"), prefix(24)));
-  assert_eq!(v6, extras::address::Cidr::V6(ipv6("fd00::5"), prefix(64)));
+  assert_eq!(v4, extras::address::CIDR::V4(ipv4("10.0.0.2"), prefix(24)));
+  assert_eq!(v6, extras::address::CIDR::V6(ipv6("fd00::5"), prefix(64)));
   assert_eq!(
     v4.address().expect("an address"),
-    extras::address::IpAddress::V4(ipv4("10.0.0.2"))
+    extras::address::IPAddress::V4(ipv4("10.0.0.2"))
   );
   assert_eq!(v6.prefix().expect("a prefix"), prefix(64));
   assert_eq!(
     v4.lower().expect("the lowest address"),
-    extras::address::IpAddress::V4(ipv4("10.0.0.0"))
+    extras::address::IPAddress::V4(ipv4("10.0.0.0"))
   );
   assert_eq!(
     v4.upper().expect("the highest address"),
-    extras::address::IpAddress::V4(ipv4("10.0.0.255"))
+    extras::address::IPAddress::V4(ipv4("10.0.0.255"))
   );
   assert!(
-    v6.contains(&extras::address::IpAddress::V6(ipv6("fd00::abcd")))
+    v6.contains(&extras::address::IPAddress::V6(ipv6("fd00::abcd")))
       .expect("an answer")
   );
   assert!(
     !v4
-      .contains(&extras::address::IpAddress::V6(ipv6("fd00::abcd")))
+      .contains(&extras::address::IPAddress::V6(ipv6("fd00::abcd")))
       .expect("an answer")
   );
   assert_eq!(v6.description().expect("a description"), "fd00::5/64");
@@ -246,24 +246,24 @@ fn reads_a_block_of_either_family() {
 
 #[test]
 fn makes_blocks_of_either_family_as_swift_does() {
-  let v4 = extras::address::IpAddress::V4(ipv4("10.0.0.2"));
-  let v6 = extras::address::IpAddress::V6(ipv6("fd00::5"));
+  let v4 = extras::address::IPAddress::V4(ipv4("10.0.0.2"));
+  let v6 = extras::address::IPAddress::V6(ipv6("fd00::5"));
 
   assert_eq!(
-    extras::address::Cidr::new(&v4, prefix(24)).expect("a valid block"),
-    extras::address::Cidr::V4(ipv4("10.0.0.2"), prefix(24))
+    extras::address::CIDR::new(&v4, prefix(24)).expect("a valid block"),
+    extras::address::CIDR::V4(ipv4("10.0.0.2"), prefix(24))
   );
-  assert!(extras::address::Cidr::new(&v4, prefix(64)).is_err());
-  assert!(extras::address::Cidr::from_range(&v4, &v6).is_err());
+  assert!(extras::address::CIDR::new(&v4, prefix(64)).is_err());
+  assert!(extras::address::CIDR::from_range(&v4, &v6).is_err());
   assert_eq!(
-    extras::address::Cidr::from_range(
-      &extras::address::IpAddress::V4(ipv4("10.0.0.0")),
-      &extras::address::IpAddress::V4(ipv4("10.0.0.255"))
+    extras::address::CIDR::from_range(
+      &extras::address::IPAddress::V4(ipv4("10.0.0.0")),
+      &extras::address::IPAddress::V4(ipv4("10.0.0.255"))
     )
     .expect("a range"),
-    extras::address::Cidr::V4(ipv4("10.0.0.0"), prefix(24))
+    extras::address::CIDR::V4(ipv4("10.0.0.0"), prefix(24))
   );
-  assert!(extras::address::Cidr::parse("nowhere/24").is_err());
+  assert!(extras::address::CIDR::parse("nowhere/24").is_err());
 }
 
 #[test]

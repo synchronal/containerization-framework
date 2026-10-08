@@ -34,6 +34,7 @@
 //! };
 //! let container = manager.create("demo", &image, options, |config| {
 //!   config.process.arguments = vec!["/bin/sleep".into(), "infinity".into()];
+//!   Ok(())
 //! })?;
 //! container.create()?;
 //! container.start()?;
@@ -65,6 +66,8 @@
 //! built purely in Rust work as usual.
 //!
 //! [Containerization]: https://github.com/apple/containerization
+
+#![warn(missing_debug_implementations)]
 
 /// A Swift enum backed by strings: Rust's cases, each with its `rawValue`.
 macro_rules! raw_values {

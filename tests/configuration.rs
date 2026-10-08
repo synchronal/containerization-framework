@@ -41,7 +41,7 @@ fn names_resolves_and_tunes_the_container() {
   let container = Container::boot_with("cfw-test-config-names", |configuration| {
     configuration.hostname = Some("configured-host".into());
     configuration.sysctl = [("net.core.somaxconn".to_string(), "4096".to_string())].into();
-    configuration.dns = Some(cfw::containerization::network::Dns {
+    configuration.dns = Some(cfw::containerization::network::DNS {
       nameservers: vec![support::network::GATEWAY.into(), "1.1.1.1".into()],
       domain: Some("example.test".into()),
       search_domains: vec!["a.test".into(), "b.test".into()],

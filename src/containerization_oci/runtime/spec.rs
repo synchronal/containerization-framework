@@ -2,7 +2,7 @@
 //! holds.
 
 use super::User;
-use crate::containerization_oci::image::ImageConfig;
+use crate::containerization_oci::image;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -62,7 +62,7 @@ impl Default for Process {
 
 impl Process {
   /// `Process(from: ImageConfig)`.
-  pub fn from_image_config(config: &ImageConfig) -> Result<Self, Error> {
+  pub fn from_image_config(config: &image::ImageConfig) -> Result<Self, Error> {
     platform::outcome(
       ffi::cz_process_from_image_config(config.clone()),
       "make a process from an image config",

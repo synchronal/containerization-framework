@@ -102,7 +102,7 @@ pub(in super::super) fn boot_log_file(path: String, append: bool) -> vm::BootLog
   }
 }
 
-impl vm::VmConfiguration {
+impl vm::VMConfiguration {
   pub(crate) fn cpus(&self) -> u32 {
     self.cpus
   }
@@ -120,7 +120,7 @@ impl vm::VmConfiguration {
   }
 
   /// Only when [`Self::interface_kind_at`] is `Nat`.
-  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NatInterface {
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NATInterface {
     nat_interface(&self.interfaces[index])
   }
 
@@ -185,16 +185,16 @@ impl vm::AttachedFilesystem {
   }
 }
 
-impl From<system_platform::Os> for ffi::PlatformOs {
-  fn from(os: system_platform::Os) -> Self {
+impl From<system_platform::OS> for ffi::PlatformOs {
+  fn from(os: system_platform::OS) -> Self {
     match os {
-      system_platform::Os::Linux => Self::Linux,
-      system_platform::Os::Darwin => Self::Darwin,
+      system_platform::OS::Linux => Self::Linux,
+      system_platform::OS::Darwin => Self::Darwin,
     }
   }
 }
 
-impl From<ffi::PlatformOs> for system_platform::Os {
+impl From<ffi::PlatformOs> for system_platform::OS {
   fn from(os: ffi::PlatformOs) -> Self {
     match os {
       ffi::PlatformOs::Linux => Self::Linux,
@@ -264,7 +264,7 @@ mod tests {
 
   #[test]
   fn copies_swifts_system_platform_raw_values() {
-    let os = system_platform::Os::ALL_CASES.iter().map(|os| os.as_str());
+    let os = system_platform::OS::ALL_CASES.iter().map(|os| os.as_str());
     let architectures = system_platform::Architecture::ALL_CASES
       .iter()
       .map(|architecture| architecture.as_str());

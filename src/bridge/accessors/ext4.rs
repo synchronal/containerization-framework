@@ -63,7 +63,7 @@ mod tests {
   use crate::bridge::ffi;
   use crate::containerization_ext4::ext4;
   use crate::containerization_ext4::file_timestamps;
-  use crate::containerization_io::ReadStream;
+  use crate::containerization_io;
   use std::mem::offset_of;
   use std::mem::size_of;
   use std::time::Duration;
@@ -148,6 +148,9 @@ mod tests {
 
   #[test]
   fn copies_swifts_read_stream_buffer_size() {
-    assert_eq!(ffi::cz_read_stream_buffer_size() as usize, ReadStream::BUFFER_SIZE);
+    assert_eq!(
+      ffi::cz_read_stream_buffer_size() as usize,
+      containerization_io::ReadStream::BUFFER_SIZE
+    );
   }
 }

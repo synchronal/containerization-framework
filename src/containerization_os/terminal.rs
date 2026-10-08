@@ -3,6 +3,7 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::os::fd::RawFd;
 
 /// `Terminal.Size`.
@@ -16,6 +17,12 @@ pub struct Size {
 /// [`Terminal::close`] does.
 pub struct Terminal {
   pub(crate) handle: ffi::CzTerminal,
+}
+
+impl fmt::Debug for Terminal {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("Terminal").finish_non_exhaustive()
+  }
 }
 
 // Swift's `Terminal` is `Sendable`.

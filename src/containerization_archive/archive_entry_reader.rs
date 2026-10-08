@@ -1,5 +1,6 @@
 use super::ArchiveReader;
 use crate::platform::ffi;
+use std::fmt;
 use std::io;
 use std::marker::PhantomData;
 
@@ -8,6 +9,14 @@ use std::marker::PhantomData;
 pub struct ArchiveEntryReader<'a> {
   pub(crate) handle: ffi::CzArchiveEntryReader,
   pub(crate) reader: PhantomData<&'a ArchiveReader>,
+}
+
+impl fmt::Debug for ArchiveEntryReader<'_> {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("ArchiveEntryReader")
+      .finish_non_exhaustive()
+  }
 }
 
 impl io::Read for ArchiveEntryReader<'_> {

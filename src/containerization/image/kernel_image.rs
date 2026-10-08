@@ -1,16 +1,24 @@
 use super::Image;
 use super::ImageStore;
-use crate::containerization::vm::Kernel;
-use crate::containerization::vm::SystemPlatform;
-use crate::containerization_oci::content::LocalContentStore;
+use crate::containerization::vm;
+use crate::containerization_oci;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
+use std::fmt;
 
 /// `KernelImage`.
 pub struct KernelImage {
   handle: ffi::CzKernelImage,
+}
+
+impl fmt::Debug for KernelImage {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("KernelImage")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `KernelImage` is `Sendable`.
@@ -34,7 +42,7 @@ impl KernelImage {
   }
 
   /// `KernelImage.kernel(for:)`.
-  pub fn kernel(&self, platform: SystemPlatform) -> Result<Kernel, Error> {
+  pub fn kernel(&self, platform: vm::SystemPlatform) -> Result<vm::Kernel, Error> {
     platform::outcome(
       self.handle.kernel(platform),
       format!("find the kernel in {}", self.name()),
@@ -45,10 +53,10 @@ impl KernelImage {
   /// `KernelImage.create(reference:binaries:labels:imageStore:contentStore:)`.
   pub fn create(
     reference: &str,
-    binaries: &[Kernel],
+    binaries: &[vm::Kernel],
     labels: &BTreeMap<String, String>,
     image_store: &ImageStore,
-    content_store: &LocalContentStore,
+    content_store: &containerization_oci::content::LocalContentStore,
   ) -> Result<Self, Error> {
     platform::outcome(
       image_store.handle.create_kernel_image(

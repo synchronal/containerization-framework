@@ -10,7 +10,7 @@ mod inode;
 pub mod journal_config;
 mod super_block;
 
-pub use self::ext4_reader::Ext4Reader;
+pub use self::ext4_reader::EXT4Reader;
 pub use self::extended_attribute::ExtendedAttribute;
 pub use self::file_mode_flag::FileModeFlag;
 pub use self::formatter::Formatter;

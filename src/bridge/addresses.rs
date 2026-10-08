@@ -4,8 +4,8 @@
 use crate::containerization_extras::DefaultRoute as RustDefaultRoute;
 use crate::containerization_extras::InterfaceAddress as RustInterfaceAddress;
 use crate::containerization_extras::LinkRoute as RustLinkRoute;
+use crate::containerization_extras::address::IPAddress as RustIpAddress;
 use crate::containerization_extras::address::IPv6Address as RustIPv6Address;
-use crate::containerization_extras::address::IpAddress as RustIpAddress;
 
 #[swift_bridge::bridge]
 mod ffi {

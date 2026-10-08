@@ -81,7 +81,7 @@ impl MACAddress {
 }
 
 impl PartialOrd for MACAddress {
-  /// `MACAddress.<`. `None` off macOS, where Swift can't be asked.
+  /// `MACAddress.<`. It panics off macOS, where Swift can't be asked.
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
     ordering(self, other, |lhs, rhs| {
       boolean(

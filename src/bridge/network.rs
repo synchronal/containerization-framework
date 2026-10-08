@@ -1,9 +1,9 @@
 //! The network values a container or VM is configured with, which Swift
 //! reads.
 
-use crate::containerization::network::Dns as RustDns;
+use crate::containerization::network::DNS as RustDns;
 use crate::containerization::network::Hosts as RustHosts;
-use crate::containerization::network::NatInterface as RustNatInterface;
+use crate::containerization::network::NATInterface as RustNatInterface;
 use crate::containerization::network::hosts::Entry as RustHostsEntry;
 use crate::containerization_extras::address::IPv6Address as RustIPv6Address;
 

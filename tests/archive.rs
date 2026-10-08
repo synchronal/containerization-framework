@@ -359,7 +359,7 @@ fn reads_a_bundled_zip() {
   let writer = cfw::containerization_archive::ArchiveWriter::with_file(
     cfw::containerization_archive::Format::Zip,
     cfw::containerization_archive::Filter::None,
-    cfw::containerization_archive::archive_writer::FileOptions {
+    cfw::containerization_archive::archive_writer::ArchiveWriterOptions {
       options: vec![
         cfw::containerization_archive::Options::Compression(
           cfw::containerization_archive::options::Compression::Deflate,
@@ -480,10 +480,10 @@ fn unpacks_an_archive_into_a_filesystem() {
     .expect("the directory should archive");
   writer.finish_encoding().expect("the archive should finish");
 
-  cfw::containerization::image::Ext4Unpacker::new(64 * 1024 * 1024, None)
+  cfw::containerization::image::EXT4Unpacker::new(64 * 1024 * 1024, None)
     .unpack_archive(&archive, cfw::containerization_archive::Filter::Gzip, &at)
     .expect("the archive should unpack");
-  cfw::containerization_ext4::ext4::Ext4Reader::new(&at)
+  cfw::containerization_ext4::ext4::EXT4Reader::new(&at)
     .expect("the filesystem should read")
     .export(&exported)
     .expect("the filesystem should export");

@@ -1,15 +1,14 @@
 //! `EXT4.Formatter`, and the options structs its methods take.
 
 use super::JournalConfig;
-use crate::containerization_archive::ArchiveReader;
-use crate::containerization_archive::Filter;
-use crate::containerization_archive::Format;
-use crate::containerization_ext4::FileTimestamps;
-use crate::containerization_extras::ProgressHandler;
+use crate::containerization_archive;
+use crate::containerization_ext4;
+use crate::containerization_extras;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -40,7 +39,7 @@ impl Default for FormatterOptions {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CreateOptions<'a> {
   pub link: Option<PathBuf>,
-  pub ts: FileTimestamps,
+  pub ts: containerization_ext4::FileTimestamps,
   pub buf: Option<&'a [u8]>,
   pub uid: Option<u32>,
   pub gid: Option<u32>,
@@ -51,24 +50,41 @@ pub struct CreateOptions<'a> {
 /// `EXT4.Formatter.unpack(source:format:compression:progress:)`'s defaulted
 /// arguments. [`Default`] is Swift's defaults.
 pub struct UnpackOptions {
-  pub format: Format,
-  pub compression: Filter,
-  pub progress: Option<ProgressHandler>,
+  pub format: containerization_archive::Format,
+  pub compression: containerization_archive::Filter,
+  pub progress: Option<containerization_extras::ProgressHandler>,
 }
 
 impl Default for UnpackOptions {
   fn default() -> Self {
     Self {
-      format: Format::PaxRestricted,
-      compression: Filter::Gzip,
+      format: containerization_archive::Format::PaxRestricted,
+      compression: containerization_archive::Filter::Gzip,
       progress: None,
     }
+  }
+}
+
+/// Leaves out the progress handler, which is a closure.
+impl fmt::Debug for UnpackOptions {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("UnpackOptions")
+      .field("format", &self.format)
+      .field("compression", &self.compression)
+      .finish_non_exhaustive()
   }
 }
 
 /// `EXT4.Formatter`.
 pub struct Formatter {
   handle: ffi::CzExt4Formatter,
+}
+
+impl fmt::Debug for Formatter {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("Formatter").finish_non_exhaustive()
+  }
 }
 
 // Swift's `Formatter` is a class that isn't `Sendable`; Rust's isn't `Sync`,
@@ -165,7 +181,11 @@ impl Formatter {
 
   /// `EXT4.Formatter.unpack(reader:progress:)`. Swift's `progress` defaults
   /// to `nil`.
-  pub fn unpack_reader(&self, reader: &ArchiveReader, progress: Option<ProgressHandler>) -> Result<(), Error> {
+  pub fn unpack_reader(
+    &self,
+    reader: &containerization_archive::ArchiveReader,
+    progress: Option<containerization_extras::ProgressHandler>,
+  ) -> Result<(), Error> {
     platform::outcome(
       self
         .handle
@@ -177,7 +197,11 @@ impl Formatter {
 
   /// `EXT4.Formatter.scanArchiveHeaders(format:filter:file:)`: the total
   /// size of the regular files, and the number of entries.
-  pub fn scan_archive_headers(format: Format, filter: Filter, file: &Path) -> Result<(i64, isize), Error> {
+  pub fn scan_archive_headers(
+    format: containerization_archive::Format,
+    filter: containerization_archive::Filter,
+    file: &Path,
+  ) -> Result<(i64, isize), Error> {
     platform::outcome(
       ffi::cz_ext4_formatter_scan_archive_headers(format.raw_value(), filter.raw_value(), &file.display().to_string()),
       format!("scan the archive {}", file.display()),

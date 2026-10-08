@@ -12,6 +12,7 @@ pub use self::parsed_digest::ParsedDigest;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -20,6 +21,12 @@ use std::path::PathBuf;
 /// [`Content::data`] instead.
 pub struct Content {
   pub(crate) handle: ffi::CzContent,
+}
+
+impl fmt::Debug for Content {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("Content").finish_non_exhaustive()
+  }
 }
 
 // Swift's `Content` is `Sendable`.

@@ -52,7 +52,7 @@ fn resolves_and_fetches_an_index() {
 fn makes_a_client_for_a_host() {
   let client = cfw::containerization_oci::client::RegistryClient::with_host(
     "registry-1.docker.io",
-    cfw::containerization_oci::client::registry_client::HostOptions {
+    cfw::containerization_oci::client::registry_client::RegistryClientOptions {
       retry_options: Some(cfw::containerization_oci::client::RetryOptions::new(1, 1_000_000)),
       ..Default::default()
     },

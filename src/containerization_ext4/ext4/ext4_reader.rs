@@ -7,6 +7,7 @@ use super::SuperBlock;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 
 /// `EXT4.EXT4Reader.readFile(at:offset:count:followSymlinks:)`'s defaulted
@@ -30,15 +31,21 @@ impl Default for ReadFileOptions {
 }
 
 /// `EXT4.EXT4Reader`.
-pub struct Ext4Reader {
+pub struct EXT4Reader {
   handle: ffi::CzExt4Reader,
+}
+
+impl fmt::Debug for EXT4Reader {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("EXT4Reader").finish_non_exhaustive()
+  }
 }
 
 // Swift's `EXT4Reader` is a class that isn't `Sendable`; Rust's isn't `Sync`,
 // so one call runs at a time.
-unsafe impl Send for Ext4Reader {}
+unsafe impl Send for EXT4Reader {}
 
-impl Ext4Reader {
+impl EXT4Reader {
   /// `EXT4.EXT4Reader(blockDevice:)`.
   pub fn new(block_device: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(

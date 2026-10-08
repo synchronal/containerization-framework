@@ -7,6 +7,7 @@ use super::WriteEntry;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::marker::PhantomData;
 use std::os::fd::IntoRawFd;
 use std::os::fd::OwnedFd;
@@ -16,6 +17,14 @@ use std::path::Path;
 /// `IntoIterator for &ArchiveReader`.
 pub struct ArchiveReader {
   pub(crate) handle: ffi::CzArchiveReader,
+}
+
+impl fmt::Debug for ArchiveReader {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("ArchiveReader")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `ArchiveReader` is a class that isn't `Sendable`; Rust's isn't
@@ -129,6 +138,12 @@ pub struct Iterator<'a> {
   reader: PhantomData<&'a ArchiveReader>,
 }
 
+impl fmt::Debug for Iterator<'_> {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("Iterator").finish_non_exhaustive()
+  }
+}
+
 impl std::iter::Iterator for Iterator<'_> {
   type Item = (WriteEntry, Vec<u8>);
 
@@ -145,6 +160,14 @@ impl std::iter::Iterator for Iterator<'_> {
 pub struct StreamingIterator<'a> {
   handle: ffi::CzStreamingIterator,
   reader: PhantomData<&'a ArchiveReader>,
+}
+
+impl fmt::Debug for StreamingIterator<'_> {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("StreamingIterator")
+      .finish_non_exhaustive()
+  }
 }
 
 impl<'a> std::iter::Iterator for StreamingIterator<'a> {

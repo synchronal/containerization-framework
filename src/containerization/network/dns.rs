@@ -5,14 +5,14 @@ use crate::platform::ffi;
 
 /// `DNS`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Dns {
+pub struct DNS {
   pub nameservers: Vec<String>,
   pub domain: Option<String>,
   pub search_domains: Vec<String>,
   pub options: Vec<String>,
 }
 
-impl Dns {
+impl DNS {
   /// `DNS.defaultNameservers`.
   pub fn default_nameservers() -> Vec<String> {
     strings(&["1.1.1.1"])
@@ -31,7 +31,7 @@ impl Dns {
 }
 
 /// `DNS()`.
-impl Default for Dns {
+impl Default for DNS {
   fn default() -> Self {
     Self {
       nameservers: Self::default_nameservers(),

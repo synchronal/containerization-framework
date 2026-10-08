@@ -6,24 +6,17 @@ use super::Mount;
 use super::StatCategory;
 use super::UnixSocketConfiguration;
 use crate::containerization::GIB;
-use crate::containerization::network::Dns;
-use crate::containerization::network::Hosts;
-use crate::containerization::network::Interface;
-use crate::containerization::process::ExitStatus;
-use crate::containerization::process::LinuxProcess;
-use crate::containerization::process::LinuxProcessConfiguration;
-use crate::containerization::process::Signal;
+use crate::containerization::network;
+use crate::containerization::process;
 use crate::containerization::strings;
-use crate::containerization::vm::BootLog;
-use crate::containerization::vm::VmResources;
-use crate::containerization::vm::VzVirtualMachineInstance;
-use crate::containerization::vm::VzVirtualMachineManager;
+use crate::containerization::vm;
 use crate::containerization_oci;
 use crate::containerization_os::terminal;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 use std::path::Path;
@@ -42,20 +35,20 @@ pub enum SeccompProfile {
 /// `LinuxContainer.Configuration`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Configuration {
-  pub process: LinuxProcessConfiguration,
+  pub process: process::LinuxProcessConfiguration,
   pub cpus: u32,
   pub memory_in_bytes: u64,
   pub hostname: Option<String>,
   pub sysctl: BTreeMap<String, String>,
-  pub interfaces: Vec<Interface>,
+  pub interfaces: Vec<network::Interface>,
   pub sockets: Vec<UnixSocketConfiguration>,
   pub mounts: Vec<Mount>,
   pub masked_paths: Vec<String>,
   pub readonly_paths: Vec<String>,
-  pub dns: Option<Dns>,
-  pub hosts: Option<Hosts>,
+  pub dns: Option<network::DNS>,
+  pub hosts: Option<network::Hosts>,
   pub virtualization: bool,
-  pub boot_log: Option<BootLog>,
+  pub boot_log: Option<vm::BootLog>,
   pub oci_runtime_path: Option<String>,
   pub seccomp_profile: SeccompProfile,
   pub use_init: bool,
@@ -65,7 +58,7 @@ pub struct Configuration {
 impl Default for Configuration {
   fn default() -> Self {
     Self {
-      process: LinuxProcessConfiguration::default(),
+      process: process::LinuxProcessConfiguration::default(),
       cpus: 4,
       memory_in_bytes: GIB,
       hostname: None,
@@ -129,6 +122,14 @@ pub struct LinuxContainer {
   pub(crate) handle: ffi::CzLinuxContainer,
 }
 
+impl fmt::Debug for LinuxContainer {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("LinuxContainer")
+      .finish_non_exhaustive()
+  }
+}
+
 // Swift's `LinuxContainer` is `Sendable`.
 unsafe impl Send for LinuxContainer {}
 unsafe impl Sync for LinuxContainer {}
@@ -145,8 +146,8 @@ impl LinuxContainer {
     id: &str,
     rootfs: Mount,
     writable_layer: Option<Mount>,
-    vmm: &VzVirtualMachineManager,
-    vm: VmResources,
+    vmm: &vm::VZVirtualMachineManager,
+    vm: vm::VMResources,
     configuration: Configuration,
   ) -> Result<Self, Error> {
     let (has_writable_layer, writable_layer) = writable_layer_crossing(writable_layer);
@@ -176,12 +177,12 @@ impl LinuxContainer {
     id: &str,
     rootfs: Mount,
     writable_layer: Option<Mount>,
-    vmm: &VzVirtualMachineManager,
-    vm: VmResources,
-    configuration: impl FnOnce(&mut Configuration),
+    vmm: &vm::VZVirtualMachineManager,
+    vm: vm::VMResources,
+    configuration: impl FnOnce(&mut Configuration) -> Result<(), Error>,
   ) -> Result<Self, Error> {
     let mut config = Configuration::default();
-    configuration(&mut config);
+    configuration(&mut config)?;
 
     Self::new(id, rootfs, writable_layer, vmm, vm, config)
   }
@@ -210,8 +211,8 @@ impl LinuxContainer {
   }
 
   /// `LinuxContainer.vm`.
-  pub fn vm(&self) -> VmResources {
-    VmResources {
+  pub fn vm(&self) -> vm::VMResources {
+    vm::VMResources {
       cpus: self.handle.vm_cpus(),
       memory_in_bytes: self.handle.vm_memory_in_bytes(),
     }
@@ -228,7 +229,7 @@ impl LinuxContainer {
   }
 
   /// `LinuxContainer.interfaces`: the configuration's.
-  pub fn interfaces(&self) -> Vec<Interface> {
+  pub fn interfaces(&self) -> Vec<network::Interface> {
     self.config().interfaces
   }
 
@@ -248,12 +249,12 @@ impl LinuxContainer {
   }
 
   /// `LinuxContainer.kill(_:)`.
-  pub fn kill(&self, signal: Signal) -> Result<(), Error> {
+  pub fn kill(&self, signal: process::Signal) -> Result<(), Error> {
     platform::outcome(self.handle.kill(signal.raw_value), format!("signal {}", self.id())).map(drop)
   }
 
   /// `LinuxContainer.wait(timeoutInSeconds:)`.
-  pub fn wait(&self, timeout_in_seconds: Option<i64>) -> Result<ExitStatus, Error> {
+  pub fn wait(&self, timeout_in_seconds: Option<i64>) -> Result<process::ExitStatus, Error> {
     platform::outcome(self.handle.wait(timeout_in_seconds), format!("wait for {}", self.id()))
       .map(|outcome| platform::exit_status(&outcome))
   }
@@ -264,32 +265,38 @@ impl LinuxContainer {
   }
 
   /// `LinuxContainer.exec(_:configuration:)`.
-  pub fn exec(&self, id: &str, configuration: LinuxProcessConfiguration) -> Result<LinuxProcess, Error> {
+  pub fn exec(
+    &self,
+    id: &str,
+    configuration: process::LinuxProcessConfiguration,
+  ) -> Result<process::LinuxProcess, Error> {
     platform::outcome(
       self.handle.exec(id, configuration),
       format!("exec {id} in {}", self.id()),
     )
-    .map(|outcome| LinuxProcess {
+    .map(|outcome| process::LinuxProcess {
       handle: outcome.linux_process(),
     })
   }
 
   /// `LinuxContainer.exec(_:configuration:)` with a closure, which changes a
-  /// `LinuxProcessConfiguration()`. Swift calls it once, on its own thread.
+  /// `LinuxProcessConfiguration()`. Swift calls it once, on its own thread,
+  /// and an error it returns is thrown.
   pub fn exec_with(
     &self,
     id: &str,
-    configuration: impl FnOnce(&mut LinuxProcessConfiguration) + Send + 'static,
-  ) -> Result<LinuxProcess, Error> {
-    platform::outcome(
-      self.handle.exec_with(
-        id,
-        LinuxProcessConfiguration::default(),
-        platform::ConfigureProcess::new(configuration),
-      ),
+    configuration: impl FnOnce(&mut process::LinuxProcessConfiguration) -> Result<(), Error> + Send + 'static,
+  ) -> Result<process::LinuxProcess, Error> {
+    platform::configured(
+      configuration,
+      |configure| {
+        self
+          .handle
+          .exec_with(id, process::LinuxProcessConfiguration::default(), configure)
+      },
       format!("exec {id} in {}", self.id()),
     )
-    .map(|outcome| LinuxProcess {
+    .map(|outcome| process::LinuxProcess {
       handle: outcome.linux_process(),
     })
   }
@@ -311,14 +318,14 @@ impl LinuxContainer {
   /// created; `body` runs the same way, on this thread.
   pub fn with_virtual_machine_instance<T>(
     &self,
-    body: impl FnOnce(&VzVirtualMachineInstance) -> Result<T, Error>,
+    body: impl FnOnce(&vm::VZVirtualMachineInstance) -> Result<T, Error>,
   ) -> Result<T, Error> {
     let instance = platform::outcome(
       self.handle.virtual_machine_instance(),
       format!("reach {}'s virtual machine", self.id()),
     )?;
 
-    body(&VzVirtualMachineInstance {
+    body(&vm::VZVirtualMachineInstance {
       handle: instance.virtual_machine_instance(),
     })
   }
@@ -490,7 +497,7 @@ mod tests {
     assert_eq!(configuration.process.working_directory, "/");
     assert_eq!(
       configuration.process.environment_variables,
-      [format!("PATH={}", LinuxProcessConfiguration::DEFAULT_PATH)]
+      [format!("PATH={}", process::LinuxProcessConfiguration::DEFAULT_PATH)]
     );
   }
 }

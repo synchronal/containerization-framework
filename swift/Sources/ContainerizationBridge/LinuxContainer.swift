@@ -27,7 +27,7 @@ final class CzLinuxContainer: Sendable {
 
   func config(seed: RustLinuxContainerConfiguration, receive: RustConfigure) {
     fill(seed, from: container.config)
-    receive.call(seed)
+    _ = receive.call(seed)
   }
 
   func vmCpus() -> UInt32 {
@@ -178,10 +178,14 @@ func configured(
 
   return { config in
     fill(seed, from: config)
-    configuration.call(seed)
+    if configuration.call(seed) { throw RustClosureThrew() }
     config = try LinuxProcessConfiguration(seed)
   }
 }
+
+/// Thrown when a Rust closure returns an error. Rust keeps the error and
+/// returns it in place of what Swift reports.
+struct RustClosureThrew: Error {}
 
 // MARK: For unit tests
 

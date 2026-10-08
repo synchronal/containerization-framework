@@ -1,18 +1,24 @@
 use super::Image;
 use super::ImageStore;
-use crate::containerization::container::Mount;
-use crate::containerization::vm::SystemPlatform;
-use crate::containerization_oci::content::LocalContentStore;
-use crate::containerization_oci::image::Platform;
+use crate::containerization::container;
+use crate::containerization::vm;
+use crate::containerization_oci;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::Path;
 
 /// `InitImage`.
 pub struct InitImage {
   pub(crate) handle: ffi::CzInitImage,
+}
+
+impl fmt::Debug for InitImage {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("InitImage").finish_non_exhaustive()
+  }
 }
 
 // Swift's `InitImage` is `Sendable`.
@@ -32,10 +38,10 @@ impl InitImage {
   pub fn create(
     reference: &str,
     rootfs: &Path,
-    platform: &Platform,
+    platform: &containerization_oci::image::Platform,
     labels: &BTreeMap<String, String>,
     image_store: &ImageStore,
-    content_store: &LocalContentStore,
+    content_store: &containerization_oci::content::LocalContentStore,
   ) -> Result<Self, Error> {
     platform::outcome(
       image_store.handle.create_init_image(
@@ -59,7 +65,7 @@ impl InitImage {
   }
 
   /// `InitImage.initBlock(at:for:)`.
-  pub fn init_block(&self, at: &Path, platform: SystemPlatform) -> Result<Mount, Error> {
+  pub fn init_block(&self, at: &Path, platform: vm::SystemPlatform) -> Result<container::Mount, Error> {
     platform::outcome(
       self.handle.init_block(&at.display().to_string(), platform),
       format!("unpack {} to {}", self.name(), at.display()),

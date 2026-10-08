@@ -5,7 +5,7 @@ use crate::containerization::container::Mount as RustMount;
 use crate::containerization::container::UnixSocketConfiguration as RustUnixSocketConfiguration;
 use crate::containerization::container::linux_pod::ContainerConfiguration as RustPodContainerConfiguration;
 use crate::containerization::container::linux_pod::PodVolume as RustPodVolume;
-use crate::containerization::network::Dns as RustDns;
+use crate::containerization::network::DNS as RustDns;
 use crate::containerization::network::Hosts as RustHosts;
 use crate::containerization::process::LinuxProcessConfiguration as RustLinuxProcessConfiguration;
 use crate::containerization::vm::AttachedFilesystem as RustAttachedFilesystem;

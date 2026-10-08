@@ -17,7 +17,7 @@ use crate::containerization::container;
 use crate::containerization::process;
 #[cfg(target_os = "macos")]
 use crate::containerization_error;
-use crate::containerization_extras::ProgressHandler;
+use crate::containerization_extras;
 use crate::error::Error;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -27,40 +27,74 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 /// A `ProgressHandler?`, as it crosses to Swift.
-pub(crate) struct Progress(pub(crate) Option<ProgressHandler>);
+pub(crate) struct Progress(pub(crate) Option<containerization_extras::ProgressHandler>);
 
-type Configuring<T> = Box<dyn FnOnce(&mut T) + Send>;
+type Configuring<T> = Box<dyn FnOnce(&mut T) -> Result<(), Error> + Send>;
 
-/// An `(inout T) -> Void` closure, as it crosses to Swift. Swift calls it
-/// once, with the value it filled.
-pub(crate) struct Configure<T>(Mutex<Option<Configuring<T>>>);
+/// An `(inout T) throws -> Void` closure, as it crosses to Swift. Swift calls
+/// it once, with the value it filled, and throws if it returns an error.
+pub(crate) struct Configure<T> {
+  configure: Mutex<Option<Configuring<T>>>,
+  thrown: Arc<Mutex<Option<Error>>>,
+}
 
 impl<T> Configure<T> {
-  pub(crate) fn new(configure: impl FnOnce(&mut T) + Send + 'static) -> Self {
-    Self(Mutex::new(Some(Box::new(configure))))
+  pub(crate) fn new(configure: impl FnOnce(&mut T) -> Result<(), Error> + Send + 'static) -> Self {
+    Self {
+      configure: Mutex::new(Some(Box::new(configure))),
+      thrown: Arc::default(),
+    }
   }
 
-  /// Runs the closure on the value Swift filled, the first time only.
-  pub(crate) fn call(&self, value: &mut T) {
-    let configure = self.0.lock().unwrap_or_else(PoisonError::into_inner).take();
+  /// Runs the closure on the value Swift filled, the first time only, and
+  /// says whether it threw. Its error is kept for Rust to return.
+  pub(crate) fn call(&self, value: &mut T) -> bool {
+    let configure = self
+      .configure
+      .lock()
+      .unwrap_or_else(PoisonError::into_inner)
+      .take();
 
-    if let Some(configure) = configure {
-      configure(value);
+    match configure.map(|configure| configure(value)) {
+      Some(Err(error)) => {
+        *self.thrown.lock().unwrap_or_else(PoisonError::into_inner) = Some(error);
+        true
+      }
+      _ => false,
     }
   }
 }
 
-/// The manager's `(inout LinuxContainer.Configuration) -> Void`.
+/// The manager's `(inout LinuxContainer.Configuration) throws -> Void`.
 pub(crate) type ConfigureContainer = Configure<container::linux_container::Configuration>;
 
-/// An `(inout LinuxProcessConfiguration) -> Void`.
+/// An `(inout LinuxProcessConfiguration) throws -> Void`.
 pub(crate) type ConfigureProcess = Configure<process::LinuxProcessConfiguration>;
 
-/// An `(inout LinuxPod.Configuration) -> Void`.
+/// An `(inout LinuxPod.Configuration) throws -> Void`.
 pub(crate) type ConfigurePod = Configure<container::linux_pod::Configuration>;
 
-/// An `(inout LinuxPod.ContainerConfiguration) -> Void`.
+/// An `(inout LinuxPod.ContainerConfiguration) throws -> Void`.
 pub(crate) type ConfigurePodContainer = Configure<container::linux_pod::ContainerConfiguration>;
+
+/// What a throwing Swift call returned, when `call` hands it `configure` as
+/// its closure, or what it threw as a failure of `action`. If the closure
+/// threw, its own error is returned, as Swift rethrows it.
+pub(crate) fn configured<T>(
+  configure: impl FnOnce(&mut T) -> Result<(), Error> + Send + 'static,
+  call: impl FnOnce(Configure<T>) -> ffi::CzOutcome,
+  action: impl Into<String>,
+) -> Result<ffi::CzOutcome, Error> {
+  let configure = Configure::new(configure);
+  let thrown = Arc::clone(&configure.thrown);
+  let returned = call(configure);
+
+  if let Some(error) = thrown.lock().unwrap_or_else(PoisonError::into_inner).take() {
+    return Err(error);
+  }
+
+  outcome(returned, action)
+}
 
 /// What `call` returned, and the value its Swift call filled and handed to
 /// the closure `call` passes it, if it did.
@@ -69,6 +103,7 @@ pub(crate) fn filled<T: Default + Send + 'static, R>(call: impl FnOnce(Configure
   let slot = Arc::clone(&filled);
   let receive = Configure::new(move |value| {
     *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(std::mem::take(value));
+    Ok(())
   });
 
   let returned = call(receive);

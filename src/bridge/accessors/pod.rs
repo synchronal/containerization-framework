@@ -152,7 +152,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::interface_kind_at`] is `Nat`.
-  pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::network::NatInterface {
+  pub(crate) fn nat_interface_at(&self, index: usize) -> &containerization::network::NATInterface {
     container::nat_interface(&self.interfaces[index])
   }
 
@@ -187,7 +187,7 @@ impl linux_pod::Configuration {
   }
 
   /// Only when [`Self::has_dns`].
-  pub(crate) fn dns(&self) -> &containerization::network::Dns {
+  pub(crate) fn dns(&self) -> &containerization::network::DNS {
     present(&self.dns)
   }
 
@@ -338,7 +338,7 @@ impl linux_pod::ContainerConfiguration {
   }
 
   /// Only when [`Self::has_dns`].
-  pub(crate) fn dns(&self) -> &containerization::network::Dns {
+  pub(crate) fn dns(&self) -> &containerization::network::DNS {
     present(&self.dns)
   }
 

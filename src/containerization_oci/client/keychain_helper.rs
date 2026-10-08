@@ -1,5 +1,5 @@
 use super::Authentication;
-use crate::containerization_os::keychain::RegistryInfo;
+use crate::containerization_os::keychain;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -32,7 +32,7 @@ impl KeychainHelper {
   }
 
   /// `KeychainHelper.list()`.
-  pub fn list(&self) -> Result<Vec<RegistryInfo>, Error> {
+  pub fn list(&self) -> Result<Vec<keychain::RegistryInfo>, Error> {
     platform::outcome(
       ffi::cz_keychain_helper_list(&self.security_domain, self.access_group.clone()),
       "list the keychain's registries",

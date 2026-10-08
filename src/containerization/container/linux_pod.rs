@@ -8,46 +8,39 @@ use super::LinuxContainer;
 use super::Mount;
 use super::StatCategory;
 use super::UnixSocketConfiguration;
-use super::linux_container::SeccompProfile;
+use super::linux_container;
 use crate::containerization::GIB;
-use crate::containerization::network::Dns;
-use crate::containerization::network::Hosts;
-use crate::containerization::network::Interface;
-use crate::containerization::process::ExitStatus;
-use crate::containerization::process::LinuxProcess;
-use crate::containerization::process::LinuxProcessConfiguration;
-use crate::containerization::process::Signal;
-use crate::containerization::vm::BootLog;
-use crate::containerization::vm::VmResources;
-use crate::containerization::vm::VzVirtualMachineInstance;
-use crate::containerization::vm::VzVirtualMachineManager;
+use crate::containerization::network;
+use crate::containerization::process;
+use crate::containerization::vm;
 use crate::containerization_os::terminal;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 
 /// `LinuxPod.Configuration`, without `extensions`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Configuration {
-  pub interfaces: Vec<Interface>,
+  pub interfaces: Vec<network::Interface>,
   pub virtualization: bool,
-  pub boot_log: Option<BootLog>,
+  pub boot_log: Option<vm::BootLog>,
   pub share_process_namespace: bool,
   pub hostname: Option<String>,
-  pub dns: Option<Dns>,
-  pub hosts: Option<Hosts>,
+  pub dns: Option<network::DNS>,
+  pub hosts: Option<network::Hosts>,
   pub volumes: Vec<PodVolume>,
   pub oci_runtime_path: Option<String>,
-  pub seccomp_profile: SeccompProfile,
+  pub seccomp_profile: linux_container::SeccompProfile,
 }
 
 /// `LinuxPod.ContainerConfiguration`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContainerConfiguration {
-  pub process: LinuxProcessConfiguration,
+  pub process: process::LinuxProcessConfiguration,
   pub cpus: u32,
   pub memory_in_bytes: u64,
   pub hostname: Option<String>,
@@ -56,10 +49,10 @@ pub struct ContainerConfiguration {
   pub masked_paths: Vec<String>,
   pub readonly_paths: Vec<String>,
   pub sockets: Vec<UnixSocketConfiguration>,
-  pub dns: Option<Dns>,
-  pub hosts: Option<Hosts>,
+  pub dns: Option<network::DNS>,
+  pub hosts: Option<network::Hosts>,
   /// The pod's when `None`.
-  pub seccomp_profile: Option<SeccompProfile>,
+  pub seccomp_profile: Option<linux_container::SeccompProfile>,
   pub use_init: bool,
 }
 
@@ -67,7 +60,7 @@ pub struct ContainerConfiguration {
 impl Default for ContainerConfiguration {
   fn default() -> Self {
     Self {
-      process: LinuxProcessConfiguration::default(),
+      process: process::LinuxProcessConfiguration::default(),
       cpus: 4,
       memory_in_bytes: GIB,
       hostname: None,
@@ -120,6 +113,12 @@ pub struct LinuxPod {
   pub(crate) handle: ffi::CzLinuxPod,
 }
 
+impl fmt::Debug for LinuxPod {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("LinuxPod").finish_non_exhaustive()
+  }
+}
+
 // Swift's `LinuxPod` is `Sendable`.
 unsafe impl Send for LinuxPod {}
 unsafe impl Sync for LinuxPod {}
@@ -130,12 +129,12 @@ impl LinuxPod {
   /// runs here, and Swift's closure takes what it made.
   pub fn new(
     id: &str,
-    vmm: &VzVirtualMachineManager,
-    vm: VmResources,
-    configuration: impl FnOnce(&mut Configuration),
+    vmm: &vm::VZVirtualMachineManager,
+    vm: vm::VMResources,
+    configuration: impl FnOnce(&mut Configuration) -> Result<(), Error>,
   ) -> Result<Self, Error> {
     let mut config = Configuration::default();
-    configuration(&mut config);
+    configuration(&mut config)?;
 
     platform::outcome(
       ffi::cz_linux_pod_new(id, vmm.handle.duplicate(), vm.cpus, vm.memory_in_bytes, config),
@@ -159,8 +158,8 @@ impl LinuxPod {
   }
 
   /// `LinuxPod.vm`.
-  pub fn vm(&self) -> VmResources {
-    VmResources {
+  pub fn vm(&self) -> vm::VMResources {
+    vm::VMResources {
       cpus: self.handle.vm_cpus(),
       memory_in_bytes: self.handle.vm_memory_in_bytes(),
     }
@@ -177,26 +176,26 @@ impl LinuxPod {
   }
 
   /// `LinuxPod.interfaces`: the configuration's.
-  pub fn interfaces(&self) -> Vec<Interface> {
+  pub fn interfaces(&self) -> Vec<network::Interface> {
     self.config().interfaces
   }
 
   /// `LinuxPod.addContainer(_:rootfs:configuration:)`, whose closure changes a
   /// `LinuxPod.ContainerConfiguration()`. Swift calls it once, on its own
-  /// thread.
+  /// thread, and an error it returns is thrown.
   pub fn add_container(
     &self,
     id: &str,
     rootfs: Mount,
-    configuration: impl FnOnce(&mut ContainerConfiguration) + Send + 'static,
+    configuration: impl FnOnce(&mut ContainerConfiguration) -> Result<(), Error> + Send + 'static,
   ) -> Result<(), Error> {
-    platform::outcome(
-      self.handle.add_container(
-        id,
-        rootfs,
-        ContainerConfiguration::default(),
-        platform::Configure::new(configuration),
-      ),
+    platform::configured(
+      configuration,
+      |configure| {
+        self
+          .handle
+          .add_container(id, rootfs, ContainerConfiguration::default(), configure)
+      },
       format!("add {id} to pod {}", self.id()),
     )
     .map(drop)
@@ -231,7 +230,7 @@ impl LinuxPod {
   }
 
   /// `LinuxPod.killContainer(_:signal:)`.
-  pub fn kill_container(&self, container_id: &str, signal: Signal) -> Result<(), Error> {
+  pub fn kill_container(&self, container_id: &str, signal: process::Signal) -> Result<(), Error> {
     platform::outcome(
       self.handle.kill_container(container_id, signal.raw_value),
       format!("signal {container_id} in pod {}", self.id()),
@@ -240,7 +239,11 @@ impl LinuxPod {
   }
 
   /// `LinuxPod.waitContainer(_:timeoutInSeconds:)`.
-  pub fn wait_container(&self, container_id: &str, timeout_in_seconds: Option<i64>) -> Result<ExitStatus, Error> {
+  pub fn wait_container(
+    &self,
+    container_id: &str,
+    timeout_in_seconds: Option<i64>,
+  ) -> Result<process::ExitStatus, Error> {
     platform::outcome(
       self.handle.wait_container(container_id, timeout_in_seconds),
       format!("wait for {container_id} in pod {}", self.id()),
@@ -261,23 +264,27 @@ impl LinuxPod {
 
   /// `LinuxPod.execInContainer(_:processID:configuration:)`. The closure
   /// changes the container's process configuration, less its arguments,
-  /// terminal and stdio. Swift calls it once, on its own thread.
+  /// terminal and stdio. Swift calls it once, on its own thread, and an error
+  /// it returns is thrown.
   pub fn exec_in_container(
     &self,
     container_id: &str,
     process_id: &str,
-    configuration: impl FnOnce(&mut LinuxProcessConfiguration) + Send + 'static,
-  ) -> Result<LinuxProcess, Error> {
-    platform::outcome(
-      self.handle.exec_in_container(
-        container_id,
-        process_id,
-        LinuxProcessConfiguration::default(),
-        platform::ConfigureProcess::new(configuration),
-      ),
+    configuration: impl FnOnce(&mut process::LinuxProcessConfiguration) -> Result<(), Error> + Send + 'static,
+  ) -> Result<process::LinuxProcess, Error> {
+    platform::configured(
+      configuration,
+      |configure| {
+        self.handle.exec_in_container(
+          container_id,
+          process_id,
+          process::LinuxProcessConfiguration::default(),
+          configure,
+        )
+      },
       format!("exec {process_id} in {container_id} in pod {}", self.id()),
     )
-    .map(|outcome| LinuxProcess {
+    .map(|outcome| process::LinuxProcess {
       handle: outcome.linux_process(),
     })
   }
@@ -323,14 +330,14 @@ impl LinuxPod {
   /// [`LinuxContainer::with_virtual_machine_instance`] is.
   pub fn with_virtual_machine_instance<T>(
     &self,
-    body: impl FnOnce(&VzVirtualMachineInstance) -> Result<T, Error>,
+    body: impl FnOnce(&vm::VZVirtualMachineInstance) -> Result<T, Error>,
   ) -> Result<T, Error> {
     let instance = platform::outcome(
       self.handle.virtual_machine_instance(),
       format!("reach pod {}'s virtual machine", self.id()),
     )?;
 
-    body(&VzVirtualMachineInstance {
+    body(&vm::VZVirtualMachineInstance {
       handle: instance.virtual_machine_instance(),
     })
   }

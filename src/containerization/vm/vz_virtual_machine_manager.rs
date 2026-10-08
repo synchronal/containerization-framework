@@ -1,10 +1,10 @@
 //! `VZVirtualMachineManager`, and the options for its initializer:
-//! [`ManagerOptions`].
+//! [`VZVirtualMachineManagerOptions`].
 
 use super::Kernel;
-use super::VmConfiguration;
-use super::VzVirtualMachineInstance;
-use crate::containerization::container::Mount;
+use super::VMConfiguration;
+use super::VZVirtualMachineInstance;
+use crate::containerization::container;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -14,23 +14,27 @@ use std::fmt;
 /// the initial filesystem. [`Default`] is Swift's defaults. `group` and
 /// `logger` are SwiftNIO's and swift-log's, and are left at `nil`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct ManagerOptions {
+pub struct VZVirtualMachineManagerOptions {
   pub rosetta: bool,
   pub nested_virtualization: bool,
 }
 
 /// `VZVirtualMachineManager`, which boots VMs with Virtualization.framework.
-pub struct VzVirtualMachineManager {
+pub struct VZVirtualMachineManager {
   pub(crate) handle: ffi::CzVirtualMachineManager,
 }
 
 // Swift's `VZVirtualMachineManager` is `Sendable`.
-unsafe impl Send for VzVirtualMachineManager {}
-unsafe impl Sync for VzVirtualMachineManager {}
+unsafe impl Send for VZVirtualMachineManager {}
+unsafe impl Sync for VZVirtualMachineManager {}
 
-impl VzVirtualMachineManager {
+impl VZVirtualMachineManager {
   /// `VZVirtualMachineManager(kernel:initialFilesystem:rosetta:nestedVirtualization:group:logger:)`.
-  pub fn new(kernel: &Kernel, initial_filesystem: &Mount, options: ManagerOptions) -> Result<Self, Error> {
+  pub fn new(
+    kernel: &Kernel,
+    initial_filesystem: &container::Mount,
+    options: VZVirtualMachineManagerOptions,
+  ) -> Result<Self, Error> {
     platform::outcome(
       ffi::cz_virtual_machine_manager_new(
         kernel.clone(),
@@ -48,9 +52,9 @@ impl VzVirtualMachineManager {
   /// `VZVirtualMachineManager.create(config:)`, with a `StandardVMConfig` of
   /// `config`. Swift returns `any VirtualMachineInstance`, which on macOS is
   /// always a `VZVirtualMachineInstance`.
-  pub fn create(&self, config: &VmConfiguration) -> Result<VzVirtualMachineInstance, Error> {
+  pub fn create(&self, config: &VMConfiguration) -> Result<VZVirtualMachineInstance, Error> {
     platform::outcome(self.handle.create(config.clone()), "create a virtual machine").map(|outcome| {
-      VzVirtualMachineInstance {
+      VZVirtualMachineInstance {
         handle: outcome.virtual_machine_instance(),
       }
     })
@@ -59,7 +63,7 @@ impl VzVirtualMachineManager {
 
 /// Swift's `VZVirtualMachineManager` is a struct, so a copy boots the same
 /// kernel and initial filesystem.
-impl Clone for VzVirtualMachineManager {
+impl Clone for VZVirtualMachineManager {
   fn clone(&self) -> Self {
     Self {
       handle: self.handle.duplicate(),
@@ -68,10 +72,10 @@ impl Clone for VzVirtualMachineManager {
 }
 
 /// Without its fields, which Swift keeps private.
-impl fmt::Debug for VzVirtualMachineManager {
+impl fmt::Debug for VZVirtualMachineManager {
   fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
     formatter
-      .debug_struct("VzVirtualMachineManager")
+      .debug_struct("VZVirtualMachineManager")
       .finish_non_exhaustive()
   }
 }

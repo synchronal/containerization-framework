@@ -66,7 +66,7 @@ pub fn unpack(at: &std::path::Path) -> cfw::containerization::container::Mount {
   let store = image_store();
   let platform = cfw::containerization_oci::image::Platform::current().expect("the current platform");
 
-  cfw::containerization::image::Ext4Unpacker::new(super::TEST_ROOTFS_SIZE_IN_BYTES, None)
+  cfw::containerization::image::EXT4Unpacker::new(super::TEST_ROOTFS_SIZE_IN_BYTES, None)
     .unpack(&image(&store), &platform, at, None)
     .unwrap_or_else(|error| panic!("{IMAGE} should unpack to {}: {error}", at.display()))
 }
@@ -92,7 +92,7 @@ pub fn manager(store: &cfw::containerization::image::ImageStore) -> cfw::contain
 /// The same, made with `options`.
 pub fn manager_with(
   store: &cfw::containerization::image::ImageStore,
-  options: cfw::containerization::container::container_manager::ManagerOptions,
+  options: cfw::containerization::container::container_manager::ContainerManagerOptions,
 ) -> cfw::containerization::container::ContainerManager {
   let kernel = kernel();
   let _lock = initfs_lock();
@@ -103,7 +103,7 @@ pub fn manager_with(
 
 /// A VM manager booting [`kernel`] and the init block a container manager
 /// unpacks into the store from [`INITFS_REFERENCE`].
-pub fn vmm() -> cfw::containerization::vm::VzVirtualMachineManager {
+pub fn vmm() -> cfw::containerization::vm::VZVirtualMachineManager {
   // Unpacks the init block, if no manager has yet.
   drop(manager(&image_store()));
 
@@ -115,7 +115,7 @@ pub fn vmm() -> cfw::containerization::vm::VzVirtualMachineManager {
     &[],
   );
 
-  cfw::containerization::vm::VzVirtualMachineManager::new(&kernel(), &initfs, Default::default())
+  cfw::containerization::vm::VZVirtualMachineManager::new(&kernel(), &initfs, Default::default())
     .unwrap_or_else(|error| panic!("a VM manager should be made: {error}"))
 }
 

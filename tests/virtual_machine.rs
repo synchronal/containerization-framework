@@ -23,7 +23,7 @@ fn run_true(container: &cfw::containerization::container::LinuxContainer, id: &s
 fn boots_a_virtual_machine_of_its_own() {
   let shared = tempfile::tempdir().expect("a temporary directory");
   let vmm = support::store::vmm();
-  let config = cfw::containerization::vm::VmConfiguration {
+  let config = cfw::containerization::vm::VMConfiguration {
     cpus: support::TEST_CPUS,
     memory_in_bytes: support::vm().memory_in_bytes,
     mounts_by_id: [(
@@ -100,7 +100,7 @@ fn boots_a_virtual_machine_of_its_own() {
 #[test]
 fn talks_to_the_guest_agent() {
   let vmm = support::store::vmm();
-  let config = cfw::containerization::vm::VmConfiguration {
+  let config = cfw::containerization::vm::VMConfiguration {
     cpus: support::TEST_CPUS,
     memory_in_bytes: support::vm().memory_in_bytes,
     ..Default::default()

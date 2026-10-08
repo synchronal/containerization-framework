@@ -130,7 +130,7 @@ fn reaches_its_store_and_creates_from_a_reference() {
   };
 
   let container = manager
-    .create_from_reference(name, support::store::IMAGE, options, |_| {})
+    .create_with_reference(name, support::store::IMAGE, options, |_| Ok(()))
     .expect("the manager should create from a reference it has");
 
   assert_eq!(container.id(), name);

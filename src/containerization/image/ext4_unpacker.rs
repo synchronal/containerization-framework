@@ -1,9 +1,9 @@
 use super::Image;
-use crate::containerization::container::Mount;
-use crate::containerization_archive::Filter;
-use crate::containerization_ext4::ext4::JournalConfig;
-use crate::containerization_extras::ProgressHandler;
-use crate::containerization_oci::image::Platform;
+use crate::containerization::container;
+use crate::containerization_archive;
+use crate::containerization_ext4::ext4;
+use crate::containerization_extras;
+use crate::containerization_oci;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -12,14 +12,14 @@ use std::path::Path;
 /// `EXT4Unpacker`. A value, as Swift's is a struct, and its fields are private,
 /// as Swift's are.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Ext4Unpacker {
+pub struct EXT4Unpacker {
   pub(crate) capacity_in_bytes: u64,
-  pub(crate) journal: Option<JournalConfig>,
+  pub(crate) journal: Option<ext4::JournalConfig>,
 }
 
-impl Ext4Unpacker {
+impl EXT4Unpacker {
   /// `EXT4Unpacker(capacityInBytes:journal:)`.
-  pub fn new(capacity_in_bytes: u64, journal: Option<JournalConfig>) -> Self {
+  pub fn new(capacity_in_bytes: u64, journal: Option<ext4::JournalConfig>) -> Self {
     Self {
       capacity_in_bytes,
       journal,
@@ -30,10 +30,10 @@ impl Ext4Unpacker {
   pub fn unpack(
     &self,
     image: &Image,
-    platform: &Platform,
+    platform: &containerization_oci::image::Platform,
     at: &Path,
-    progress: Option<ProgressHandler>,
-  ) -> Result<Mount, Error> {
+    progress: Option<containerization_extras::ProgressHandler>,
+  ) -> Result<container::Mount, Error> {
     platform::outcome(
       ffi::cz_ext4_unpack(
         *self,
@@ -48,7 +48,12 @@ impl Ext4Unpacker {
   }
 
   /// `EXT4Unpacker.unpack(archive:compression:at:)`.
-  pub fn unpack_archive(&self, archive: &Path, compression: Filter, at: &Path) -> Result<(), Error> {
+  pub fn unpack_archive(
+    &self,
+    archive: &Path,
+    compression: containerization_archive::Filter,
+    at: &Path,
+  ) -> Result<(), Error> {
     platform::outcome(
       ffi::cz_ext4_unpack_archive(
         *self,

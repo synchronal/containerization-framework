@@ -3,6 +3,7 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 
 /// `Reference`, a handle on Swift's class. [`Reference::normalize`] changes
 /// it in place.
@@ -10,10 +11,16 @@ pub struct Reference {
   handle: ffi::CzReference,
 }
 
+impl fmt::Debug for Reference {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter.debug_struct("Reference").finish_non_exhaustive()
+  }
+}
+
 /// The defaulted arguments of `Reference(path:domain:tag:digest:)`. As in
 /// Swift, they default to `None`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct NewOptions {
+pub struct ReferenceOptions {
   pub domain: Option<String>,
   pub tag: Option<String>,
   pub digest: Option<String>,
@@ -21,7 +28,7 @@ pub struct NewOptions {
 
 impl Reference {
   /// `Reference(path:domain:tag:digest:)`.
-  pub fn new(path: &str, options: NewOptions) -> Result<Self, Error> {
+  pub fn new(path: &str, options: ReferenceOptions) -> Result<Self, Error> {
     Self::made(
       ffi::cz_reference_new(path, options.domain, options.tag, options.digest),
       format!("make a reference to {path}"),

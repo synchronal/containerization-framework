@@ -175,7 +175,7 @@ fn parses_and_normalizes_a_reference() {
 fn makes_a_reference_from_its_parts() {
   let reference = oci::image::Reference::new(
     "library/alpine",
-    oci::image::reference::NewOptions {
+    oci::image::reference::ReferenceOptions {
       domain: Some("ghcr.io".to_string()),
       tag: Some("3".to_string()),
       ..Default::default()

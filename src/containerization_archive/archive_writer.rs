@@ -8,6 +8,7 @@ use super::WriteEntry;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::os::fd::RawFd;
 use std::path::Path;
 
@@ -15,12 +16,12 @@ use std::path::Path;
 /// [`Default`] is Swift's defaults: no options, and
 /// `ArchiveWriterConfiguration.defaultLocales`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FileOptions {
+pub struct ArchiveWriterOptions {
   pub options: Vec<Options>,
   pub locales: Vec<String>,
 }
 
-impl Default for FileOptions {
+impl Default for ArchiveWriterOptions {
   fn default() -> Self {
     Self {
       options: Vec::new(),
@@ -32,6 +33,14 @@ impl Default for FileOptions {
 /// `ArchiveWriter`.
 pub struct ArchiveWriter {
   pub(crate) handle: ffi::CzArchiveWriter,
+}
+
+impl fmt::Debug for ArchiveWriter {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("ArchiveWriter")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `ArchiveWriter` is a class that isn't `Sendable`; Rust's isn't
@@ -52,7 +61,7 @@ impl ArchiveWriter {
   }
 
   /// `ArchiveWriter(format:filter:options:locales:file:)`.
-  pub fn with_file(format: Format, filter: Filter, options: FileOptions, file: &Path) -> Result<Self, Error> {
+  pub fn with_file(format: Format, filter: Filter, options: ArchiveWriterOptions, file: &Path) -> Result<Self, Error> {
     let configuration = ArchiveWriterConfiguration {
       format,
       filter,
@@ -142,6 +151,14 @@ impl ArchiveWriter {
 /// `ArchiveWriterTransaction`.
 pub struct ArchiveWriterTransaction {
   handle: ffi::CzArchiveWriterTransaction,
+}
+
+impl fmt::Debug for ArchiveWriterTransaction {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("ArchiveWriterTransaction")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `ArchiveWriterTransaction` is a class that isn't `Sendable`; Rust's

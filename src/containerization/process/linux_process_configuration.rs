@@ -2,7 +2,7 @@ use super::LinuxCapabilities;
 use super::LinuxRLimit;
 use crate::containerization::strings;
 use crate::containerization_oci;
-use crate::containerization_os::terminal::Terminal;
+use crate::containerization_os::terminal;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
@@ -53,7 +53,7 @@ impl LinuxProcessConfiguration {
   /// `LinuxProcessConfiguration.setTerminalIO(terminal:)`: sets what a pty
   /// needs, and `terminal` as stdin and stdout. Where Swift keeps the
   /// terminal, `stdin` and `stdout` hold its descriptor.
-  pub fn set_terminal_io(&mut self, terminal: &Terminal) -> Result<(), Error> {
+  pub fn set_terminal_io(&mut self, terminal: &terminal::Terminal) -> Result<(), Error> {
     let process = platform::filled_process(
       |receive| ffi::cz_linux_process_configuration_set_terminal_io(self.clone(), terminal.handle.duplicate(), receive),
       "set a process configuration's terminal",

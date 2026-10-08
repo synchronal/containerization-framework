@@ -6,7 +6,7 @@ use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 
 /// `VsockListener`, made by
-/// [`super::VzVirtualMachineInstance::listen`]. Swift's is an
+/// [`super::VZVirtualMachineInstance::listen`]. Swift's is an
 /// `AsyncSequence` of connections; this is an [`Iterator`] of their
 /// descriptors, whose `next` blocks until one arrives, and ends once
 /// [`Self::finish`] is called. `&VsockListener` iterates too, so another

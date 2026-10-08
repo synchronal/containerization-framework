@@ -6,8 +6,8 @@ use crate::platform::ffi;
 /// and so normalizes its `architecture` as that does.
 ///
 /// `==` is Swift's, which treats an `arm64` platform with no variant as
-/// `arm64/v8` and ignores `os_version` and `os_features`. Where Swift can't be
-/// asked, as off macOS, every field must match.
+/// `arm64/v8` and ignores `os_version` and `os_features`. Off macOS, where
+/// Swift can't be asked, comparing two platforms panics.
 #[derive(Clone, Debug)]
 pub struct Platform {
   pub architecture: String,
@@ -24,25 +24,11 @@ impl PartialEq for Platform {
       "compare two platforms",
     )
     .map(|outcome| outcome.boolean())
-    .unwrap_or_else(|_| {
-      (
-        &self.architecture,
-        &self.os,
-        &self.os_version,
-        &self.os_features,
-        &self.variant,
-      ) == (
-        &other.architecture,
-        &other.os,
-        &other.os_version,
-        &other.os_features,
-        &other.variant,
-      )
-    })
+    .unwrap_or_else(|error| panic!("{error}"))
   }
 }
 
-/// Swift's `Platform` is `Hashable`, so its `==` is an equivalence.
+/// Swift's `==` is an equivalence.
 impl Eq for Platform {}
 
 impl Platform {

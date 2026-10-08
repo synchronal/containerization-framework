@@ -1,30 +1,28 @@
-//! `ContainerManager`, the options for its initializers: [`ManagerOptions`],
-//! and the options for its `create`s: [`CreateOptions`] and
-//! [`RootfsCreateOptions`].
+//! `ContainerManager`, the options for its initializers:
+//! [`ContainerManagerOptions`], and the options for its `create`s:
+//! [`CreateOptions`] and [`CreateWithRootfsOptions`].
 
 use super::LinuxContainer;
 use super::Mount;
 use super::linux_container;
 use crate::containerization::GIB;
-use crate::containerization::image::Image;
-use crate::containerization::image::ImageStore;
-use crate::containerization::network::VmnetNetwork;
-use crate::containerization::vm::Kernel;
-use crate::containerization::vm::VmResources;
-use crate::containerization::vm::VzVirtualMachineManager;
-use crate::containerization_extras::ProgressHandler;
+use crate::containerization::image;
+use crate::containerization::network;
+use crate::containerization::vm;
+use crate::containerization_extras;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
+use std::fmt;
 use std::path::Path;
 
 /// The defaulted arguments of `ContainerManager`'s initializers, after the
 /// image store or root. [`Default`] is Swift's defaults.
 #[derive(Debug, Default)]
-pub struct ManagerOptions {
+pub struct ContainerManagerOptions {
   /// Swift's `Network?`, of which `VmnetNetwork` is the conforming type on
   /// macOS.
-  pub network: Option<VmnetNetwork>,
+  pub network: Option<network::VmnetNetwork>,
   pub rosetta: bool,
   pub nested_virtualization: bool,
 }
@@ -37,8 +35,8 @@ pub struct CreateOptions {
   pub writable_layer_size_in_bytes: Option<u64>,
   pub read_only: bool,
   pub networking: bool,
-  pub vm: VmResources,
-  pub progress: Option<ProgressHandler>,
+  pub vm: vm::VMResources,
+  pub progress: Option<containerization_extras::ProgressHandler>,
 }
 
 impl Default for CreateOptions {
@@ -48,27 +46,41 @@ impl Default for CreateOptions {
       writable_layer_size_in_bytes: None,
       read_only: false,
       networking: true,
-      vm: VmResources::default(),
+      vm: vm::VMResources::default(),
       progress: None,
     }
+  }
+}
+
+/// Leaves out the progress handler, which is a closure.
+impl fmt::Debug for CreateOptions {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("CreateOptions")
+      .field("rootfs_size_in_bytes", &self.rootfs_size_in_bytes)
+      .field("writable_layer_size_in_bytes", &self.writable_layer_size_in_bytes)
+      .field("read_only", &self.read_only)
+      .field("networking", &self.networking)
+      .field("vm", &self.vm)
+      .finish_non_exhaustive()
   }
 }
 
 /// `ContainerManager.create(_:image:rootfs:...)`'s defaulted arguments, between
 /// the rootfs and the configuration. [`Default`] is Swift's defaults.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RootfsCreateOptions {
+pub struct CreateWithRootfsOptions {
   pub writable_layer: Option<Mount>,
   pub networking: bool,
-  pub vm: VmResources,
+  pub vm: vm::VMResources,
 }
 
-impl Default for RootfsCreateOptions {
+impl Default for CreateWithRootfsOptions {
   fn default() -> Self {
     Self {
       writable_layer: None,
       networking: true,
-      vm: VmResources::default(),
+      vm: vm::VMResources::default(),
     }
   }
 }
@@ -76,6 +88,14 @@ impl Default for RootfsCreateOptions {
 /// `ContainerManager`.
 pub struct ContainerManager {
   handle: ffi::CzContainerManager,
+}
+
+impl fmt::Debug for ContainerManager {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("ContainerManager")
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `ContainerManager` is `Sendable`; `create`, `release_network` and
@@ -86,10 +106,10 @@ unsafe impl Sync for ContainerManager {}
 impl ContainerManager {
   /// `ContainerManager(kernel:initfs:imageStore:network:rosetta:nestedVirtualization:)`.
   pub fn new(
-    kernel: &Kernel,
+    kernel: &vm::Kernel,
     initfs: &Mount,
-    image_store: &ImageStore,
-    options: ManagerOptions,
+    image_store: &image::ImageStore,
+    options: ContainerManagerOptions,
   ) -> Result<Self, Error> {
     Self::made(
       image_store.handle.container_manager(
@@ -105,10 +125,10 @@ impl ContainerManager {
 
   /// `ContainerManager(kernel:initfsReference:imageStore:network:rosetta:nestedVirtualization:)`.
   pub fn with_initfs_reference(
-    kernel: &Kernel,
+    kernel: &vm::Kernel,
     initfs_reference: &str,
-    image_store: &ImageStore,
-    options: ManagerOptions,
+    image_store: &image::ImageStore,
+    options: ContainerManagerOptions,
   ) -> Result<Self, Error> {
     Self::made(
       image_store.handle.container_manager_with_initfs_reference(
@@ -124,7 +144,12 @@ impl ContainerManager {
 
   /// `ContainerManager(kernel:initfs:root:network:rosetta:nestedVirtualization:)`.
   /// A `None` root is `ImageStore.default`'s.
-  pub fn at_root(kernel: &Kernel, initfs: &Mount, root: Option<&Path>, options: ManagerOptions) -> Result<Self, Error> {
+  pub fn at_root(
+    kernel: &vm::Kernel,
+    initfs: &Mount,
+    root: Option<&Path>,
+    options: ContainerManagerOptions,
+  ) -> Result<Self, Error> {
     Self::made(
       ffi::cz_container_manager_at_root(
         kernel.clone(),
@@ -141,10 +166,10 @@ impl ContainerManager {
   /// `ContainerManager(kernel:initfsReference:root:network:rosetta:nestedVirtualization:)`.
   /// A `None` root is `ImageStore.default`'s.
   pub fn at_root_with_initfs_reference(
-    kernel: &Kernel,
+    kernel: &vm::Kernel,
     initfs_reference: &str,
     root: Option<&Path>,
-    options: ManagerOptions,
+    options: ContainerManagerOptions,
   ) -> Result<Self, Error> {
     Self::made(
       ffi::cz_container_manager_at_root_with_initfs_reference(
@@ -160,7 +185,7 @@ impl ContainerManager {
   }
 
   /// `ContainerManager(vmm:network:logger:)`, on `ImageStore.default`.
-  pub fn with_vmm(vmm: &VzVirtualMachineManager, network: Option<VmnetNetwork>) -> Result<Self, Error> {
+  pub fn with_vmm(vmm: &vm::VZVirtualMachineManager, network: Option<network::VmnetNetwork>) -> Result<Self, Error> {
     Self::made(
       ffi::cz_container_manager_with_vmm(vmm.handle.duplicate(), network_crossing(network)),
       "make a container manager",
@@ -174,8 +199,8 @@ impl ContainerManager {
   }
 
   /// `ContainerManager.imageStore`.
-  pub fn image_store(&self) -> ImageStore {
-    ImageStore {
+  pub fn image_store(&self) -> image::ImageStore {
+    image::ImageStore {
       handle: self.handle.image_store(),
     }
   }
@@ -184,24 +209,30 @@ impl ContainerManager {
   /// The manager's store pulls the image if it doesn't have it.
   ///
   /// `configuration` runs as [`Self::create`]'s does.
-  pub fn create_from_reference(
+  pub fn create_with_reference(
     &mut self,
     id: &str,
     reference: &str,
     mut options: CreateOptions,
-    configuration: impl FnOnce(&mut linux_container::Configuration) + Send + 'static,
+    configuration: impl FnOnce(&mut linux_container::Configuration) -> Result<(), Error> + Send + 'static,
   ) -> Result<LinuxContainer, Error> {
     let progress = platform::Progress(options.progress.take());
-    let outcome = self.handle.create_from_reference(
-      id,
-      reference,
-      options,
-      progress,
-      linux_container::Configuration::default(),
-      platform::Configure::new(configuration),
-    );
 
-    platform::outcome(outcome, format!("create {id} from {reference}")).map(|outcome| LinuxContainer {
+    platform::configured(
+      configuration,
+      |configure| {
+        self.handle.create_from_reference(
+          id,
+          reference,
+          options,
+          progress,
+          linux_container::Configuration::default(),
+          configure,
+        )
+      },
+      format!("create {id} from {reference}"),
+    )
+    .map(|outcome| LinuxContainer {
       handle: outcome.linux_container(),
     })
   }
@@ -209,25 +240,32 @@ impl ContainerManager {
   /// `ContainerManager.create(_:image:rootfsSizeInBytes:writableLayerSizeInBytes:readOnly:networking:vm:progress:configuration:)`.
   ///
   /// `configuration` runs on another thread, as Swift's closure does, against
-  /// the configuration the manager seeded.
+  /// the configuration the manager seeded. An error it returns is thrown and
+  /// returned by `create`.
   pub fn create(
     &mut self,
     id: &str,
-    image: &Image,
+    image: &image::Image,
     mut options: CreateOptions,
-    configuration: impl FnOnce(&mut linux_container::Configuration) + Send + 'static,
+    configuration: impl FnOnce(&mut linux_container::Configuration) -> Result<(), Error> + Send + 'static,
   ) -> Result<LinuxContainer, Error> {
     let progress = platform::Progress(options.progress.take());
-    let outcome = self.handle.create(
-      id,
-      image.handle.duplicate(),
-      options,
-      progress,
-      linux_container::Configuration::default(),
-      platform::Configure::new(configuration),
-    );
 
-    platform::outcome(outcome, format!("create {id}")).map(|outcome| LinuxContainer {
+    platform::configured(
+      configuration,
+      |configure| {
+        self.handle.create(
+          id,
+          image.handle.duplicate(),
+          options,
+          progress,
+          linux_container::Configuration::default(),
+          configure,
+        )
+      },
+      format!("create {id}"),
+    )
+    .map(|outcome| LinuxContainer {
       handle: outcome.linux_container(),
     })
   }
@@ -241,21 +279,26 @@ impl ContainerManager {
   pub fn create_with_rootfs(
     &mut self,
     id: &str,
-    image: &Image,
+    image: &image::Image,
     rootfs: Mount,
-    options: RootfsCreateOptions,
-    configuration: impl FnOnce(&mut linux_container::Configuration) + Send + 'static,
+    options: CreateWithRootfsOptions,
+    configuration: impl FnOnce(&mut linux_container::Configuration) -> Result<(), Error> + Send + 'static,
   ) -> Result<LinuxContainer, Error> {
-    let outcome = self.handle.create_with_rootfs(
-      id,
-      image.handle.duplicate(),
-      rootfs,
-      options,
-      linux_container::Configuration::default(),
-      platform::Configure::new(configuration),
-    );
-
-    platform::outcome(outcome, format!("create {id}")).map(|outcome| LinuxContainer {
+    platform::configured(
+      configuration,
+      |configure| {
+        self.handle.create_with_rootfs(
+          id,
+          image.handle.duplicate(),
+          rootfs,
+          options,
+          linux_container::Configuration::default(),
+          configure,
+        )
+      },
+      format!("create {id}"),
+    )
+    .map(|outcome| LinuxContainer {
       handle: outcome.linux_container(),
     })
   }
@@ -272,7 +315,7 @@ impl ContainerManager {
 }
 
 /// A `Network?`, as it crosses to Swift.
-fn network_crossing(network: Option<VmnetNetwork>) -> ffi::CzNetwork {
+fn network_crossing(network: Option<network::VmnetNetwork>) -> ffi::CzNetwork {
   match network {
     Some(network) => network.handle.as_network(),
     None => ffi::cz_no_network(),
