@@ -51,6 +51,8 @@
 
 - A process's `exited_at` and a keychain `RegistryInfo`'s dates now keep
   dates before 1970 instead of becoming 1970.
+- `VsockListener`'s iterator panics if the bridge fails. Before, the failure
+  looked like the end of the connections.
 
 ## v0.4.0
 

@@ -36,17 +36,21 @@ impl VsockListener {
   }
 }
 
+/// Swift's sequence can't throw, so a failure of the bridge itself panics
+/// rather than looking like the end of the connections.
 impl Iterator for &VsockListener {
   type Item = OwnedFd;
 
   fn next(&mut self) -> Option<OwnedFd> {
-    self
-      .handle
-      .next()
-      .optional_int32()
-      // SAFETY: Swift's handle for a connection doesn't close its descriptor,
-      // and forgets it once it crosses.
-      .map(|descriptor| unsafe { OwnedFd::from_raw_fd(descriptor) })
+    platform::outcome(
+      self.handle.next(),
+      format!("accept a connection on vsock port {}", self.port()),
+    )
+    .unwrap_or_else(|error| panic!("{error}"))
+    .optional_int32()
+    // SAFETY: Swift's handle for a connection doesn't close its descriptor,
+    // and forgets it once it crosses.
+    .map(|descriptor| unsafe { OwnedFd::from_raw_fd(descriptor) })
   }
 }
 
