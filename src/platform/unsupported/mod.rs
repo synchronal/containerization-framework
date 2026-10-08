@@ -88,6 +88,30 @@ impl From<network::vmnet_network::Mode> for VmnetMode {
   }
 }
 
+/// `UnixSocketConfiguration.Direction`.
+pub(crate) enum SocketDirection {
+  Into,
+  OutOf,
+}
+
+impl From<container::unix_socket_configuration::Direction> for SocketDirection {
+  fn from(direction: container::unix_socket_configuration::Direction) -> Self {
+    match direction {
+      container::unix_socket_configuration::Direction::Into => Self::Into,
+      container::unix_socket_configuration::Direction::OutOf => Self::OutOf,
+    }
+  }
+}
+
+impl From<SocketDirection> for container::unix_socket_configuration::Direction {
+  fn from(direction: SocketDirection) -> Self {
+    match direction {
+      SocketDirection::Into => Self::Into,
+      SocketDirection::OutOf => Self::OutOf,
+    }
+  }
+}
+
 /// `VirtualMachineInstanceState`.
 pub(crate) enum InstanceState {
   Starting,

@@ -199,14 +199,11 @@ final class CzLinuxPod: Sendable {
     return CzOutcome { try blocking { try await pod.closeContainerStdin(id) } }
   }
 
-  func relayUnixSocket(id: RustStr, socket: RustUnixSocketConfiguration) -> CzOutcome {
+  func relayUnixSocket(id: RustStr, socket: CzUnixSocketConfiguration) -> CzOutcome {
     let pod = pod
     let id = id.toString()
+    let socket = socket.configuration
 
-    return CzOutcome {
-      let socket = try UnixSocketConfiguration(socket)
-
-      return try blocking { try await pod.relayUnixSocket(id, socket: socket) }
-    }
+    return CzOutcome { try blocking { try await pod.relayUnixSocket(id, socket: socket) } }
   }
 }

@@ -318,7 +318,9 @@ impl Vminitd {
   /// `Vminitd.relaySocket(port:configuration:)`.
   pub fn relay_socket(&self, port: u32, configuration: &container::UnixSocketConfiguration) -> Result<(), Error> {
     platform::outcome(
-      self.handle.relay_socket(port, configuration.clone()),
+      self
+        .handle
+        .relay_socket(port, configuration.handle.duplicate()),
       format!("relay a socket over vsock port {port}"),
     )
     .map(drop)
@@ -327,7 +329,9 @@ impl Vminitd {
   /// `Vminitd.stopSocketRelay(configuration:)`.
   pub fn stop_socket_relay(&self, configuration: &container::UnixSocketConfiguration) -> Result<(), Error> {
     platform::outcome(
-      self.handle.stop_socket_relay(configuration.clone()),
+      self
+        .handle
+        .stop_socket_relay(configuration.handle.duplicate()),
       "stop a socket relay",
     )
     .map(drop)

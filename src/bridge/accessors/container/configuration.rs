@@ -23,7 +23,6 @@ use crate::containerization::network;
 use crate::containerization::process;
 use crate::containerization::vm;
 use crate::containerization_oci::runtime;
-use std::path::PathBuf;
 
 fn runtime_options_of(kind: ffi::RuntimeKind, options: Vec<String>) -> mount::RuntimeOptions {
   match kind {
@@ -98,24 +97,6 @@ impl container::Mount {
       | mount::RuntimeOptions::Any(options) => options,
       mount::RuntimeOptions::Shared => &[],
     }
-  }
-}
-
-impl container::UnixSocketConfiguration {
-  pub(crate) fn source(&self) -> String {
-    accessors::path(&self.source)
-  }
-
-  pub(crate) fn destination(&self) -> String {
-    accessors::path(&self.destination)
-  }
-
-  pub(crate) fn permissions(&self) -> Option<u32> {
-    self.permissions
-  }
-
-  pub(crate) fn direction(&self) -> ffi::SocketDirection {
-    self.direction.into()
   }
 }
 
@@ -233,19 +214,10 @@ impl linux_container::Configuration {
     set_ipv6_gateway(&mut self.interfaces, high, low, zone);
   }
 
-  pub(crate) fn push_socket(
-    &mut self,
-    source: String,
-    destination: String,
-    permissions: Option<u32>,
-    direction: ffi::SocketDirection,
-  ) {
-    self.sockets.push(container::UnixSocketConfiguration {
-      source: PathBuf::from(source),
-      destination: PathBuf::from(destination),
-      permissions,
-      direction: direction.into(),
-    });
+  pub(crate) fn push_socket(&mut self, socket: ffi::CzUnixSocketConfiguration) {
+    self
+      .sockets
+      .push(container::UnixSocketConfiguration { handle: socket });
   }
 
   pub(crate) fn push_mount(
@@ -348,8 +320,8 @@ impl linux_container::Configuration {
     self.sockets.len()
   }
 
-  pub(crate) fn sockets_at(&self, index: usize) -> &container::UnixSocketConfiguration {
-    &self.sockets[index]
+  pub(crate) fn sockets_at(&self, index: usize) -> ffi::CzUnixSocketConfiguration {
+    self.sockets[index].handle.duplicate()
   }
 
   pub(crate) fn mounts_len(&self) -> usize {
@@ -569,7 +541,17 @@ mod tests {
     configuration
       .process_mut()
       .set_arguments(vec!["/bin/true".into()]);
+    let socket = container::UnixSocketConfiguration::new("/host.sock", "/guest.sock").expect("a socket configuration");
+    configuration.clear_sockets();
+    configuration.push_socket(socket.handle.duplicate());
 
+    assert_eq!(configuration.sockets_len(), 1);
+    assert_eq!(
+      configuration.sockets_at(0).id(),
+      socket.id(),
+      "a socket keeps its id both ways"
+    );
+    assert_eq!(configuration.sockets, [socket]);
     assert_eq!(configuration.mounts_len(), 1, "Swift's mounts replace the defaults");
     assert!(matches!(
       configuration.mounts_at(0).runtime_kind(),

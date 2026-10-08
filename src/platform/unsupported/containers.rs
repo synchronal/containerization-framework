@@ -7,6 +7,7 @@ use super::CzOutcome;
 use super::CzTerminal;
 use super::CzVirtualMachineManager;
 use super::FilesystemOperationKind;
+use super::SocketDirection;
 use crate::containerization::container;
 use crate::containerization::process;
 use crate::containerization::vm;
@@ -19,6 +20,7 @@ taken!(
   linux_container -> CzLinuxContainer,
   linux_process -> CzLinuxProcess,
   linux_pod -> CzLinuxPod,
+  unix_socket_configuration -> CzUnixSocketConfiguration,
   container_statistics_list -> Vec<container::ContainerStatistics>,
   mount -> container::Mount,
   optional_mount -> Option<container::Mount>,
@@ -27,7 +29,13 @@ taken!(
   exited_at -> f64,
 );
 
-handles!(CzContainerManager, CzLinuxContainer, CzLinuxProcess, CzLinuxPod,);
+handles!(
+  CzContainerManager,
+  CzLinuxContainer,
+  CzLinuxProcess,
+  CzLinuxPod,
+  CzUnixSocketConfiguration,
+);
 
 failing!(
   cz_container_manager_at_root(vm::Kernel, container::Mount, Option<String>, CzNetwork, bool, bool),
@@ -52,6 +60,7 @@ failing!(
   ),
   cz_linux_rlimit_to_oci(process::LinuxRLimit),
   cz_linux_capabilities_to_oci(process::LinuxCapabilities),
+  cz_unix_socket_configuration_new(&str, &str),
   cz_mount_clone(container::Mount, &str),
   cz_mount_tag_hash(container::Mount),
   cz_exit_status_new(i32),
@@ -326,7 +335,49 @@ impl CzLinuxPod {
     match self.0 {}
   }
 
-  pub(crate) fn relay_unix_socket(&self, _id: &str, _socket: container::UnixSocketConfiguration) -> CzOutcome {
+  pub(crate) fn relay_unix_socket(&self, _id: &str, _socket: CzUnixSocketConfiguration) -> CzOutcome {
+    match self.0 {}
+  }
+}
+
+impl CzUnixSocketConfiguration {
+  pub(crate) fn duplicate(&self) -> CzUnixSocketConfiguration {
+    match self.0 {}
+  }
+
+  pub(crate) fn id(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn source(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn destination(&self) -> String {
+    match self.0 {}
+  }
+
+  pub(crate) fn permissions(&self) -> Option<u16> {
+    match self.0 {}
+  }
+
+  pub(crate) fn direction(&self) -> SocketDirection {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_source(&self, _source: &str) {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_destination(&self, _destination: &str) {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_permissions(&self, _permissions: Option<u16>) {
+    match self.0 {}
+  }
+
+  pub(crate) fn set_direction(&self, _direction: SocketDirection) {
     match self.0 {}
   }
 }

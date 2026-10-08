@@ -37,7 +37,6 @@ mod spec;
 mod vm;
 
 use crate::containerization::container::Mount as RustMount;
-use crate::containerization::container::UnixSocketConfiguration as RustUnixSocketConfiguration;
 use crate::containerization::container::container_manager::CreateOptions as RustCreateOptions;
 use crate::containerization::container::container_manager::CreateWithRootfsOptions as RustRootfsCreateOptions;
 use crate::containerization::container::linux_container::Configuration as RustLinuxContainerConfiguration;
@@ -289,8 +288,6 @@ pub(crate) mod ffi {
     #[swift_bridge(already_declared)]
     type RustMount;
     #[swift_bridge(already_declared)]
-    type RustUnixSocketConfiguration;
-    #[swift_bridge(already_declared)]
     type RustLinuxCapabilities;
     #[swift_bridge(already_declared)]
     type RustLinuxProcessConfiguration;
@@ -302,8 +299,6 @@ pub(crate) mod ffi {
     type RustBootLog;
     #[swift_bridge(already_declared)]
     type RustPodVolume;
-    #[swift_bridge(already_declared)]
-    type RustPodContainerConfiguration;
     #[swift_bridge(already_declared)]
     type RustAttachedFilesystem;
     #[swift_bridge(already_declared)]
@@ -405,13 +400,7 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "pushVmnetInterface")]
     fn push_vmnet_interface(self: &mut RustLinuxContainerConfiguration, interface: CzVmnetInterface);
     #[swift_bridge(swift_name = "pushSocket")]
-    fn push_socket(
-      self: &mut RustLinuxContainerConfiguration,
-      source: String,
-      destination: String,
-      permissions: Option<u32>,
-      direction: SocketDirection,
-    );
+    fn push_socket(self: &mut RustLinuxContainerConfiguration, socket: CzUnixSocketConfiguration);
     #[swift_bridge(swift_name = "pushMount")]
     fn push_mount(
       self: &mut RustLinuxContainerConfiguration,
@@ -467,7 +456,7 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "socketsLen")]
     fn sockets_len(self: &RustLinuxContainerConfiguration) -> usize;
     #[swift_bridge(swift_name = "socketsAt")]
-    fn sockets_at(self: &RustLinuxContainerConfiguration, index: usize) -> &RustUnixSocketConfiguration;
+    fn sockets_at(self: &RustLinuxContainerConfiguration, index: usize) -> CzUnixSocketConfiguration;
     #[swift_bridge(swift_name = "mountsLen")]
     fn mounts_len(self: &RustLinuxContainerConfiguration) -> usize;
     #[swift_bridge(swift_name = "mountsAt")]
@@ -636,6 +625,51 @@ pub(crate) mod ffi {
     fn seccomp_mode(self: &RustPodConfiguration) -> SeccompMode;
     #[swift_bridge(swift_name = "seccompProfile")]
     fn seccomp_profile(self: &RustPodConfiguration) -> &RustLinuxSeccomp;
+
+    // Read as `RustLinuxContainerConfiguration` is. Its seccomp profile is
+    // `nil` unless `has_seccomp_profile`.
+    type RustPodContainerConfiguration;
+    fn process(self: &RustPodContainerConfiguration) -> &RustLinuxProcessConfiguration;
+    fn cpus(self: &RustPodContainerConfiguration) -> u32;
+    #[swift_bridge(swift_name = "memoryInBytes")]
+    fn memory_in_bytes(self: &RustPodContainerConfiguration) -> u64;
+    fn hostname(self: &RustPodContainerConfiguration) -> Option<&str>;
+    #[swift_bridge(swift_name = "sysctlLen")]
+    fn sysctl_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "sysctlKeyAt")]
+    fn sysctl_key_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "sysctlValueAt")]
+    fn sysctl_value_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "mountsLen")]
+    fn mounts_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "mountsAt")]
+    fn mounts_at(self: &RustPodContainerConfiguration, index: usize) -> &RustMount;
+    #[swift_bridge(swift_name = "maskedPathsLen")]
+    fn masked_paths_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "maskedPathsAt")]
+    fn masked_paths_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "readonlyPathsLen")]
+    fn readonly_paths_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "readonlyPathsAt")]
+    fn readonly_paths_at(self: &RustPodContainerConfiguration, index: usize) -> &str;
+    #[swift_bridge(swift_name = "socketsLen")]
+    fn sockets_len(self: &RustPodContainerConfiguration) -> usize;
+    #[swift_bridge(swift_name = "socketsAt")]
+    fn sockets_at(self: &RustPodContainerConfiguration, index: usize) -> CzUnixSocketConfiguration;
+    #[swift_bridge(swift_name = "hasDns")]
+    fn has_dns(self: &RustPodContainerConfiguration) -> bool;
+    fn dns(self: &RustPodContainerConfiguration) -> &RustDns;
+    #[swift_bridge(swift_name = "hasHosts")]
+    fn has_hosts(self: &RustPodContainerConfiguration) -> bool;
+    fn hosts(self: &RustPodContainerConfiguration) -> &RustHosts;
+    #[swift_bridge(swift_name = "hasSeccompProfile")]
+    fn has_seccomp_profile(self: &RustPodContainerConfiguration) -> bool;
+    #[swift_bridge(swift_name = "seccompMode")]
+    fn seccomp_mode(self: &RustPodContainerConfiguration) -> SeccompMode;
+    #[swift_bridge(swift_name = "seccompProfile")]
+    fn seccomp_profile(self: &RustPodContainerConfiguration) -> &RustLinuxSeccomp;
+    #[swift_bridge(swift_name = "useInit")]
+    fn use_init(self: &RustPodContainerConfiguration) -> bool;
   }
 
   extern "Swift" {
@@ -662,6 +696,8 @@ pub(crate) mod ffi {
     fn vmnet_network(self: &CzOutcome) -> CzVmnetNetwork;
     #[swift_bridge(swift_name = "vmnetInterface")]
     fn vmnet_interface(self: &CzOutcome) -> CzVmnetInterface;
+    #[swift_bridge(swift_name = "unixSocketConfiguration")]
+    fn unix_socket_configuration(self: &CzOutcome) -> CzUnixSocketConfiguration;
     #[swift_bridge(swift_name = "linuxProcess")]
     fn linux_process(self: &CzOutcome) -> CzLinuxProcess;
     #[swift_bridge(swift_name = "virtualMachineManager")]
@@ -2594,9 +2630,9 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "enableRosetta")]
     fn enable_rosetta(self: &CzVminitd) -> CzOutcome;
     #[swift_bridge(swift_name = "relaySocket")]
-    fn relay_socket(self: &CzVminitd, port: u32, configuration: RustUnixSocketConfiguration) -> CzOutcome;
+    fn relay_socket(self: &CzVminitd, port: u32, configuration: CzUnixSocketConfiguration) -> CzOutcome;
     #[swift_bridge(swift_name = "stopSocketRelay")]
-    fn stop_socket_relay(self: &CzVminitd, configuration: RustUnixSocketConfiguration) -> CzOutcome;
+    fn stop_socket_relay(self: &CzVminitd, configuration: CzUnixSocketConfiguration) -> CzOutcome;
 
     // `next` blocks for a connection, and its outcome holds the descriptor,
     // which Rust then owns, or `Absent` once the listener is finished.
@@ -2656,6 +2692,27 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "macAddress")]
     fn mac_address(self: &CzVmnetInterface) -> CzOutcome;
     fn mtu(self: &CzVmnetInterface) -> u32;
+
+    // A `UnixSocketConfiguration`, which crosses whole so that its private
+    // `id` survives. The init's outcome holds one. Permissions cross as a
+    // `CModeT`.
+    type CzUnixSocketConfiguration;
+    #[swift_bridge(swift_name = "unixSocketConfiguration")]
+    fn cz_unix_socket_configuration_new(source: &str, destination: &str) -> CzOutcome;
+    fn duplicate(self: &CzUnixSocketConfiguration) -> CzUnixSocketConfiguration;
+    fn id(self: &CzUnixSocketConfiguration) -> String;
+    fn source(self: &CzUnixSocketConfiguration) -> String;
+    fn destination(self: &CzUnixSocketConfiguration) -> String;
+    fn permissions(self: &CzUnixSocketConfiguration) -> Option<u16>;
+    fn direction(self: &CzUnixSocketConfiguration) -> SocketDirection;
+    #[swift_bridge(swift_name = "setSource")]
+    fn set_source(self: &CzUnixSocketConfiguration, source: &str);
+    #[swift_bridge(swift_name = "setDestination")]
+    fn set_destination(self: &CzUnixSocketConfiguration, destination: &str);
+    #[swift_bridge(swift_name = "setPermissions")]
+    fn set_permissions(self: &CzUnixSocketConfiguration, permissions: Option<u16>);
+    #[swift_bridge(swift_name = "setDirection")]
+    fn set_direction(self: &CzUnixSocketConfiguration, direction: SocketDirection);
 
     // The getters' outcomes hold a `Mount` or `Absent`. `config` fills `seed`
     // with the container's configuration and hands it to `receive`, and
@@ -2799,7 +2856,7 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "closeContainerStdin")]
     fn close_container_stdin(self: &CzLinuxPod, id: &str) -> CzOutcome;
     #[swift_bridge(swift_name = "relayUnixSocket")]
-    fn relay_unix_socket(self: &CzLinuxPod, id: &str, socket: RustUnixSocketConfiguration) -> CzOutcome;
+    fn relay_unix_socket(self: &CzLinuxPod, id: &str, socket: CzUnixSocketConfiguration) -> CzOutcome;
 
     type CzLinuxProcess;
     fn id(self: &CzLinuxProcess) -> String;

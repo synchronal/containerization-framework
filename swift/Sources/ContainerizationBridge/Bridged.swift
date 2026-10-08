@@ -81,6 +81,7 @@ public final class CzOutcome: @unchecked Sendable {
   func linuxContainer() -> CzLinuxContainer { taken() }
   func vmnetNetwork() -> CzVmnetNetwork { taken() }
   func vmnetInterface() -> CzVmnetInterface { taken() }
+  func unixSocketConfiguration() -> CzUnixSocketConfiguration { taken() }
   func linuxProcess() -> CzLinuxProcess { taken() }
   func virtualMachineManager() -> CzVirtualMachineManager { taken() }
   func virtualMachineInstance() -> CzVirtualMachineInstance { taken() }

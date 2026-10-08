@@ -287,24 +287,18 @@ final class CzVminitd: Sendable {
     return CzOutcome { try blocking { try await agent.enableRosetta() } }
   }
 
-  func relaySocket(port: UInt32, configuration: RustUnixSocketConfiguration) -> CzOutcome {
+  func relaySocket(port: UInt32, configuration: CzUnixSocketConfiguration) -> CzOutcome {
     let agent = agent
+    let configuration = configuration.configuration
 
-    return CzOutcome {
-      let configuration = try UnixSocketConfiguration(configuration)
-
-      return try blocking { try await agent.relaySocket(port: port, configuration: configuration) }
-    }
+    return CzOutcome { try blocking { try await agent.relaySocket(port: port, configuration: configuration) } }
   }
 
-  func stopSocketRelay(configuration: RustUnixSocketConfiguration) -> CzOutcome {
+  func stopSocketRelay(configuration: CzUnixSocketConfiguration) -> CzOutcome {
     let agent = agent
+    let configuration = configuration.configuration
 
-    return CzOutcome {
-      let configuration = try UnixSocketConfiguration(configuration)
-
-      return try blocking { try await agent.stopSocketRelay(configuration: configuration) }
-    }
+    return CzOutcome { try blocking { try await agent.stopSocketRelay(configuration: configuration) } }
   }
 }
 

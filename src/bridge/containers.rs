@@ -2,7 +2,6 @@
 //! reads and fills through setters.
 
 use crate::containerization::container::Mount as RustMount;
-use crate::containerization::container::UnixSocketConfiguration as RustUnixSocketConfiguration;
 use crate::containerization::container::container_manager::CreateOptions as RustCreateOptions;
 use crate::containerization::container::container_manager::CreateWithRootfsOptions as RustRootfsCreateOptions;
 use crate::containerization::process::LinuxCapabilities as RustLinuxCapabilities;
@@ -13,15 +12,11 @@ use crate::containerization_oci::runtime::User as RustUser;
 use super::ffi::CapabilitySet;
 use super::ffi::RlimitKind;
 use super::ffi::RuntimeKind;
-use super::ffi::SocketDirection;
 
 #[swift_bridge::bridge]
 mod ffi {
   #[swift_bridge(already_declared)]
   enum RuntimeKind {}
-
-  #[swift_bridge(already_declared)]
-  enum SocketDirection {}
 
   #[swift_bridge(already_declared)]
   enum RlimitKind {}
@@ -56,12 +51,6 @@ mod ffi {
     fn runtime_options_len(self: &RustMount) -> usize;
     #[swift_bridge(swift_name = "runtimeOptionsAt")]
     fn runtime_options_at(self: &RustMount, index: usize) -> &str;
-
-    type RustUnixSocketConfiguration;
-    fn source(self: &RustUnixSocketConfiguration) -> String;
-    fn destination(self: &RustUnixSocketConfiguration) -> String;
-    fn permissions(self: &RustUnixSocketConfiguration) -> Option<u32>;
-    fn direction(self: &RustUnixSocketConfiguration) -> SocketDirection;
 
     type RustUser;
     fn uid(self: &RustUser) -> u32;

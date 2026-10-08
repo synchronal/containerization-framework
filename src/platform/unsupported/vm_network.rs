@@ -3,6 +3,7 @@
 
 use super::CzNetwork;
 use super::CzOutcome;
+use super::CzUnixSocketConfiguration;
 use super::FilesystemOperationKind;
 use super::HostsEntryName;
 use super::InstanceState;
@@ -354,11 +355,11 @@ impl CzVminitd {
     match self.0 {}
   }
 
-  pub(crate) fn relay_socket(&self, _port: u32, _configuration: container::UnixSocketConfiguration) -> CzOutcome {
+  pub(crate) fn relay_socket(&self, _port: u32, _configuration: CzUnixSocketConfiguration) -> CzOutcome {
     match self.0 {}
   }
 
-  pub(crate) fn stop_socket_relay(&self, _configuration: container::UnixSocketConfiguration) -> CzOutcome {
+  pub(crate) fn stop_socket_relay(&self, _configuration: CzUnixSocketConfiguration) -> CzOutcome {
     match self.0 {}
   }
 }

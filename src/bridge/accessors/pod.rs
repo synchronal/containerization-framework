@@ -329,8 +329,8 @@ impl linux_pod::ContainerConfiguration {
     self.sockets.len()
   }
 
-  pub(crate) fn sockets_at(&self, index: usize) -> &containerization::container::UnixSocketConfiguration {
-    &self.sockets[index]
+  pub(crate) fn sockets_at(&self, index: usize) -> ffi::CzUnixSocketConfiguration {
+    self.sockets[index].handle.duplicate()
   }
 
   pub(crate) fn has_dns(&self) -> bool {

@@ -370,7 +370,7 @@ impl LinuxPod {
   /// `LinuxPod.relayUnixSocket(_:socket:)`.
   pub fn relay_unix_socket(&self, container_id: &str, socket: UnixSocketConfiguration) -> Result<(), Error> {
     platform::outcome(
-      self.handle.relay_unix_socket(container_id, socket),
+      self.handle.relay_unix_socket(container_id, socket.handle),
       format!("relay a socket for {container_id} in pod {}", self.id()),
     )
     .map(drop)

@@ -148,6 +148,55 @@ fn talks_to_the_guest_agent() {
 }
 
 #[test]
+fn stops_a_socket_relay_by_the_configuration_that_started_it() {
+  let host = tempfile::tempdir().expect("a temporary directory");
+  let vmm = support::store::vmm();
+  let config = cfw::containerization::vm::VMConfiguration {
+    cpus: support::TEST_CPUS,
+    memory_in_bytes: support::vm().memory_in_bytes,
+    ..Default::default()
+  };
+  let instance = vmm.create(&config).expect("a VM should be created");
+  instance.start().expect("the VM should start");
+
+  let agent = instance
+    .dial_agent()
+    .expect("the guest agent should answer");
+  agent.standard_setup().expect("the guest should set up");
+
+  let socket = cfw::containerization::container::UnixSocketConfiguration::new(
+    host.path().join("relayed.sock"),
+    "/tmp/cfw-relay/relayed.sock",
+  )
+  .expect("a socket configuration");
+  assert_eq!(
+    socket.direction(),
+    cfw::containerization::container::unix_socket_configuration::Direction::Into
+  );
+  assert_eq!(socket.clone().id(), socket.id(), "a copy keeps the id");
+  assert_eq!(socket.clone(), socket);
+
+  agent
+    .relay_socket(0x3000, &socket)
+    .expect("the agent should relay the socket");
+  let stat = agent
+    .stat("/", "/tmp/cfw-relay/relayed.sock")
+    .expect("the guest should have the relayed socket");
+  assert_eq!(stat.mode & 0o170000, 0o140000, "{stat:?} should be a socket");
+
+  agent
+    .stop_socket_relay(&socket)
+    .expect("the agent should stop the relay it started");
+  assert!(
+    agent.stop_socket_relay(&socket).is_err(),
+    "a stopped relay can't be stopped again"
+  );
+
+  agent.close().expect("the agent's connection should close");
+  instance.stop().expect("the VM should stop");
+}
+
+#[test]
 fn pauses_and_resumes_a_container_on_its_own_manager() {
   let name = "cfw-test-vmm-container";
   let directory = tempfile::tempdir().expect("a temporary directory");

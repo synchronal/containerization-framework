@@ -13,8 +13,6 @@ import ContainerizationExtras
 import ContainerizationOCI
 import ContainerizationOS
 import Foundation
-// For `FilePermissions` (relayed socket mode).
-import SystemPackage
 
 // MARK: Rust to Swift
 
@@ -35,31 +33,6 @@ extension Containerization.Mount {
       destination: mount.destination().toString(),
       options: strings(mount.optionsLen(), mount.optionsAt),
       runtimeOptions: runtimeOptions
-    )
-  }
-}
-
-extension UnixSocketConfiguration {
-  init(_ socket: RustUnixSocketConfigurationRef) throws {
-    // `CModeT` is 16-bit: refuse a mode that doesn't fit, not truncate it.
-    let permissions = try socket.permissions().map { mode in
-      guard let mode = CModeT(exactly: mode) else {
-        throw BridgeError.malformed("socket permissions", String(mode, radix: 8))
-      }
-      return FilePermissions(rawValue: mode)
-    }
-
-    let direction: Direction =
-      switch socket.direction() {
-      case .Into: .into
-      case .OutOf: .outOf
-      }
-
-    self.init(
-      source: URL(filePath: socket.source().toString()),
-      destination: URL(filePath: socket.destination().toString()),
-      permissions: permissions,
-      direction: direction
     )
   }
 }
@@ -208,7 +181,7 @@ extension LinuxContainer.Configuration {
       configuration.natInterfaceAt,
       configuration.vmnetInterfaceAt
     )
-    sockets = try list(configuration.socketsLen()) { try UnixSocketConfiguration(configuration.socketsAt($0)) }
+    sockets = list(configuration.socketsLen()) { configuration.socketsAt($0).configuration }
     mounts = list(configuration.mountsLen()) { Containerization.Mount(configuration.mountsAt($0)) }
     maskedPaths = strings(configuration.maskedPathsLen(), configuration.maskedPathsAt)
     readonlyPaths = strings(configuration.readonlyPathsLen(), configuration.readonlyPathsAt)
@@ -288,7 +261,7 @@ extension LinuxPod.ContainerConfiguration {
     mounts = list(configuration.mountsLen()) { Containerization.Mount(configuration.mountsAt($0)) }
     maskedPaths = strings(configuration.maskedPathsLen(), configuration.maskedPathsAt)
     readonlyPaths = strings(configuration.readonlyPathsLen(), configuration.readonlyPathsAt)
-    sockets = try list(configuration.socketsLen()) { try UnixSocketConfiguration(configuration.socketsAt($0)) }
+    sockets = list(configuration.socketsLen()) { configuration.socketsAt($0).configuration }
     dns = configuration.hasDns() ? DNS(configuration.dns()) : nil
     hosts = configuration.hasHosts() ? Hosts(configuration.hosts()) : nil
     seccompProfile =
@@ -480,12 +453,7 @@ func fill(_ built: RustLinuxContainerConfigurationRefMut, from configuration: Li
   )
 
   for socket in configuration.sockets {
-    built.pushSocket(
-      rust(socket.source.path(percentEncoded: false)),
-      rust(socket.destination.path(percentEncoded: false)),
-      socket.permissions.map { UInt32($0.rawValue) },
-      socket.direction == .into ? .Into : .OutOf
-    )
+    built.pushSocket(CzUnixSocketConfiguration(socket))
   }
 
   for mount in configuration.mounts {

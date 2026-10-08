@@ -46,6 +46,13 @@
   addresses had no order.
 - `Error` is `#[non_exhaustive]`, and `Error::unavailable` is no longer
   public. `Error` now implements `Clone`, `PartialEq` and `Eq`.
+- `UnixSocketConfiguration` now holds the Swift value instead of public
+  fields, so it keeps the `id` that Swift gives it. It has `id`, `source`,
+  `destination`, `permissions` and `direction` methods, and a `set_` method
+  for each field but `id`. `UnixSocketConfiguration::new` returns a `Result`,
+  because it can't reach Swift off macOS. Permissions are a `u16`, as Swift's
+  `CModeT` is. Two configurations are equal when their `id`s and other fields
+  match, so a configuration equals only itself or an unchanged clone.
 
 ### Fixes
 
@@ -53,6 +60,12 @@
   dates before 1970 instead of becoming 1970.
 - `VsockListener`'s iterator panics if the bridge fails. Before, the failure
   looked like the end of the connections.
+- `Vminitd::stop_socket_relay` now stops the relay that `relay_socket` started
+  with the same configuration. Before, each call made a new Swift
+  configuration with a new `id`, so the guest never found the relay to stop.
+  Sockets in a container's configuration also keep their `id`s when it
+  crosses to Swift and back, as do those in a pod container's configuration
+  when it crosses to Swift.
 - The build script no longer rewrites the staged FFI glue on every run, so
   SwiftPM doesn't recompile an unchanged bridge. A change to
   `swift/Package.resolved` now reruns the build script.
