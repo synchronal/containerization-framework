@@ -15,7 +15,7 @@ impl Bundle {
   /// `Bundle.create(path:spec:)`, which writes `spec` as `config.json`.
   pub fn create(path: &Path, spec: &Spec) -> Result<Self, Error> {
     Self::at(
-      ffi::cz_bundle_create(&path.display().to_string(), spec.clone()),
+      ffi::cz_bundle_create(platform::path(path)?, spec.clone()),
       format!("create a bundle at {}", path.display()),
     )
   }
@@ -23,7 +23,7 @@ impl Bundle {
   /// `Bundle.create(path:spec:)` with `Data`, written unchecked.
   pub fn create_from_data(path: &Path, spec: &[u8]) -> Result<Self, Error> {
     Self::at(
-      ffi::cz_bundle_create_from_data(&path.display().to_string(), spec.to_vec()),
+      ffi::cz_bundle_create_from_data(platform::path(path)?, spec.to_vec()),
       format!("create a bundle at {}", path.display()),
     )
   }
@@ -31,7 +31,7 @@ impl Bundle {
   /// `Bundle.load(path:)`, which fails if nothing is at `path`.
   pub fn load(path: &Path) -> Result<Self, Error> {
     Self::at(
-      ffi::cz_bundle_load(&path.display().to_string()),
+      ffi::cz_bundle_load(platform::path(path)?),
       format!("load the bundle at {}", path.display()),
     )
   }
@@ -50,7 +50,7 @@ impl Bundle {
   /// `Bundle.configPath`.
   pub fn config_path(&self) -> Result<PathBuf, Error> {
     platform::outcome(
-      ffi::cz_bundle_config_path(&self.path.display().to_string()),
+      ffi::cz_bundle_config_path(platform::path(&self.path)?),
       "find a bundle's config",
     )
     .map(|outcome| PathBuf::from(outcome.text()))
@@ -59,7 +59,7 @@ impl Bundle {
   /// `Bundle.rootfsPath`.
   pub fn rootfs_path(&self) -> Result<PathBuf, Error> {
     platform::outcome(
-      ffi::cz_bundle_rootfs_path(&self.path.display().to_string()),
+      ffi::cz_bundle_rootfs_path(platform::path(&self.path)?),
       "find a bundle's rootfs",
     )
     .map(|outcome| PathBuf::from(outcome.text()))
@@ -68,7 +68,7 @@ impl Bundle {
   /// `Bundle.delete()`.
   pub fn delete(&self) -> Result<(), Error> {
     platform::outcome(
-      ffi::cz_bundle_delete(&self.path.display().to_string()),
+      ffi::cz_bundle_delete(platform::path(&self.path)?),
       format!("delete the bundle at {}", self.path.display()),
     )
     .map(drop)
@@ -77,7 +77,7 @@ impl Bundle {
   /// `Bundle.loadConfig()`.
   pub fn load_config(&self) -> Result<Spec, Error> {
     platform::outcome(
-      ffi::cz_bundle_load_config(&self.path.display().to_string()),
+      ffi::cz_bundle_load_config(platform::path(&self.path)?),
       format!("load the config of the bundle at {}", self.path.display()),
     )
     .map(|outcome| outcome.spec())

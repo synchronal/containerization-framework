@@ -30,7 +30,7 @@ impl LocalContentStore {
   /// `LocalContentStore(path:)`.
   pub fn new(path: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(
-      ffi::cz_local_content_store_new(&path.display().to_string()),
+      ffi::cz_local_content_store_new(platform::path(path)?),
       format!("open the content store at {}", path.display()),
     )?;
 

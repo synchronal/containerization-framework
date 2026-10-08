@@ -282,8 +282,16 @@ fn stats_files_links_and_symlinks() {
     link.mode & mode(cfw::containerization_ext4::ext4::FileModeFlag::TYPE_MASK, 0),
     mode(cfw::containerization_ext4::ext4::FileModeFlag::S_IFLNK, 0)
   );
-  assert!(reader.exists("/hello".as_ref(), false));
-  assert!(!reader.exists("/nowhere".as_ref(), true));
+  assert!(
+    reader
+      .exists("/hello".as_ref(), false)
+      .expect("the path is UTF-8")
+  );
+  assert!(
+    !reader
+      .exists("/nowhere".as_ref(), true)
+      .expect("the path is UTF-8")
+  );
   assert_eq!(
     cfw::containerization_ext4::ext4::EXT4Reader::read_inline_extended_attributes(&inode.inline_xattrs)
       .expect("the file's inline extended attributes")
@@ -330,7 +338,11 @@ fn unlinks_a_file() {
 
   let reader = cfw::containerization_ext4::ext4::EXT4Reader::new(&at).expect("the filesystem should read");
 
-  assert!(!reader.exists("/gone.txt".as_ref(), true));
+  assert!(
+    !reader
+      .exists("/gone.txt".as_ref(), true)
+      .expect("the path is UTF-8")
+  );
 }
 
 #[test]

@@ -154,7 +154,7 @@ impl ContainerManager {
       ffi::cz_container_manager_at_root(
         kernel.clone(),
         initfs.clone(),
-        root.map(|root| root.display().to_string()),
+        root.map(platform::path).transpose()?.map(str::to_string),
         network_crossing(options.network),
         options.rosetta,
         options.nested_virtualization,
@@ -175,7 +175,7 @@ impl ContainerManager {
       ffi::cz_container_manager_at_root_with_initfs_reference(
         kernel.clone(),
         initfs_reference,
-        root.map(|root| root.display().to_string()),
+        root.map(platform::path).transpose()?.map(str::to_string),
         network_crossing(options.network),
         options.rosetta,
         options.nested_virtualization,

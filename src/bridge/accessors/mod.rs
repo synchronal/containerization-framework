@@ -26,7 +26,16 @@ use crate::bridge::ffi;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-fn path(path: &Path) -> String {
+/// A path Swift reads while it builds a model, or `None` if it isn't UTF-8,
+/// which Swift's `String` requires. Swift then throws, naming the path by
+/// [`lossy_path`].
+fn path(path: &Path) -> Option<String> {
+  path.to_str().map(str::to_string)
+}
+
+/// A path as text, with any bytes that aren't UTF-8 replaced, for the error
+/// Swift throws when [`path`] is `None`.
+fn lossy_path(path: &Path) -> String {
   path.display().to_string()
 }
 

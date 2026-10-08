@@ -148,7 +148,7 @@ impl RegistryClient {
       self.handle.fetch_blob(
         name,
         descriptor.clone(),
-        &into.display().to_string(),
+        platform::path(into)?,
         platform::Progress(progress),
       ),
       format!("fetch {} from {name} into {}", descriptor.digest, into.display()),

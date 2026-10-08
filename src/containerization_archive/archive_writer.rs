@@ -69,7 +69,7 @@ impl ArchiveWriter {
       locales: options.locales,
     };
     let outcome = platform::outcome(
-      ffi::cz_archive_writer_with_file(configuration, &file.display().to_string()),
+      ffi::cz_archive_writer_with_file(configuration, platform::path(file)?),
       format!("write a {} archive to {}", format.raw_value(), file.display()),
     )?;
 
@@ -81,7 +81,7 @@ impl ArchiveWriter {
   /// `ArchiveWriter.open(file:)`.
   pub fn open(&self, file: &Path) -> Result<(), Error> {
     platform::outcome(
-      self.handle.open(&file.display().to_string()),
+      self.handle.open(platform::path(file)?),
       format!("open {} for an archive", file.display()),
     )
     .map(drop)
@@ -126,7 +126,7 @@ impl ArchiveWriter {
   /// `ArchiveWriter.archiveDirectory(_:)`.
   pub fn archive_directory(&self, dir: &Path) -> Result<(), Error> {
     platform::outcome(
-      self.handle.archive_directory(&dir.display().to_string()),
+      self.handle.archive_directory(platform::path(dir)?),
       format!("archive {}", dir.display()),
     )
     .map(drop)
@@ -138,9 +138,9 @@ impl ArchiveWriter {
       self.handle.archive(
         paths
           .iter()
-          .map(|path| path.display().to_string())
-          .collect(),
-        &base.display().to_string(),
+          .map(|path| platform::path(path).map(str::to_string))
+          .collect::<Result<_, _>>()?,
+        platform::path(base)?,
       ),
       format!("archive paths under {}", base.display()),
     )

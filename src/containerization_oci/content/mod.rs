@@ -41,7 +41,7 @@ impl Content {
   /// `LocalContent(path:)`, which reads the file at `path` without a store.
   pub fn open(path: &Path) -> Result<Self, Error> {
     platform::outcome(
-      ffi::cz_local_content_open(&path.display().to_string()),
+      ffi::cz_local_content_open(platform::path(path)?),
       format!("open {} as content", path.display()),
     )
     .map(|outcome| Self {

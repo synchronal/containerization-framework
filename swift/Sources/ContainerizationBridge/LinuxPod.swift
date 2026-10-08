@@ -70,7 +70,7 @@ final class CzLinuxPod: Sendable {
     return CzOutcome {
       try blocking {
         try await pod.addContainer(id, rootfs: rootfs) { config in
-          if configuration.call(seed) { throw RustClosureThrew() }
+          if configuration.call(seed) { throw BridgeError.bodyFailed }
           config = try LinuxPod.ContainerConfiguration(seed)
         }
       }

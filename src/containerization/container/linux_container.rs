@@ -358,8 +358,8 @@ impl LinuxContainer {
   pub fn copy_in(&self, source: &Path, destination: &Path, options: CopyInOptions) -> Result<(), Error> {
     platform::outcome(
       self.handle.copy_in(
-        &source.display().to_string(),
-        &destination.display().to_string(),
+        platform::path(source)?,
+        platform::path(destination)?,
         options.mode,
         options.create_parents,
         options.chunk_size,
@@ -374,8 +374,8 @@ impl LinuxContainer {
   pub fn copy_out(&self, source: &Path, destination: &Path, options: CopyOutOptions) -> Result<(), Error> {
     platform::outcome(
       self.handle.copy_out(
-        &source.display().to_string(),
-        &destination.display().to_string(),
+        platform::path(source)?,
+        platform::path(destination)?,
         options.create_parents,
         options.chunk_size,
       ),

@@ -25,7 +25,7 @@ impl ContentWriter {
   /// `ContentWriter(for:)`.
   pub fn new(base: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(
-      ffi::cz_content_writer_new(&base.display().to_string()),
+      ffi::cz_content_writer_new(platform::path(base)?),
       format!("write content into {}", base.display()),
     )?;
 
@@ -46,7 +46,7 @@ impl ContentWriter {
   /// it instead.
   pub fn create(&self, from: &Path) -> Result<(i64, String), Error> {
     platform::outcome(
-      self.handle.create(&from.display().to_string()),
+      self.handle.create(platform::path(from)?),
       format!("write {} as content", from.display()),
     )
     .map(|outcome| written(&outcome))
@@ -56,7 +56,7 @@ impl ContentWriter {
   /// `digestString`. It fails if `destination` exists.
   pub fn copy(from: &Path, destination: &Path) -> Result<(i64, String), Error> {
     platform::outcome(
-      ffi::cz_content_writer_copy(&from.display().to_string(), &destination.display().to_string()),
+      ffi::cz_content_writer_copy(platform::path(from)?, platform::path(destination)?),
       format!("copy {} to {}", from.display(), destination.display()),
     )
     .map(|outcome| written(&outcome))

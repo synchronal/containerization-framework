@@ -60,7 +60,7 @@ impl ParsedDigest {
   /// `ParsedDigest.path(in:)`.
   pub fn path(&self, in_root: &Path) -> Result<PathBuf, Error> {
     platform::outcome(
-      ffi::cz_parsed_digest_path(&self.encoded, &in_root.display().to_string()),
+      ffi::cz_parsed_digest_path(&self.encoded, platform::path(in_root)?),
       format!("find {} in {}", self.encoded, in_root.display()),
     )
     .map(|outcome| PathBuf::from(outcome.text()))

@@ -95,7 +95,7 @@ impl Formatter {
   /// `EXT4.Formatter(_:blockSize:minDiskSize:journal:)`.
   pub fn new(device_path: &Path, options: FormatterOptions) -> Result<Self, Error> {
     platform::outcome(
-      ffi::cz_ext4_formatter_new(&device_path.display().to_string(), options),
+      ffi::cz_ext4_formatter_new(platform::path(device_path)?, options),
       format!("format {}", device_path.display()),
     )
     .map(|outcome| Self {
@@ -108,7 +108,7 @@ impl Formatter {
     platform::outcome(
       self
         .handle
-        .link(&link.display().to_string(), &target.display().to_string()),
+        .link(platform::path(link)?, platform::path(target)?),
       format!("link {} to {}", link.display(), target.display()),
     )
     .map(drop)
@@ -120,7 +120,7 @@ impl Formatter {
     platform::outcome(
       self
         .handle
-        .unlink(&path.display().to_string(), directory_whiteout),
+        .unlink(platform::path(path)?, directory_whiteout),
       format!("unlink {}", path.display()),
     )
     .map(drop)
@@ -138,8 +138,13 @@ impl Formatter {
 
     platform::outcome(
       self.handle.create(
-        &path.display().to_string(),
-        options.link.map(|link| link.display().to_string()),
+        platform::path(path)?,
+        options
+          .link
+          .as_deref()
+          .map(platform::path)
+          .transpose()?
+          .map(str::to_string),
         mode,
         platform::seconds(ts.access),
         platform::seconds(ts.modification),
@@ -169,7 +174,7 @@ impl Formatter {
   pub fn unpack(&self, source: &Path, options: UnpackOptions) -> Result<(), Error> {
     platform::outcome(
       self.handle.unpack(
-        &source.display().to_string(),
+        platform::path(source)?,
         options.format.raw_value(),
         options.compression.raw_value(),
         platform::Progress(options.progress),
@@ -203,7 +208,7 @@ impl Formatter {
     file: &Path,
   ) -> Result<(i64, isize), Error> {
     platform::outcome(
-      ffi::cz_ext4_formatter_scan_archive_headers(format.raw_value(), filter.raw_value(), &file.display().to_string()),
+      ffi::cz_ext4_formatter_scan_archive_headers(format.raw_value(), filter.raw_value(), platform::path(file)?),
       format!("scan the archive {}", file.display()),
     )
     .map(|outcome| (outcome.scanned_size(), outcome.scanned_items()))

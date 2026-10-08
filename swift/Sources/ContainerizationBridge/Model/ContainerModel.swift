@@ -157,10 +157,19 @@ extension LinuxProcessConfiguration {
   }
 }
 
+/// The file URL of a path Rust lends. Rust lends `nil` for a path that isn't
+/// UTF-8, which a `String` can't hold, and this throws, naming `what` and the
+/// path as `lossy` gives it.
+func lentPath(_ path: String?, _ what: String, _ lossy: () -> RustString) throws -> URL {
+  guard let path else { throw BridgeError.malformed("\(what) path", lossy().toString()) }
+  return URL(filePath: path)
+}
+
 extension BootLog {
   static func from(_ bootLog: RustBootLogRef) throws -> BootLog {
     switch bootLog.kind() {
-    case .File: .file(path: URL(filePath: bootLog.path().toString()), append: bootLog.append())
+    case .File:
+      .file(path: try lentPath(bootLog.path()?.toString(), "boot log", bootLog.lossyPath), append: bootLog.append())
     case .FileHandle: .fileHandle(try duplicate(bootLog.fileHandle()))
     }
   }
@@ -210,16 +219,18 @@ func lentSeccompProfile(
 
 extension LinuxPod.PodVolume {
   init(_ volume: RustPodVolumeRef) throws {
-    let location = volume.location().toString()
+    let location = volume.location()?.toString()
     let source: Source =
       switch volume.sourceKind() {
       case .Nbd:
         .nbd(
-          url: try URL(string: location) ?? { throw BridgeError.malformed("volume URL", location) }(),
+          url: try location.flatMap { URL(string: $0) }
+            ?? { throw BridgeError.malformed("volume URL", volume.lossyLocation().toString()) }(),
           timeout: volume.timeout(),
           readOnly: volume.readOnly()
         )
-      case .DiskImage: .diskImage(path: URL(filePath: location), readOnly: volume.readOnly())
+      case .DiskImage:
+        .diskImage(path: try lentPath(location, "volume", volume.lossyLocation), readOnly: volume.readOnly())
       case .Tmpfs: .tmpfs(sizeBytes: volume.sizeBytes())
       }
 
@@ -348,7 +359,7 @@ extension SystemPlatform {
 extension Kernel {
   init(_ kernel: RustKernelRef) throws {
     self.init(
-      path: URL(filePath: kernel.path().toString()),
+      path: try lentPath(kernel.path()?.toString(), "kernel", kernel.lossyPath),
       platform: try SystemPlatform(kernel.platform()),
       commandline: CommandLine(
         kernelArgs: strings(kernel.kernelArgsLen(), kernel.kernelArgsAt),

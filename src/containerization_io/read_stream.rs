@@ -36,7 +36,7 @@ impl ReadStream {
   /// [`ReadStream::BUFFER_SIZE`].
   pub fn with_url(url: &Path, buffer_size: usize) -> Result<Self, Error> {
     Self::opened(
-      ffi::cz_read_stream_with_url(&url.display().to_string(), buffer_size),
+      ffi::cz_read_stream_with_url(platform::path(url)?, buffer_size),
       format!("read {}", url.display()),
     )
   }

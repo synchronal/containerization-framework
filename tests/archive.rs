@@ -435,6 +435,35 @@ fn says_which_archive_it_could_not_open() {
 }
 
 #[test]
+fn refuses_a_path_that_isnt_utf8_without_asking_swift() {
+  use std::os::unix::ffi::OsStrExt;
+
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  let archive = directory
+    .path()
+    .join(std::ffi::OsStr::from_bytes(b"\xff.tar"));
+
+  let error = cfw::containerization_archive::ArchiveWriter::with_file(
+    cfw::containerization_archive::Format::Pax,
+    cfw::containerization_archive::Filter::None,
+    Default::default(),
+    &archive,
+  )
+  .err()
+  .expect("a path that isn't UTF-8");
+
+  assert!(matches!(error, cfw::Error::Failed { .. }), "{error:?}");
+  assert!(error.to_string().contains("UTF-8"), "{error}");
+  assert_eq!(
+    std::fs::read_dir(directory.path())
+      .expect("the temporary directory")
+      .count(),
+    0,
+    "Swift was asked to write the archive"
+  );
+}
+
+#[test]
 fn says_which_file_is_not_in_an_archive() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let archive = directory.path().join("one.tar");

@@ -24,7 +24,7 @@ unsafe impl Sync for FileInfo {}
 /// `File.info(_:)`, which doesn't follow a symlink at `path`.
 pub fn info(path: &Path) -> Result<FileInfo, Error> {
   platform::outcome(
-    ffi::cz_file_info(&path.display().to_string()),
+    ffi::cz_file_info(platform::path(path)?),
     format!("read {}'s file info", path.display()),
   )
   .map(|outcome| FileInfo {

@@ -138,7 +138,7 @@ private func configured(
 
   return { config in
     fill(seed, from: config)
-    if configuration.call(seed) { throw RustClosureThrew() }
+    if configuration.call(seed) { throw BridgeError.bodyFailed }
     config = try LinuxContainer.Configuration(seed)
   }
 }

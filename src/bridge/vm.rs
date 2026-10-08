@@ -30,18 +30,26 @@ mod ffi {
   extern "Rust" {
     type RustBootLog;
     fn kind(self: &RustBootLog) -> BootLogKind;
-    fn path(self: &RustBootLog) -> String;
+    // `path` is `None` if the path isn't UTF-8, and Swift throws, naming it
+    // by `lossyPath`.
+    fn path(self: &RustBootLog) -> Option<String>;
+    #[swift_bridge(swift_name = "lossyPath")]
+    fn lossy_path(self: &RustBootLog) -> String;
     fn append(self: &RustBootLog) -> bool;
     #[swift_bridge(swift_name = "fileHandle")]
     fn file_handle(self: &RustBootLog) -> i32;
 
-    // `location` is an `nbd` source's URL or a `diskImage`'s path.
+    // `location` is an `nbd` source's URL or a `diskImage`'s path. It is
+    // `None` if the path isn't UTF-8, and Swift throws, naming it by
+    // `lossyLocation`.
     type RustPodVolume;
     fn name(self: &RustPodVolume) -> &str;
     fn format(self: &RustPodVolume) -> &str;
     #[swift_bridge(swift_name = "sourceKind")]
     fn source_kind(self: &RustPodVolume) -> PodVolumeKind;
-    fn location(self: &RustPodVolume) -> String;
+    fn location(self: &RustPodVolume) -> Option<String>;
+    #[swift_bridge(swift_name = "lossyLocation")]
+    fn lossy_location(self: &RustPodVolume) -> String;
     fn timeout(self: &RustPodVolume) -> Option<f64>;
     #[swift_bridge(swift_name = "readOnly")]
     fn read_only(self: &RustPodVolume) -> bool;
@@ -74,7 +82,11 @@ mod ffi {
     fn flags(self: &RustBinfmtEntry) -> &str;
 
     type RustKernel;
-    fn path(self: &RustKernel) -> String;
+    // `path` is `None` if the path isn't UTF-8, and Swift throws, naming it
+    // by `lossyPath`.
+    fn path(self: &RustKernel) -> Option<String>;
+    #[swift_bridge(swift_name = "lossyPath")]
+    fn lossy_path(self: &RustKernel) -> String;
     fn platform(self: &RustKernel) -> &RustSystemPlatform;
     #[swift_bridge(swift_name = "kernelArgsLen")]
     fn kernel_args_len(self: &RustKernel) -> usize;

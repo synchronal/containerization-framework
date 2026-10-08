@@ -53,9 +53,19 @@
   because it can't reach Swift off macOS. Permissions are a `u16`, as Swift's
   `CModeT` is. Two configurations are equal when their `id`s and other fields
   match, so a configuration equals only itself or an unchanged clone.
+- `UnixSocketConfiguration::set_source` and `set_destination` now return
+  `Result<(), Error>`, and `EXT4Reader::exists` now returns
+  `Result<bool, Error>`. Each fails if its path isn't valid UTF-8 (see
+  Fixes).
 
 ### Fixes
 
+- A path that isn't valid UTF-8 now fails the call with `Error::Failed`
+  before it reaches Swift. Before, its invalid bytes were replaced with
+  U+FFFD, so a call such as `Bundle::delete` or
+  `ArchiveReader::extract_contents` could act on a different file. A kernel,
+  boot log or pod disk image path that isn't UTF-8 also fails the call that
+  hands its configuration to Swift.
 - A process's `exited_at` and a keychain `RegistryInfo`'s dates now keep
   dates before 1970 instead of becoming 1970.
 - `VsockListener`'s iterator panics if the bridge fails. Before, the failure

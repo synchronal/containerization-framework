@@ -125,7 +125,7 @@ impl ImageStore {
   /// `ImageStore(path:)`.
   pub fn new(path: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(
-      ffi::cz_image_store_new(&path.display().to_string()),
+      ffi::cz_image_store_new(platform::path(path)?),
       format!("open the image store at {}", path.display()),
     )?;
 
@@ -148,9 +148,7 @@ impl ImageStore {
     content_store: &containerization_oci::content::LocalContentStore,
   ) -> Result<Self, Error> {
     let outcome = platform::outcome(
-      content_store
-        .handle
-        .image_store(&path.display().to_string()),
+      content_store.handle.image_store(platform::path(path)?),
       format!("open the image store at {}", path.display()),
     )?;
 
@@ -281,7 +279,7 @@ impl ImageStore {
           .iter()
           .map(|reference| reference.to_string())
           .collect(),
-        &out.display().to_string(),
+        platform::path(out)?,
         has_platform,
         platform,
       ),
@@ -310,7 +308,7 @@ impl ImageStore {
     platform::outcome(
       self
         .handle
-        .load(&directory.display().to_string(), platform::Progress(progress)),
+        .load(platform::path(directory)?, platform::Progress(progress)),
       format!("load images from {}", directory.display()),
     )
     .map(|outcome| images(&outcome))

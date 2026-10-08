@@ -240,10 +240,21 @@ impl linux_pod::PodVolume {
   }
 
   /// An `nbd` source's URL or a `diskImage`'s path, and empty for a `tmpfs`.
-  pub(crate) fn location(&self) -> String {
+  /// It is `None` if a `diskImage`'s path isn't UTF-8.
+  pub(crate) fn location(&self) -> Option<String> {
+    match &self.source {
+      pod_volume::Source::Nbd { url, .. } => Some(url.clone()),
+      pod_volume::Source::DiskImage { path, .. } => super::path(path),
+      pod_volume::Source::Tmpfs { .. } => Some(String::new()),
+    }
+  }
+
+  /// [`Self::location`] with any bytes that aren't UTF-8 replaced, for the
+  /// error Swift throws when it is `None`.
+  pub(crate) fn lossy_location(&self) -> String {
     match &self.source {
       pod_volume::Source::Nbd { url, .. } => url.clone(),
-      pod_volume::Source::DiskImage { path, .. } => super::path(path),
+      pod_volume::Source::DiskImage { path, .. } => super::lossy_path(path),
       pod_volume::Source::Tmpfs { .. } => String::new(),
     }
   }

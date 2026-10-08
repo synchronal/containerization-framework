@@ -49,7 +49,7 @@ impl EXT4Reader {
   /// `EXT4.EXT4Reader(blockDevice:)`.
   pub fn new(block_device: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(
-      ffi::cz_ext4_reader_new(&block_device.display().to_string()),
+      ffi::cz_ext4_reader_new(platform::path(block_device)?),
       format!("read the filesystem in {}", block_device.display()),
     )?;
 
@@ -64,20 +64,17 @@ impl EXT4Reader {
   }
 
   /// `EXT4.EXT4Reader.exists(_:followSymlinks:)`. Swift's `followSymlinks`
-  /// defaults to `true`.
-  pub fn exists(&self, path: &Path, follow_symlinks: bool) -> bool {
-    self
-      .handle
-      .exists(&path.display().to_string(), follow_symlinks)
+  /// defaults to `true`. It fails if the path isn't UTF-8, which Swift's
+  /// `String` requires.
+  pub fn exists(&self, path: &Path, follow_symlinks: bool) -> Result<bool, Error> {
+    Ok(self.handle.exists(platform::path(path)?, follow_symlinks))
   }
 
   /// `EXT4.EXT4Reader.stat(_:followSymlinks:)`. Swift's `followSymlinks`
   /// defaults to `true`.
   pub fn stat(&self, path: &Path, follow_symlinks: bool) -> Result<(InodeNumber, Inode), Error> {
     platform::outcome(
-      self
-        .handle
-        .stat(&path.display().to_string(), follow_symlinks),
+      self.handle.stat(platform::path(path)?, follow_symlinks),
       format!("stat {}", path.display()),
     )
     .map(|outcome| (outcome.inode_number(), outcome.inode()))
@@ -87,7 +84,7 @@ impl EXT4Reader {
   /// `.` and `..`.
   pub fn list_directory(&self, path: &Path) -> Result<Vec<String>, Error> {
     platform::outcome(
-      self.handle.list_directory(&path.display().to_string()),
+      self.handle.list_directory(platform::path(path)?),
       format!("list {}", path.display()),
     )
     .map(|outcome| outcome.strings())
@@ -97,7 +94,7 @@ impl EXT4Reader {
   pub fn read_file(&self, at: &Path, options: ReadFileOptions) -> Result<Vec<u8>, Error> {
     platform::outcome(
       self.handle.read_file(
-        &at.display().to_string(),
+        platform::path(at)?,
         options.offset,
         options.count,
         options.follow_symlinks,
@@ -110,7 +107,7 @@ impl EXT4Reader {
   /// `EXT4.EXT4Reader.export(archive:)`.
   pub fn export(&self, archive: &Path) -> Result<(), Error> {
     platform::outcome(
-      self.handle.export(&archive.display().to_string()),
+      self.handle.export(platform::path(archive)?),
       format!("export the filesystem to {}", archive.display()),
     )
     .map(drop)

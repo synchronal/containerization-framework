@@ -74,10 +74,20 @@ impl vm::BootLog {
     }
   }
 
-  /// Empty unless [`Self::kind`] is `File`.
-  pub(crate) fn path(&self) -> String {
+  /// Empty unless [`Self::kind`] is `File`, and `None` if the file's path
+  /// isn't UTF-8.
+  pub(crate) fn path(&self) -> Option<String> {
     match self {
       Self::File { path, .. } => accessors::path(path),
+      Self::FileHandle(_) => Some(String::new()),
+    }
+  }
+
+  /// The file's path with any bytes that aren't UTF-8 replaced, for the
+  /// error Swift throws when [`Self::path`] is `None`.
+  pub(crate) fn lossy_path(&self) -> String {
+    match self {
+      Self::File { path, .. } => accessors::lossy_path(path),
       Self::FileHandle(_) => String::new(),
     }
   }
@@ -232,8 +242,15 @@ impl vm::SystemPlatform {
 }
 
 impl vm::Kernel {
-  pub(crate) fn path(&self) -> String {
+  /// The kernel's path, or `None` if it isn't UTF-8.
+  pub(crate) fn path(&self) -> Option<String> {
     accessors::path(&self.path)
+  }
+
+  /// The kernel's path with any bytes that aren't UTF-8 replaced, for the
+  /// error Swift throws when [`Self::path`] is `None`.
+  pub(crate) fn lossy_path(&self) -> String {
+    accessors::lossy_path(&self.path)
   }
 
   pub(crate) fn platform(&self) -> &vm::SystemPlatform {
@@ -260,6 +277,7 @@ impl vm::Kernel {
 #[cfg(test)]
 mod tests {
   use crate::bridge::ffi;
+  use crate::containerization::vm;
   use crate::containerization::vm::system_platform;
 
   #[test]
@@ -272,6 +290,21 @@ mod tests {
     assert_eq!(
       ffi::cz_system_platform_raw_values(),
       os.chain(architectures).collect::<Vec<_>>()
+    );
+  }
+
+  #[test]
+  fn lends_no_kernel_path_that_isnt_utf8() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let path = std::ffi::OsStr::from_bytes(b"/tmp/\xff");
+    let kernel = vm::Kernel::new(path, vm::SystemPlatform::LINUX_ARM);
+
+    assert_eq!(kernel.path(), None);
+    assert_eq!(kernel.lossy_path(), "/tmp/\u{FFFD}");
+    assert_eq!(
+      vm::Kernel::new("/vmlinux", vm::SystemPlatform::LINUX_ARM).path(),
+      Some("/vmlinux".to_string())
     );
   }
 }

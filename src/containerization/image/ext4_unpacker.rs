@@ -39,7 +39,7 @@ impl EXT4Unpacker {
         *self,
         image.handle.duplicate(),
         platform.clone(),
-        &at.display().to_string(),
+        platform::path(at)?,
         platform::Progress(progress),
       ),
       format!("unpack {} to {}", image.reference(), at.display()),
@@ -57,9 +57,9 @@ impl EXT4Unpacker {
     platform::outcome(
       ffi::cz_ext4_unpack_archive(
         *self,
-        &archive.display().to_string(),
+        platform::path(archive)?,
         compression.raw_value(),
-        &at.display().to_string(),
+        platform::path(at)?,
       ),
       format!("unpack {} to {}", archive.display(), at.display()),
     )

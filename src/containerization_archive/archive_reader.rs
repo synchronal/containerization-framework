@@ -35,7 +35,7 @@ impl ArchiveReader {
   /// `ArchiveReader(file:)`, which detects the format and filter.
   pub fn new(file: &Path) -> Result<Self, Error> {
     Self::opened(
-      ffi::cz_archive_reader_new(&file.display().to_string()),
+      ffi::cz_archive_reader_new(platform::path(file)?),
       format!("read the archive {}", file.display()),
     )
   }
@@ -43,7 +43,7 @@ impl ArchiveReader {
   /// `ArchiveReader(format:filter:file:)`.
   pub fn with_format(format: Format, filter: Filter, file: &Path) -> Result<Self, Error> {
     Self::opened(
-      ffi::cz_archive_reader_with_format(format.raw_value(), filter.raw_value(), &file.display().to_string()),
+      ffi::cz_archive_reader_with_format(format.raw_value(), filter.raw_value(), platform::path(file)?),
       format!("read the {} archive {}", format.raw_value(), file.display()),
     )
   }
@@ -97,7 +97,7 @@ impl ArchiveReader {
   /// `ArchiveReader.extractContents(to:)`: the member paths it rejected.
   pub fn extract_contents(&self, to: &Path) -> Result<Vec<String>, Error> {
     platform::outcome(
-      self.handle.extract_contents(&to.display().to_string()),
+      self.handle.extract_contents(platform::path(to)?),
       format!("extract an archive to {}", to.display()),
     )
     .map(|outcome| outcome.strings())

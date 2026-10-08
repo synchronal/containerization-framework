@@ -20,6 +20,7 @@ use crate::containerization_error;
 use crate::containerization_extras;
 use crate::error::Error;
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
@@ -147,6 +148,17 @@ fn error(_outcome: &ffi::CzOutcome, action: impl Into<String>, message: String) 
   Error::unavailable(action, message)
 }
 
+/// A path as it crosses to Swift. Swift's `String` holds only UTF-8, so a
+/// path that isn't UTF-8 fails here and Swift is never asked to act on it.
+pub(crate) fn path(path: &Path) -> Result<&str, Error> {
+  path.to_str().ok_or_else(|| {
+    Error::failed(
+      format!("pass the path {} to Swift", path.display()),
+      "the path isn't UTF-8, which Swift's String requires",
+    )
+  })
+}
+
 /// `ExitStatus`, its `exitedAt` crossing as seconds since 1970.
 pub(crate) fn exit_status(outcome: &ffi::CzOutcome) -> process::ExitStatus {
   process::ExitStatus {
@@ -214,5 +226,19 @@ mod tests {
     for seconds in [-86_400.5, 0.0, 1_700_000_000.25] {
       assert_eq!(super::seconds(system_time(seconds)), seconds);
     }
+  }
+
+  #[test]
+  fn crosses_a_utf8_path_as_it_is() {
+    assert_eq!(super::path(Path::new("/tmp/file")).unwrap(), "/tmp/file");
+  }
+
+  #[test]
+  fn fails_a_path_that_isnt_utf8() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let path = Path::new(std::ffi::OsStr::from_bytes(b"/tmp/\xff"));
+
+    assert!(matches!(super::path(path), Err(Error::Failed { .. })));
   }
 }

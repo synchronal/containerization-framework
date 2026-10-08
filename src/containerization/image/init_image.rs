@@ -46,7 +46,7 @@ impl InitImage {
     platform::outcome(
       image_store.handle.create_init_image(
         reference,
-        &rootfs.display().to_string(),
+        platform::path(rootfs)?,
         platform.clone(),
         labels.keys().cloned().collect(),
         labels.values().cloned().collect(),
@@ -67,7 +67,7 @@ impl InitImage {
   /// `InitImage.initBlock(at:for:)`.
   pub fn init_block(&self, at: &Path, platform: vm::SystemPlatform) -> Result<container::Mount, Error> {
     platform::outcome(
-      self.handle.init_block(&at.display().to_string(), platform),
+      self.handle.init_block(platform::path(at)?, platform),
       format!("unpack {} to {}", self.name(), at.display()),
     )
     .map(|outcome| outcome.mount())

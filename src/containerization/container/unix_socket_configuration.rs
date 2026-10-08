@@ -32,10 +32,10 @@ impl UnixSocketConfiguration {
   /// `UnixSocketConfiguration(source:destination:)`, with its other arguments
   /// at their defaults.
   pub fn new(source: impl AsRef<Path>, destination: impl AsRef<Path>) -> Result<Self, Error> {
-    let source = source.as_ref().display().to_string();
-    let destination = destination.as_ref().display().to_string();
+    let source = platform::path(source.as_ref())?;
+    let destination = platform::path(destination.as_ref())?;
     let outcome = platform::outcome(
-      ffi::cz_unix_socket_configuration_new(&source, &destination),
+      ffi::cz_unix_socket_configuration_new(source, destination),
       format!("configure a socket relay from {source} to {destination}"),
     )?;
 
@@ -54,11 +54,11 @@ impl UnixSocketConfiguration {
     PathBuf::from(self.handle.source())
   }
 
-  /// Sets `UnixSocketConfiguration.source`.
-  pub fn set_source(&mut self, source: impl AsRef<Path>) {
-    self
-      .handle
-      .set_source(&source.as_ref().display().to_string());
+  /// Sets `UnixSocketConfiguration.source`. It fails if the path isn't UTF-8,
+  /// which Swift's `String` requires.
+  pub fn set_source(&mut self, source: impl AsRef<Path>) -> Result<(), Error> {
+    self.handle.set_source(platform::path(source.as_ref())?);
+    Ok(())
   }
 
   /// `UnixSocketConfiguration.destination`.
@@ -66,11 +66,13 @@ impl UnixSocketConfiguration {
     PathBuf::from(self.handle.destination())
   }
 
-  /// Sets `UnixSocketConfiguration.destination`.
-  pub fn set_destination(&mut self, destination: impl AsRef<Path>) {
+  /// Sets `UnixSocketConfiguration.destination`. It fails if the path isn't
+  /// UTF-8, which Swift's `String` requires.
+  pub fn set_destination(&mut self, destination: impl AsRef<Path>) -> Result<(), Error> {
     self
       .handle
-      .set_destination(&destination.as_ref().display().to_string());
+      .set_destination(platform::path(destination.as_ref())?);
+    Ok(())
   }
 
   /// `UnixSocketConfiguration.permissions`, as the mode's raw value.
