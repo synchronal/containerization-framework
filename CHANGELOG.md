@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.0
+
 - Update Containerization to 0.49.0. Use the matching init image,
   `ghcr.io/apple/containerization/vminit:0.49.0`. Swift's public API is
   unchanged, but this release changes some behavior:
