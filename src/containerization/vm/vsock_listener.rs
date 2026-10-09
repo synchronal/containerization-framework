@@ -36,8 +36,9 @@ impl VsockListener {
   }
 }
 
-/// Swift's sequence can't throw, so a failure of the bridge itself panics
-/// rather than looking like the end of the connections.
+/// Swift's sequence can't throw, so `next` yields descriptors, not `Result`s.
+/// It panics only if the bridge never runs Swift's `next`, which callers can't
+/// cause, so that this bug doesn't look like the end of the connections.
 impl Iterator for &VsockListener {
   type Item = OwnedFd;
 

@@ -17,6 +17,8 @@ VM, and renames types so they more closely match Swift.
 - `ext4::FileXattrsState::read` is bound. Nothing else on `FileXattrsState`
   is, because Swift gives no public way to create one.
 - Every public type implements `Debug`.
+- The docs for iterating a `VsockListener` now explain that its panic marks
+  a broken bridge invariant, not a failure callers should handle.
 
 ### Breaking changes
 
