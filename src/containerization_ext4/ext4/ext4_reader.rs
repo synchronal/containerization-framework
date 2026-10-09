@@ -132,7 +132,8 @@ impl EXT4Reader {
   }
 }
 
-fn attributes(outcome: ffi::CzOutcome, action: &str) -> Result<Vec<ExtendedAttribute>, Error> {
+/// The `[EXT4.ExtendedAttribute]` an outcome holds, which Rust can only count.
+pub(super) fn attributes(outcome: ffi::CzOutcome, action: &str) -> Result<Vec<ExtendedAttribute>, Error> {
   platform::outcome(outcome, action).map(|outcome| {
     (0..outcome.len())
       .map(|_| ExtendedAttribute::opaque())

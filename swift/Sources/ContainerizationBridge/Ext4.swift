@@ -77,6 +77,12 @@ func readBlockExtendedAttributes(buffer: RustVec<UInt8>) -> CzOutcome {
   return CzOutcome { try EXT4.EXT4Reader.readBlockExtendedAttributes(from: buffer) }
 }
 
+func readFileXattrs(buffer: RustVec<UInt8>, start: UInt, offset: UInt) -> CzOutcome {
+  let buffer = [UInt8](buffer)
+
+  return CzOutcome { try EXT4.FileXattrsState.read(buffer: buffer, start: Int(start), offset: Int(offset)) }
+}
+
 func rootInode() -> CzOutcome {
   CzOutcome { EXT4.Inode.Root() }
 }

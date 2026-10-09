@@ -299,6 +299,13 @@ fn stats_files_links_and_symlinks() {
     2,
     "the file's attribute, and the empty `system.data` Swift adds beside it"
   );
+  assert_eq!(
+    cfw::containerization_ext4::ext4::FileXattrsState::read(&inode.inline_xattrs, 4, 4)
+      .expect("the entries after the inline header")
+      .len(),
+    2,
+    "the same attributes, read past the header as readInlineExtendedAttributes does"
+  );
 }
 
 #[test]

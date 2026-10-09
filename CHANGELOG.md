@@ -14,9 +14,16 @@
   `DefaultRoute`, which `Vminitd` configures an interface with.
 - `containerization_os::binfmt` has `Entry`, which `Vminitd::setup_emulator`
   registers in the guest.
+- `containerization_ext4::ext4::FileXattrsState::read` binds Swift's
+  `EXT4.FileXattrsState.read(buffer:start:offset:)`. The rest of
+  `FileXattrsState` isn't bound, because Swift's initializer is internal and
+  nothing public returns one.
 
 ### Breaking changes
 
+- `ExtendedAttribute` no longer implements `PartialEq` or `Eq`. Swift's type
+  isn't `Equatable`, and since its fields are internal, every value compared
+  equal to every other.
 - Types that mirror a Swift type now take Swift's exact name.
   `BlockIoDevice`, `BlockIoStatistics`, `Cidr`, `CpuStatistics`, `Dns`,
   `Ext4Reader`, `Ext4Unpacker`, `IpAddress`, `NatInterface`,

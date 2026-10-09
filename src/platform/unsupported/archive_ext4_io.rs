@@ -59,6 +59,7 @@ failing!(
   cz_ext4_unpack_archive(image::EXT4Unpacker, &str, &str, &str),
   cz_ext4_reader_read_inline_extended_attributes(Vec<u8>),
   cz_ext4_reader_read_block_extended_attributes(Vec<u8>),
+  cz_ext4_file_xattrs_state_read(Vec<u8>, usize, usize),
   cz_ext4_inode_root(),
   cz_ext4_extended_attribute_compress_name(&str),
   cz_ext4_extended_attribute_decompress_name(isize, &str),

@@ -3,8 +3,8 @@ use crate::platform;
 use crate::platform::ffi;
 
 /// `EXT4.ExtendedAttribute`. Swift's fields are internal, so it holds nothing
-/// Rust can read.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Rust can read, and like Swift's it isn't comparable.
+#[derive(Clone, Copy, Debug)]
 pub struct ExtendedAttribute {
   _private: (),
 }

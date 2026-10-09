@@ -1529,6 +1529,8 @@ pub(crate) mod ffi {
     fn cz_ext4_reader_read_inline_extended_attributes(buffer: Vec<u8>) -> CzOutcome;
     #[swift_bridge(swift_name = "readBlockExtendedAttributes")]
     fn cz_ext4_reader_read_block_extended_attributes(buffer: Vec<u8>) -> CzOutcome;
+    #[swift_bridge(swift_name = "readFileXattrs")]
+    fn cz_ext4_file_xattrs_state_read(buffer: Vec<u8>, start: usize, offset: usize) -> CzOutcome;
     #[swift_bridge(swift_name = "inodeNumber")]
     fn inode_number(self: &CzOutcome) -> u32;
     #[swift_bridge(swift_name = "inodeBytes")]
