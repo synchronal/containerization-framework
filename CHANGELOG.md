@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.5.0
+
 This release lets you talk to `vminitd`, the init process that runs in every
 VM, and renames types so they more closely match Swift.
 
