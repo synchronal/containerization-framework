@@ -2,93 +2,80 @@
 
 ## Unreleased
 
+This release lets you talk to `vminitd`, the init process that runs in every
+VM, and renames types so they more closely match Swift.
+
+- `VZVirtualMachineInstance::dial_agent` returns a
+  `containerization::vm::Vminitd`, a client for the agent running in the
+  guest. It can set up the guest, run processes, mount filesystems, configure
+  networking, DNS and hosts, stat paths, relay sockets and report container
+  statistics. Its `writeFile` and `copy` aren't bound yet, because Swift
+  offers no public way to build their arguments.
+- Types that `Vminitd` takes are new as well: `InterfaceAddress`, `LinkRoute`
+  and `DefaultRoute` in `containerization_extras`, and `binfmt::Entry` in
+  `containerization_os::linux`.
+- `ext4::FileXattrsState::read` is bound. Nothing else on `FileXattrsState`
+  is, because Swift gives no public way to create one.
 - Every public type implements `Debug`.
-- `VZVirtualMachineInstance::dial_agent` returns the new
-  `containerization::vm::Vminitd`, the client of the agent running in the
-  guest. It can set up the guest, manage processes, mount filesystems,
-  configure networking, DNS and hosts, stat paths, relay sockets and read
-  container statistics. Its `writeFile` and `copy` aren't bound, because
-  Swift's `WriteFileFlags` has no public initializer and `copy` takes a
-  generated protobuf type.
-- `containerization_extras` has `InterfaceAddress`, `LinkRoute` and
-  `DefaultRoute`, which `Vminitd` configures an interface with.
-- `containerization_os::linux::binfmt` has `Entry`, which `Vminitd::setup_emulator`
-  registers in the guest.
-- `containerization_ext4::ext4::FileXattrsState::read` binds Swift's
-  `EXT4.FileXattrsState.read(buffer:start:offset:)`. The rest of
-  `FileXattrsState` isn't bound, because Swift's initializer is internal and
-  nothing public returns one.
 
 ### Breaking changes
 
-- `CapabilityName`, `CapabilitySet` and `binfmt` have moved from the root of
-  `containerization_os` to `containerization_os::linux`, as they are in
-  Swift's `Linux` directory.
-- `ExtendedAttribute` no longer implements `PartialEq` or `Eq`. Swift's type
-  isn't `Equatable`, and since its fields are internal, every value compared
-  equal to every other.
-- Types that mirror a Swift type now take Swift's exact name.
-  `BlockIoDevice`, `BlockIoStatistics`, `Cidr`, `CpuStatistics`, `Dns`,
-  `Ext4Reader`, `Ext4Unpacker`, `IpAddress`, `NatInterface`,
-  `VmConfiguration`, `VmResources`, `VzVirtualMachineInstance`,
-  `VzVirtualMachineManager` and `system_platform::Os` are now
-  `BlockIODevice`, `BlockIOStatistics`, `CIDR`, `CPUStatistics`, `DNS`,
-  `EXT4Reader`, `EXT4Unpacker`, `IPAddress`, `NATInterface`,
-  `VMConfiguration`, `VMResources`, `VZVirtualMachineInstance`,
-  `VZVirtualMachineManager` and `OS`.
-- The structs that stand in for an initializer's default arguments are named
-  after its type. `container_manager::ManagerOptions` is now
-  `ContainerManagerOptions`, `vz_virtual_machine_manager::ManagerOptions` is
-  `VZVirtualMachineManagerOptions`, `reference::NewOptions` is
-  `ReferenceOptions`, `registry_client::HostOptions` is
-  `RegistryClientOptions`, and `archive_writer::FileOptions` is
-  `ArchiveWriterOptions`. A method's struct is named after the method, so
-  `RootfsCreateOptions` is now `CreateWithRootfsOptions`.
-- `ContainerManager::create_from_reference` is now `create_with_reference`,
-  and `LinuxCapabilities::with` is now `with_capabilities`.
-- Configuration closures return `Result<(), Error>`, as Swift's can throw.
-  An error the closure returns is the one the call returns. This covers
+- Acronyms in type names are now capitalized as in Swift, so `Dns` is now
+  `DNS`. The renamed types are `BlockIoDevice`, `BlockIoStatistics`, `Cidr`,
+  `CpuStatistics`, `Dns`, `Ext4Reader`, `Ext4Unpacker`, `IpAddress`,
+  `NatInterface`, `VmConfiguration`, `VmResources`,
+  `VzVirtualMachineInstance`, `VzVirtualMachineManager` and
+  `system_platform::Os`.
+- Some other names have changed too:
+
+  | Before | After |
+  |---|---|
+  | `container_manager::ManagerOptions` | `ContainerManagerOptions` |
+  | `vz_virtual_machine_manager::ManagerOptions` | `VZVirtualMachineManagerOptions` |
+  | `reference::NewOptions` | `ReferenceOptions` |
+  | `registry_client::HostOptions` | `RegistryClientOptions` |
+  | `archive_writer::FileOptions` | `ArchiveWriterOptions` |
+  | `RootfsCreateOptions` | `CreateWithRootfsOptions` |
+  | `ContainerManager::create_from_reference` | `create_with_reference` |
+  | `LinuxCapabilities::with` | `with_capabilities` |
+  | `containerization_os::CapabilityName` | `containerization_os::linux::CapabilityName` |
+  | `containerization_os::CapabilitySet` | `containerization_os::linux::CapabilitySet` |
+  | `containerization_os::binfmt` | `containerization_os::linux::binfmt` |
+
+- Configuration closures now return `Result<(), Error>`, because Swift's can
+  throw, and an error from the closure is returned by the call. This affects
   `ContainerManager`'s `create` methods, `LinuxContainer::new_with` and
   `exec_with`, and `LinuxPod`'s `new`, `add_container` and
   `exec_in_container`.
-- Off macOS, comparing two `Platform`s or ordering two addresses now panics,
-  since only Swift can answer. Before, `Platform` compared every field, and
-  addresses had no order.
-- `Error` is `#[non_exhaustive]`, and `Error::unavailable` is no longer
-  public. `Error` now implements `Clone`, `PartialEq` and `Eq`.
-- `UnixSocketConfiguration` now holds the Swift value instead of public
-  fields, so it keeps the `id` that Swift gives it. It has `id`, `source`,
-  `destination`, `permissions` and `direction` methods, and a `set_` method
-  for each field but `id`. `UnixSocketConfiguration::new` returns a `Result`,
-  because it can't reach Swift off macOS. Permissions are a `u16`, as Swift's
-  `CModeT` is. Two configurations are equal when their `id`s and other fields
-  match, so a configuration equals only itself or an unchanged clone.
-- `UnixSocketConfiguration::set_source` and `set_destination` now return
-  `Result<(), Error>`, and `EXT4Reader::exists` now returns
-  `Result<bool, Error>`. Each fails if its path isn't valid UTF-8 (see
-  Fixes).
+- `UnixSocketConfiguration` wraps the Swift value instead of having public
+  fields, so it keeps the `id` Swift gives it. Read and change its fields
+  with methods such as `source` and `set_source`. `new`, `set_source` and
+  `set_destination` return a `Result`, and permissions are a `u16`. Two
+  configurations are equal only if their `id`s match, so a configuration
+  equals itself or an unchanged clone, never a separately created one.
+- `EXT4Reader::exists` returns a `Result`, because it fails on paths that
+  aren't valid UTF-8.
+- Off macOS, comparing two `Platform`s or ordering two addresses panics,
+  because only Swift can answer.
+- `Error` is `#[non_exhaustive]`, and `Error::unavailable` is private. `Error`
+  now implements `Clone`, `PartialEq` and `Eq`.
+- `ExtendedAttribute` no longer implements `PartialEq` or `Eq`. Swift's type
+  can't be compared, and the old implementation treated every value as equal.
 
 ### Fixes
 
-- A path that isn't valid UTF-8 now fails the call with `Error::Failed`
-  before it reaches Swift. Before, its invalid bytes were replaced with
-  U+FFFD, so a call such as `Bundle::delete` or
-  `ArchiveReader::extract_contents` could act on a different file. A kernel,
-  boot log or pod disk image path that isn't UTF-8 also fails the call that
-  hands its configuration to Swift.
-- A process's `exited_at` and a keychain `RegistryInfo`'s dates now keep
-  dates before 1970 instead of becoming 1970.
-- `VsockListener`'s iterator panics if the bridge fails. Before, the failure
-  looked like the end of the connections.
-- `Vminitd::stop_socket_relay` now stops the relay that `relay_socket` started
-  with the same configuration. Before, each call made a new Swift
-  configuration with a new `id`, so the guest never found the relay to stop.
-  Sockets in a container's configuration also keep their `id`s when it
-  crosses to Swift and back, as do those in a pod container's configuration
-  when it crosses to Swift.
-- The build script no longer rewrites the staged FFI glue on every run, so
-  SwiftPM doesn't recompile an unchanged bridge. A change to
-  `swift/Package.resolved` now reruns the build script.
+- A path that isn't valid UTF-8 now fails with `Error::Failed`. Before, its
+  invalid bytes were silently replaced, so calls such as `Bundle::delete`
+  could act on the wrong file.
+- `Vminitd::stop_socket_relay` now finds the relay that `relay_socket`
+  started. Socket configurations also keep their `id`s when a container's
+  configuration is passed to Swift.
+- Dates before 1970, such as a process's `exited_at`, are no longer clamped
+  to 1970.
+- If the bridge fails, `VsockListener`'s iterator now panics instead of
+  quietly ending as if there were no more connections.
+- Builds no longer recompile the Swift bridge when nothing has changed, and
+  a change to `swift/Package.resolved` now triggers a rebuild.
 
 ## v0.4.0
 
