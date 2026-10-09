@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Update Containerization to 0.49.0. Use the matching init image,
+  `ghcr.io/apple/containerization/vminit:0.49.0`. Swift's public API is
+  unchanged, but this release changes some behavior:
+  - Registries whose bearer challenge leaves out `service` no longer fail to
+    log in.
+  - Every registry request now sends a `User-Agent` header, set to the
+    client's `client_id`.
+  - `ext4::Formatter` now rounds an image up to a whole block, not a whole
+    block group, so images are smaller and closer to `min_disk_size`.
+  - A journal is no longer written out as zeros, so it takes far less space
+    on disk. A journal too large to address is now an error.
+  - Importing an image no longer lists a supported platform twice.
+
 ## v0.5.0
 
 This release lets you talk to `vminitd`, the init process that runs in every

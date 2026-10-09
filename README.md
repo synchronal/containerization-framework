@@ -21,7 +21,7 @@ let store = cz::image::ImageStore::new("/Users/me/.cache/containers".as_ref())?;
 let kernel = cz::vm::Kernel::new("/Users/me/.cache/vmlinux", cz::vm::SystemPlatform::LINUX_ARM);
 let mut manager = cz::container::ContainerManager::with_initfs_reference(
     &kernel,
-    "ghcr.io/apple/containerization/vminit:0.48.0",
+    "ghcr.io/apple/containerization/vminit:0.49.0",
     &store,
     Default::default(),
 )?;
@@ -180,7 +180,7 @@ fails to start unless you build an init image with one.
 ## Versioning
 
 The init image's `vminitd` must match the Containerization release this crate
-builds against (0.48.0, in `swift/Package.swift`): they share a protocol, and a
+builds against (0.49.0, in `swift/Package.swift`): they share a protocol, and a
 mismatch fails at runtime rather than at build time. As in Containerization,
 the caller chooses the kernel and the init image.
 

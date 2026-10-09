@@ -20,7 +20,7 @@ pub const IMAGE: &str = "docker.io/library/alpine:3";
 /// The init image matching the Containerization release in
 /// `swift/Package.swift`: they share a protocol, and a mismatch fails only at
 /// runtime.
-pub const INITFS_REFERENCE: &str = "ghcr.io/apple/containerization/vminit:0.48.0";
+pub const INITFS_REFERENCE: &str = "ghcr.io/apple/containerization/vminit:0.49.0";
 
 const IMAGE_LOCK: &str = ".image.lock";
 const INITFS_LOCK: &str = ".initfs.lock";
