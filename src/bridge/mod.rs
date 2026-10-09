@@ -73,7 +73,7 @@ use crate::containerization_oci::runtime::LinuxSeccomp as RustLinuxSeccomp;
 use crate::containerization_oci::runtime::Mount as RustOciMount;
 use crate::containerization_oci::runtime::Process as RustProcess;
 use crate::containerization_oci::runtime::Spec as RustSpec;
-use crate::containerization_os::binfmt::Entry as RustBinfmtEntry;
+use crate::containerization_os::linux::binfmt::Entry as RustBinfmtEntry;
 use crate::platform::ConfigureContainer as RustConfigure;
 use crate::platform::ConfigurePod as RustConfigurePod;
 use crate::platform::ConfigurePodContainer as RustConfigurePodContainer;

@@ -357,7 +357,7 @@ fn converts_containerizations_types_to_ocis() {
   );
 
   let capabilities = cfw::containerization::process::LinuxCapabilities {
-    bounding: vec![cfw::containerization_os::CapabilityName::Chown],
+    bounding: vec![cfw::containerization_os::linux::CapabilityName::Chown],
     ..Default::default()
   };
   assert_eq!(

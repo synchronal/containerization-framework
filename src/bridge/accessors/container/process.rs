@@ -42,7 +42,7 @@ impl process::LinuxCapabilities {
     self.set(set)[index].description()
   }
 
-  fn set(&self, set: ffi::CapabilitySet) -> &[containerization_os::CapabilityName] {
+  fn set(&self, set: ffi::CapabilitySet) -> &[containerization_os::linux::CapabilityName] {
     match set {
       ffi::CapabilitySet::Bounding => &self.bounding,
       ffi::CapabilitySet::Effective => &self.effective,
@@ -140,7 +140,7 @@ impl process::LinuxProcessConfiguration {
     let names = |set: Vec<String>| {
       set
         .iter()
-        .map(|description| containerization_os::CapabilityName::from_description(description))
+        .map(|description| containerization_os::linux::CapabilityName::from_description(description))
         .collect()
     };
 
@@ -271,7 +271,7 @@ mod tests {
   #[test]
   fn copies_swifts_capability_presets() {
     let oci = |capabilities: process::LinuxCapabilities| {
-      let set = |set: Vec<containerization_os::CapabilityName>| {
+      let set = |set: Vec<containerization_os::linux::CapabilityName>| {
         (!set.is_empty()).then(|| {
           set
             .iter()

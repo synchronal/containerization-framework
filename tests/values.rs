@@ -195,7 +195,7 @@ fn parses_rlimit_kinds_by_their_oci_names() {
 
 #[test]
 fn makes_capability_sets() {
-  let chown = cfw::containerization_os::CapabilityName::Chown;
+  let chown = cfw::containerization_os::linux::CapabilityName::Chown;
   let capabilities = cfw::containerization::process::LinuxCapabilities::with_capabilities(vec![chown]);
 
   assert_eq!(
@@ -209,7 +209,7 @@ fn makes_capability_sets() {
   );
 
   let all = cfw::containerization::process::LinuxCapabilities::all_capabilities();
-  assert_eq!(all.ambient, cfw::containerization_os::CapabilityName::ALL_CASES);
+  assert_eq!(all.ambient, cfw::containerization_os::linux::CapabilityName::ALL_CASES);
 }
 
 #[test]

@@ -4,7 +4,7 @@ use crate::containerization::process;
 use crate::containerization_extras;
 use crate::containerization_oci::runtime;
 use crate::containerization_os;
-use crate::containerization_os::binfmt;
+use crate::containerization_os::linux::binfmt;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;

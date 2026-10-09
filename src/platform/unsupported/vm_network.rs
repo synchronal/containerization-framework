@@ -334,7 +334,7 @@ impl CzVminitd {
   pub(crate) fn setup_emulator(
     &self,
     _binary_path: &str,
-    _configuration: containerization_os::binfmt::Entry,
+    _configuration: containerization_os::linux::binfmt::Entry,
   ) -> CzOutcome {
     match self.0 {}
   }

@@ -7,18 +7,18 @@ use crate::platform::ffi;
 /// `LinuxCapabilities`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LinuxCapabilities {
-  pub bounding: Vec<containerization_os::CapabilityName>,
-  pub effective: Vec<containerization_os::CapabilityName>,
-  pub inheritable: Vec<containerization_os::CapabilityName>,
-  pub permitted: Vec<containerization_os::CapabilityName>,
-  pub ambient: Vec<containerization_os::CapabilityName>,
+  pub bounding: Vec<containerization_os::linux::CapabilityName>,
+  pub effective: Vec<containerization_os::linux::CapabilityName>,
+  pub inheritable: Vec<containerization_os::linux::CapabilityName>,
+  pub permitted: Vec<containerization_os::linux::CapabilityName>,
+  pub ambient: Vec<containerization_os::linux::CapabilityName>,
 }
 
 impl LinuxCapabilities {
   /// `LinuxCapabilities.allCapabilities`, which holds every capability in
   /// every set.
   pub fn all_capabilities() -> Self {
-    let all = containerization_os::CapabilityName::ALL_CASES.to_vec();
+    let all = containerization_os::linux::CapabilityName::ALL_CASES.to_vec();
 
     Self {
       bounding: all.clone(),
@@ -32,20 +32,20 @@ impl LinuxCapabilities {
   /// `LinuxCapabilities.defaultOCICapabilities`.
   pub fn default_oci_capabilities() -> Self {
     Self::with_capabilities(vec![
-      containerization_os::CapabilityName::Chown,
-      containerization_os::CapabilityName::DacOverride,
-      containerization_os::CapabilityName::Fsetid,
-      containerization_os::CapabilityName::Fowner,
-      containerization_os::CapabilityName::Mknod,
-      containerization_os::CapabilityName::NetRaw,
-      containerization_os::CapabilityName::Setgid,
-      containerization_os::CapabilityName::Setuid,
-      containerization_os::CapabilityName::Setfcap,
-      containerization_os::CapabilityName::Setpcap,
-      containerization_os::CapabilityName::NetBindService,
-      containerization_os::CapabilityName::SysChroot,
-      containerization_os::CapabilityName::Kill,
-      containerization_os::CapabilityName::AuditWrite,
+      containerization_os::linux::CapabilityName::Chown,
+      containerization_os::linux::CapabilityName::DacOverride,
+      containerization_os::linux::CapabilityName::Fsetid,
+      containerization_os::linux::CapabilityName::Fowner,
+      containerization_os::linux::CapabilityName::Mknod,
+      containerization_os::linux::CapabilityName::NetRaw,
+      containerization_os::linux::CapabilityName::Setgid,
+      containerization_os::linux::CapabilityName::Setuid,
+      containerization_os::linux::CapabilityName::Setfcap,
+      containerization_os::linux::CapabilityName::Setpcap,
+      containerization_os::linux::CapabilityName::NetBindService,
+      containerization_os::linux::CapabilityName::SysChroot,
+      containerization_os::linux::CapabilityName::Kill,
+      containerization_os::linux::CapabilityName::AuditWrite,
     ])
   }
 
@@ -53,7 +53,7 @@ impl LinuxCapabilities {
   /// bounding, effective and permitted sets, and leaves the others empty.
   /// Rust has no overloading, so the suffix names the argument label that
   /// tells it apart from `LinuxCapabilities()`.
-  pub fn with_capabilities(capabilities: Vec<containerization_os::CapabilityName>) -> Self {
+  pub fn with_capabilities(capabilities: Vec<containerization_os::linux::CapabilityName>) -> Self {
     Self {
       bounding: capabilities.clone(),
       effective: capabilities.clone(),

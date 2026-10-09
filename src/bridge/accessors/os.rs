@@ -3,8 +3,8 @@
 
 use crate::bridge::ffi;
 use crate::containerization_os;
-use crate::containerization_os::binfmt;
 use crate::containerization_os::keychain;
+use crate::containerization_os::linux::binfmt;
 use crate::platform;
 
 impl binfmt::Entry {
@@ -94,7 +94,7 @@ mod tests {
 
   #[test]
   fn copies_swifts_capability_names() {
-    let names = containerization_os::CapabilityName::ALL_CASES;
+    let names = containerization_os::linux::CapabilityName::ALL_CASES;
 
     assert_eq!(
       ffi::cz_capability_name_descriptions(),
@@ -114,9 +114,9 @@ mod tests {
 
   #[test]
   fn copies_swifts_binfmt_values() {
-    let amd64 = containerization_os::binfmt::Entry::amd64();
+    let amd64 = containerization_os::linux::binfmt::Entry::amd64();
 
-    assert_eq!(ffi::cz_binfmt_path(), containerization_os::binfmt::PATH);
+    assert_eq!(ffi::cz_binfmt_path(), containerization_os::linux::binfmt::PATH);
     assert_eq!(
       ffi::cz_binfmt_entry_amd64(),
       [
@@ -134,7 +134,7 @@ mod tests {
   fn copies_swifts_capability_sets() {
     assert_eq!(
       ffi::cz_capability_set_descriptions(),
-      containerization_os::CapabilitySet::ALL
+      containerization_os::linux::CapabilitySet::ALL
         .iter()
         .map(|set| set.description())
         .collect::<Vec<_>>()

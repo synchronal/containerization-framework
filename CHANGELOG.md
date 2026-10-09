@@ -12,7 +12,7 @@
   generated protobuf type.
 - `containerization_extras` has `InterfaceAddress`, `LinkRoute` and
   `DefaultRoute`, which `Vminitd` configures an interface with.
-- `containerization_os::binfmt` has `Entry`, which `Vminitd::setup_emulator`
+- `containerization_os::linux::binfmt` has `Entry`, which `Vminitd::setup_emulator`
   registers in the guest.
 - `containerization_ext4::ext4::FileXattrsState::read` binds Swift's
   `EXT4.FileXattrsState.read(buffer:start:offset:)`. The rest of
@@ -21,6 +21,9 @@
 
 ### Breaking changes
 
+- `CapabilityName`, `CapabilitySet` and `binfmt` have moved from the root of
+  `containerization_os` to `containerization_os::linux`, as they are in
+  Swift's `Linux` directory.
 - `ExtendedAttribute` no longer implements `PartialEq` or `Eq`. Swift's type
   isn't `Equatable`, and since its fields are internal, every value compared
   equal to every other.

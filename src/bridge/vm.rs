@@ -6,7 +6,7 @@ use crate::containerization::vm::AttachedFilesystem as RustAttachedFilesystem;
 use crate::containerization::vm::BootLog as RustBootLog;
 use crate::containerization::vm::Kernel as RustKernel;
 use crate::containerization::vm::SystemPlatform as RustSystemPlatform;
-use crate::containerization_os::binfmt::Entry as RustBinfmtEntry;
+use crate::containerization_os::linux::binfmt::Entry as RustBinfmtEntry;
 
 use super::ffi::BootLogKind;
 use super::ffi::PlatformArchitecture;

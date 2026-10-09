@@ -131,8 +131,9 @@ rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
   root, `InterfaceAddress`, `LinkRoute`, `DefaultRoute`, `ProgressEvent` and
   `ProgressHandler`; and `proxy_utils`.
 - `containerization_io`: `ReadStream`.
-- `containerization_os`: `Terminal`, `CapabilityName`, `CapabilitySet`,
-  `binfmt`, `sysctl`, `file`, and `keychain::KeychainQuery`.
+- `containerization_os`: `Terminal`, `sysctl`, `file`,
+  `keychain::KeychainQuery`, and in `linux`, `CapabilityName`, `CapabilitySet`
+  and `binfmt`.
 
 A few things work differently because Rust can't express them the way Swift
 does:

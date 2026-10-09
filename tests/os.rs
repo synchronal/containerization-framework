@@ -15,19 +15,19 @@ const SECURITY_DOMAIN: &str = "dev.reflective.containerization-framework.tests.o
 
 #[test]
 fn parses_capability_names_as_swift_does() {
-  let parse = cfw::containerization_os::CapabilityName::parse;
+  let parse = cfw::containerization_os::linux::CapabilityName::parse;
 
   assert_eq!(
     parse("CAP_CHOWN").expect("a full name"),
-    cfw::containerization_os::CapabilityName::Chown
+    cfw::containerization_os::linux::CapabilityName::Chown
   );
   assert_eq!(
     parse("net_raw").expect("a name without its prefix"),
-    cfw::containerization_os::CapabilityName::NetRaw
+    cfw::containerization_os::linux::CapabilityName::NetRaw
   );
   assert_eq!(
     parse("cap_sys_admin").expect("a lowercase name"),
-    cfw::containerization_os::CapabilityName::SysAdmin
+    cfw::containerization_os::linux::CapabilityName::SysAdmin
   );
 
   let error = parse("CAP_NOPE").expect_err("an unknown name");
@@ -36,27 +36,27 @@ fn parses_capability_names_as_swift_does() {
 
 #[test]
 fn describes_capability_names() {
-  let name = cfw::containerization_os::CapabilityName::CheckpointRestore;
+  let name = cfw::containerization_os::linux::CapabilityName::CheckpointRestore;
 
   assert_eq!(name.to_string(), "CAP_CHECKPOINT_RESTORE");
   assert_eq!(name.cap_value(), 40);
-  assert_eq!(cfw::containerization_os::CapabilityName::ALL_CASES.len(), 41);
+  assert_eq!(cfw::containerization_os::linux::CapabilityName::ALL_CASES.len(), 41);
 }
 
 #[test]
 fn parses_capability_sets_as_swift_does() {
-  let parse = cfw::containerization_os::CapabilitySet::parse;
+  let parse = cfw::containerization_os::linux::CapabilitySet::parse;
 
   assert_eq!(
     parse("BOUNDING").expect("an uppercase set"),
-    cfw::containerization_os::CapabilitySet::Bounding
+    cfw::containerization_os::linux::CapabilitySet::Bounding
   );
   assert_eq!(
     parse("ambient").expect("a lowercase set"),
-    cfw::containerization_os::CapabilitySet::Ambient
+    cfw::containerization_os::linux::CapabilitySet::Ambient
   );
   assert_eq!(
-    cfw::containerization_os::CapabilitySet::Permitted.to_string(),
+    cfw::containerization_os::linux::CapabilitySet::Permitted.to_string(),
     "permitted"
   );
 
