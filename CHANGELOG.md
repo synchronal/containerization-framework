@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.10.1
+
 - A process's stdin stops at a failed read as it does at end of file. Reading
   with `FileHandle.availableData` raised an Objective-C exception when the
   read failed, as on a pty whose terminal has closed (EIO) or a reset socket,
