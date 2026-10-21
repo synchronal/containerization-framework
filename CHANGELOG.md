@@ -6,6 +6,8 @@
   with `FileHandle.availableData` raised an Objective-C exception when the
   read failed, as on a pty whose terminal has closed (EIO) or a reset socket,
   and that aborted the process holding the VM.
+- Reading a process's stdin reuses one 64 KiB buffer for the life of the
+  stream, rather than allocating a new one for every read.
 
 ## v0.10.0
 

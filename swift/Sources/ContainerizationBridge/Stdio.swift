@@ -45,6 +45,7 @@ final class FileReader: ReaderStream, @unchecked Sendable {
   /// the process, and with it the VM and every other process in it.
   func stream() -> AsyncStream<Data> {
     let descriptor = handle.fileDescriptor
+    let buffer = ReadBuffer()
 
     return .init { continuation in
       continuation.onTermination = { [weak self] _ in
@@ -52,10 +53,11 @@ final class FileReader: ReaderStream, @unchecked Sendable {
       }
 
       handle.readabilityHandler = { handle in
-        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
-        let count = buffer.withUnsafeMutableBytes { read(descriptor, $0.baseAddress, $0.count) }
+        let count = buffer.bytes.withUnsafeMutableBytes { read(descriptor, $0.baseAddress, $0.count) }
+        let error = errno
 
-        if count < 0, errno == EAGAIN || errno == EINTR {
+        // The handler fires again while the descriptor is still readable.
+        if count < 0, error == EAGAIN || error == EINTR {
           return
         }
 
@@ -67,10 +69,18 @@ final class FileReader: ReaderStream, @unchecked Sendable {
           return
         }
 
-        continuation.yield(Data(buffer[..<count]))
+        continuation.yield(Data(buffer.bytes[..<count]))
       }
     }
   }
+}
+
+/// The buffer a `FileReader` reuses for every read of its stream.
+///
+/// Unchecked: only the readability handler touches it, on one queue at a
+/// time, and it yields a copy of what it read.
+private final class ReadBuffer: @unchecked Sendable {
+  var bytes = [UInt8](repeating: 0, count: 64 * 1024)
 }
 
 /// A descriptor the guest writes. When stdout and stderr share a descriptor,
