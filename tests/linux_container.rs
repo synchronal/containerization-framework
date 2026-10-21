@@ -147,6 +147,60 @@ fn lets_go_of_the_callers_descriptors_once_a_process_is_deleted() {
   drop(process);
 }
 
+/// Reading the caller's stdin can fail rather than reach end of file, as a
+/// pty does once its terminal window has closed. That has to end the
+/// process's input, as end of file does, not abort the process the container
+/// lives in. A TCP connection its peer reset fails every read
+/// (ECONNRESET), so it stands in for the hung-up terminal.
+#[test]
+fn ends_input_when_reading_stdin_fails() {
+  let booted = Container::boot("cfw-test-container-stdin-error");
+  let container = booted.container();
+  let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback listener should bind");
+  let stdin = std::net::TcpStream::connect(listener.local_addr().expect("the listener has an address"))
+    .expect("the listener should take a connection");
+  let (peer, _) = listener
+    .accept()
+    .expect("the connection should be accepted");
+  let reset = libc::linger {
+    l_onoff: 1,
+    l_linger: 0,
+  };
+  // SAFETY: `peer` is ours, and `reset` is a linger of the size passed.
+  let set = unsafe {
+    libc::setsockopt(
+      peer.as_raw_fd(),
+      libc::SOL_SOCKET,
+      libc::SO_LINGER,
+      (&reset as *const libc::linger).cast(),
+      std::mem::size_of::<libc::linger>() as libc::socklen_t,
+    )
+  };
+  assert_eq!(set, 0, "SO_LINGER should set: {}", std::io::Error::last_os_error());
+  // Closing with a zero linger resets the connection instead of ending it.
+  drop(peer);
+  let (mut read, output) = std::io::pipe().expect("a pipe should be creatable");
+
+  let process = container
+    .exec(
+      "unreadable",
+      cfw::containerization::process::LinuxProcessConfiguration {
+        stdin: Some(stdin.as_raw_fd()),
+        stdout: Some(output.as_raw_fd()),
+        ..cfw::containerization::process::LinuxProcessConfiguration::new(&[
+          "/bin/sh",
+          "-c",
+          "cat >/dev/null; echo input ended",
+        ])
+      },
+    )
+    .expect("the process should exec");
+  assert_eq!(support::container::finish(&process, "unreadable"), 0);
+
+  drop(output);
+  assert_eq!(support::container::read_to_end(&mut read), "input ended\n");
+}
+
 #[test]
 fn execs_with_a_closure_on_swifts_defaults() {
   let booted = Container::boot("cfw-test-container-exec-with");

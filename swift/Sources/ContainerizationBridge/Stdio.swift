@@ -37,23 +37,37 @@ final class FileReader: ReaderStream, @unchecked Sendable {
   /// Containerization cancels its relay on closing stdin or deleting the
   /// process. Otherwise the handler would go on taking the caller's input
   /// until Swift frees it.
+  ///
+  /// A failed read ends the stream as end of file does. It reads with
+  /// `read(2)` rather than `availableData`, which raises an Objective-C
+  /// exception when the read fails, as it does on a pty whose terminal has
+  /// closed (EIO) or a reset socket. Swift cannot catch that, so it aborted
+  /// the process, and with it the VM and every other process in it.
   func stream() -> AsyncStream<Data> {
-    .init { continuation in
+    let descriptor = handle.fileDescriptor
+
+    return .init { continuation in
       continuation.onTermination = { [weak self] _ in
         self?.handle.readabilityHandler = nil
       }
 
       handle.readabilityHandler = { handle in
-        let data = handle.availableData
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        let count = buffer.withUnsafeMutableBytes { read(descriptor, $0.baseAddress, $0.count) }
 
-        // Empty means end of file. Containerization closes the guest's
-        // stdin once the stream finishes.
-        guard !data.isEmpty else {
+        if count < 0, errno == EAGAIN || errno == EINTR {
+          return
+        }
+
+        // Zero is end of file, and below zero a read that failed. Either way
+        // Containerization closes the guest's stdin once the stream finishes.
+        guard count > 0 else {
+          handle.readabilityHandler = nil
           continuation.finish()
           return
         }
 
-        continuation.yield(data)
+        continuation.yield(Data(buffer[..<count]))
       }
     }
   }
