@@ -50,7 +50,8 @@ impl ArchiveReader {
     )
   }
 
-  /// `ArchiveReader(name:bundle:tempDirectoryBaseName:)`.
+  /// `ArchiveReader(name:bundle:tempDirectoryBaseName:)`. Swift's
+  /// `tempDirectoryBaseName` defaults to `nil`.
   pub fn with_bundle(name: &str, bundle: &[u8], temp_directory_base_name: Option<&str>) -> Result<Self, Error> {
     Self::opened(
       ffi::cz_archive_reader_with_bundle(name, bundle.to_vec(), temp_directory_base_name.map(str::to_string)),

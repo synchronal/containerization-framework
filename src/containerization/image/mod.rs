@@ -156,3 +156,13 @@ impl Image {
     })
   }
 }
+
+/// Swift's `Image` is a struct, so a copy names the same image in the same
+/// content store.
+impl Clone for Image {
+  fn clone(&self) -> Self {
+    Self {
+      handle: self.handle.duplicate(),
+    }
+  }
+}

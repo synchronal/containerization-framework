@@ -1,5 +1,6 @@
-//! `RegistryClient`, and the [`RegistryClientOptions`] that its host init
-//! takes.
+//! `RegistryClient`, and the options its inits take:
+//! [`RegistryClientReferenceOptions`] for the reference init and
+//! [`RegistryClientOptions`] for the host init.
 //!
 //! Neither init takes Swift's `tlsConfiguration` or `logger`, which are
 //! swift-nio and swift-log types.
@@ -13,8 +14,17 @@ use crate::platform;
 use crate::platform::ffi;
 use std::path::Path;
 
-/// The defaulted arguments of `RegistryClient(host:...)`. Its [`Default`]
-/// holds Swift's defaults.
+/// The defaulted arguments of `RegistryClient(reference:...)`. [`Default`]
+/// uses Swift's defaults: not insecure, and no `auth`.
+#[derive(Clone, Debug, Default)]
+pub struct RegistryClientReferenceOptions {
+  pub insecure: bool,
+  pub auth: Option<Authentication>,
+}
+
+/// The defaulted arguments of `RegistryClient(host:...)`. [`Default`] uses
+/// Swift's defaults: the `https` scheme, a 4 MiB buffer, and every other
+/// argument `nil`.
 #[derive(Clone, Debug)]
 pub struct RegistryClientOptions {
   pub scheme: Option<String>,
@@ -52,9 +62,13 @@ unsafe impl Sync for RegistryClient {}
 impl RegistryClient {
   /// `RegistryClient(reference:insecure:auth:)`, which retries a request that
   /// fails or that a server error answers.
-  pub fn new(reference: &str, insecure: bool, auth: Option<&Authentication>) -> Result<Self, Error> {
+  pub fn new(reference: &str, options: RegistryClientReferenceOptions) -> Result<Self, Error> {
     platform::outcome(
-      ffi::cz_registry_client_new(reference, insecure, Authentication::crossing(auth)?),
+      ffi::cz_registry_client_new(
+        reference,
+        options.insecure,
+        Authentication::crossing(options.auth.as_ref())?,
+      ),
       format!("make a registry client for {reference}"),
     )
     .map(|outcome| Self {
@@ -131,7 +145,7 @@ impl RegistryClient {
     Ok((outcome.written_size(), outcome.written_digest()))
   }
 
-  /// `RegistryClient.catalog(prefix:)`.
+  /// `RegistryClient.catalog(prefix:)`. Swift's `prefix` defaults to `nil`.
   pub fn catalog(&self, prefix: Option<&str>) -> Result<Vec<String>, Error> {
     platform::outcome(
       self.handle.catalog(prefix.map(str::to_string)),
@@ -140,7 +154,8 @@ impl RegistryClient {
     .map(|outcome| outcome.strings())
   }
 
-  /// `RegistryClient.referrers(name:digest:artifactType:)`.
+  /// `RegistryClient.referrers(name:digest:artifactType:)`. Swift's
+  /// `artifactType` defaults to `nil`.
   pub fn referrers(&self, name: &str, digest: &str, artifact_type: Option<&str>) -> Result<image::Index, Error> {
     platform::outcome(
       self

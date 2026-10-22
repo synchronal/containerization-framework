@@ -9,7 +9,6 @@ use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 
 /// `VZVirtualMachineInstance`. [`super::VZVirtualMachineManager::create`]
@@ -24,6 +23,15 @@ use std::os::fd::OwnedFd;
 /// aren't bound.
 pub struct VZVirtualMachineInstance {
   pub(crate) handle: ffi::CzVirtualMachineInstance,
+}
+
+impl fmt::Debug for VZVirtualMachineInstance {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("VZVirtualMachineInstance")
+      .field("state", &self.state())
+      .finish_non_exhaustive()
+  }
 }
 
 // Swift's `VZVirtualMachineInstance` is `Sendable`.
@@ -78,10 +86,7 @@ impl VZVirtualMachineInstance {
   /// `VZVirtualMachineInstance.dial(_:)`. The caller owns the connection's
   /// descriptor.
   pub fn dial(&self, port: u32) -> Result<OwnedFd, Error> {
-    platform::outcome(self.handle.dial(port), format!("dial vsock port {port}"))
-      // SAFETY: Swift's `FileHandle` doesn't close its descriptor, and
-      // forgets it once it crosses.
-      .map(|outcome| unsafe { OwnedFd::from_raw_fd(outcome.int32()) })
+    platform::owned_fd(self.handle.dial(port), format!("dial vsock port {port}"))
   }
 
   /// `VZVirtualMachineInstance.listen(_:)`.
@@ -138,14 +143,5 @@ impl VZVirtualMachineInstance {
   /// `VZVirtualMachineInstance.Configuration.installRosetta()`.
   pub fn install_rosetta() -> Result<(), Error> {
     platform::outcome(ffi::cz_install_rosetta(), "install Rosetta").map(drop)
-  }
-}
-
-impl fmt::Debug for VZVirtualMachineInstance {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("VZVirtualMachineInstance")
-      .field("state", &self.state())
-      .finish_non_exhaustive()
   }
 }

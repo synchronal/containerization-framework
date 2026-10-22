@@ -3,6 +3,7 @@
 //===----------------------------------------------------------------------===//
 
 import Containerization
+import ContainerizationExtras
 import Foundation
 
 // The inits that take a store are methods on it, because swift-bridge can't
@@ -127,21 +128,43 @@ func containerManager(vmm: CzVirtualMachineManager, network: CzNetwork) -> CzOut
   return CzOutcome { CzContainerManager(try ContainerManager(vmm: vmm, network: network)) }
 }
 
-/// The manager's configuration closure. It fills `seed` with what the manager
-/// seeded, lets Rust's closure change it, and takes it back.
+/// The manager's configuration closure, as `configuring` makes it.
 private func configuredContainer(
   _ seed: RustLinuxContainerConfiguration,
   by configuration: RustConfigure
 ) -> @Sendable (inout LinuxContainer.Configuration) throws -> Void {
-  // Not `Sendable`, but only this closure uses them, and the manager calls it
-  // once, while `blocking` waits.
-  nonisolated(unsafe) let seed = seed
-  nonisolated(unsafe) let configuration = configuration
+  configuring(
+    seed,
+    fill: { fill($0, from: $1) },
+    call: { configuration.call($0) },
+    make: { try LinuxContainer.Configuration($0) }
+  )
+}
 
-  return { config in
-    fill(seed, from: config)
-    if configuration.call(seed) { throw BridgeError.bodyFailed }
-    config = try LinuxContainer.Configuration(seed)
+/// What `create` and `createFromReference` read from Rust before they await
+/// the manager.
+private struct Creation: Sendable {
+  let rootfsSizeInBytes: UInt64
+  let writableLayerSizeInBytes: UInt64?
+  let readOnly: Bool
+  let networking: Bool
+  let vm: VMResources
+  let progress: ProgressHandler?
+  let configure: @Sendable (inout LinuxContainer.Configuration) throws -> Void
+
+  init(
+    _ options: RustCreateOptions,
+    _ progress: RustProgressHandler,
+    _ seed: RustLinuxContainerConfiguration,
+    _ configuration: RustConfigure
+  ) {
+    rootfsSizeInBytes = options.rootfsSizeInBytes()
+    writableLayerSizeInBytes = options.writableLayerSizeInBytes()
+    readOnly = options.readOnly()
+    networking = options.networking()
+    vm = VMResources(options.vmCpus(), options.vmMemoryInBytes())
+    self.progress = progressHandler(progress)
+    configure = configuredContainer(seed, by: configuration)
   }
 }
 
@@ -170,26 +193,20 @@ final class CzContainerManager: @unchecked Sendable {
   ) -> CzOutcome {
     let id = id.toString()
     let reference = reference.toString()
-    let rootfsSizeInBytes = options.rootfsSizeInBytes()
-    let writableLayerSizeInBytes = options.writableLayerSizeInBytes()
-    let readOnly = options.readOnly()
-    let networking = options.networking()
-    let vm = VMResources(cpus: Int(options.vmCpus()), memoryInBytes: options.vmMemoryInBytes())
-    let progress = progressHandler(progress)
-    let configure = configuredContainer(seed, by: configuration)
+    let creation = Creation(options, progress, seed, configuration)
 
     return .awaiting {
       CzLinuxContainer(
         try await self.manager.create(
           id,
           reference: reference,
-          rootfsSizeInBytes: rootfsSizeInBytes,
-          writableLayerSizeInBytes: writableLayerSizeInBytes,
-          readOnly: readOnly,
-          networking: networking,
-          vm: vm,
-          progress: progress,
-          configuration: configure
+          rootfsSizeInBytes: creation.rootfsSizeInBytes,
+          writableLayerSizeInBytes: creation.writableLayerSizeInBytes,
+          readOnly: creation.readOnly,
+          networking: creation.networking,
+          vm: creation.vm,
+          progress: creation.progress,
+          configuration: creation.configure
         )
       )
     }
@@ -210,26 +227,20 @@ final class CzContainerManager: @unchecked Sendable {
   ) -> CzOutcome {
     let id = id.toString()
     let image = image.image
-    let rootfsSizeInBytes = options.rootfsSizeInBytes()
-    let writableLayerSizeInBytes = options.writableLayerSizeInBytes()
-    let readOnly = options.readOnly()
-    let networking = options.networking()
-    let vm = VMResources(cpus: Int(options.vmCpus()), memoryInBytes: options.vmMemoryInBytes())
-    let progress = progressHandler(progress)
-    let configure = configuredContainer(seed, by: configuration)
+    let creation = Creation(options, progress, seed, configuration)
 
     return .awaiting {
       CzLinuxContainer(
         try await self.manager.create(
           id,
           image: image,
-          rootfsSizeInBytes: rootfsSizeInBytes,
-          writableLayerSizeInBytes: writableLayerSizeInBytes,
-          readOnly: readOnly,
-          networking: networking,
-          vm: vm,
-          progress: progress,
-          configuration: configure
+          rootfsSizeInBytes: creation.rootfsSizeInBytes,
+          writableLayerSizeInBytes: creation.writableLayerSizeInBytes,
+          readOnly: creation.readOnly,
+          networking: creation.networking,
+          vm: creation.vm,
+          progress: creation.progress,
+          configuration: creation.configure
         )
       )
     }
@@ -250,7 +261,7 @@ final class CzContainerManager: @unchecked Sendable {
     let rootfs = Containerization.Mount(rootfs)
     let writableLayer = options.hasWritableLayer() ? Containerization.Mount(options.writableLayer()) : nil
     let networking = options.networking()
-    let vm = VMResources(cpus: Int(options.vmCpus()), memoryInBytes: options.vmMemoryInBytes())
+    let vm = VMResources(options.vmCpus(), options.vmMemoryInBytes())
     let configure = configuredContainer(seed, by: configuration)
 
     return .awaiting {

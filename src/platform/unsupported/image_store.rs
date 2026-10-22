@@ -102,11 +102,13 @@ uninhabited!(CzImage {
 });
 
 uninhabited!(CzKernelImage {
+  fn duplicate() -> CzKernelImage;
   fn name() -> String;
   fn kernel(vm::SystemPlatform) -> CzOutcome;
 });
 
 uninhabited!(CzInitImage {
+  fn duplicate() -> CzInitImage;
   fn name() -> String;
   fn init_block(&str, vm::SystemPlatform) -> CzOutcome;
 });

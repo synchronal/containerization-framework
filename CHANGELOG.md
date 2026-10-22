@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- `Image`, `InitImage`, `KernelImage` and `Vminitd` implement `Clone`, as
+  Swift's types are structs. A cloned `Vminitd` shares its connection, so
+  closing either closes both. `ContainerManager` still doesn't implement
+  `Clone`, because a Swift copy keeps its own record of the network's
+  allocations while sharing the allocators.
+- The docs of every binding with a defaulted Swift argument give Swift's
+  default; every options struct's docs describe its `Default`.
+
+### Breaking changes
+
+- A Swift function with two or more defaulted arguments is bound with an
+  options struct whose `Default` matches Swift's defaults.
+  - `ImageStore::get_init_image` takes a `GetInitImageOptions` in place of
+    its `auth` and `progress` arguments.
+  - `RegistryClient::new` takes a `RegistryClientReferenceOptions` in place
+    of its `insecure` and `auth` arguments.
+  - `LinuxContainer::new` and `LinuxContainer::new_with` take a
+    `LinuxContainerOptions` in place of their `writable_layer` and `vm`
+    arguments, and it comes after the VM manager.
+  - `LinuxPod::statistics` takes a `StatisticsOptions` in place of its
+    `container_ids` and `categories` arguments.
+  - `VmnetNetwork::new` takes a `VmnetNetworkOptions` in place of its
+    `mode`, `subnet` and `prefix_v6` arguments.
+  - `ProcNetSnmp::new` takes a `ProcNetSnmpOptions` in place of its
+    `netstat` and `snmp6` arguments.
+- `LocalContentStore::delete` and `LocalContentStore::delete_keeping` take
+  their digests as `&[&str]`, like the crate's other lists of strings, rather
+  than as `Vec<String>`.
+- `UnixSocketConfiguration::new`, `set_source` and `set_destination` take
+  `&Path`, like the crate's other paths, rather than `impl AsRef<Path>`.
+
 ## v0.10.1
 
 - A process's stdin stops at a failed read as it does at end of file. Reading

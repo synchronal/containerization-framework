@@ -79,16 +79,13 @@ impl runtime::Spec {
 
 #[cfg(test)]
 mod tests {
+  use crate::bridge::accessors::raw_values;
   use crate::bridge::ffi;
   use crate::containerization_oci::runtime;
 
   /// Checks each enum's raw values, in Rust's order, against Swift's.
   #[test]
   fn copies_swifts_raw_values() {
-    fn raw_values<T: Copy>(all: &[T], raw_value: fn(T) -> &'static str) -> Vec<&'static str> {
-      all.iter().map(|case| raw_value(*case)).collect()
-    }
-
     let copies = [
       (
         "LinuxNamespaceType",

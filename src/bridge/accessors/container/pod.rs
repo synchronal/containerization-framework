@@ -40,7 +40,6 @@ impl linux_pod::Configuration {
 
   /// `location`, `timeout`, `read_only` and `size_bytes` as
   /// [`linux_pod::PodVolume`]'s getters give them.
-  #[allow(clippy::too_many_arguments)]
   pub(crate) fn push_volume(
     &mut self,
     name: String,

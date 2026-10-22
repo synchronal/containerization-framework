@@ -28,32 +28,38 @@ impl Entry {
     platform::outcome(ffi::cz_hosts_entry_rendered(self.clone()), "render a hosts entry").map(|outcome| outcome.text())
   }
 
-  /// `Hosts.Entry.localHostIPV4(comment:)`.
+  /// `Hosts.Entry.localHostIPV4(comment:)`. Swift's `comment` defaults to
+  /// `nil`.
   pub fn local_host_ipv4(comment: Option<&str>) -> Result<Self, Error> {
     Self::named(ffi::HostsEntryName::LocalHostIpv4, comment)
   }
 
-  /// `Hosts.Entry.localHostIPV6(comment:)`.
+  /// `Hosts.Entry.localHostIPV6(comment:)`. Swift's `comment` defaults to
+  /// `nil`.
   pub fn local_host_ipv6(comment: Option<&str>) -> Result<Self, Error> {
     Self::named(ffi::HostsEntryName::LocalHostIpv6, comment)
   }
 
-  /// `Hosts.Entry.ipv6LocalNet(comment:)`.
+  /// `Hosts.Entry.ipv6LocalNet(comment:)`. Swift's `comment` defaults to
+  /// `nil`.
   pub fn ipv6_local_net(comment: Option<&str>) -> Result<Self, Error> {
     Self::named(ffi::HostsEntryName::Ipv6LocalNet, comment)
   }
 
-  /// `Hosts.Entry.ipv6MulticastPrefix(comment:)`.
+  /// `Hosts.Entry.ipv6MulticastPrefix(comment:)`. Swift's `comment` defaults
+  /// to `nil`.
   pub fn ipv6_multicast_prefix(comment: Option<&str>) -> Result<Self, Error> {
     Self::named(ffi::HostsEntryName::Ipv6MulticastPrefix, comment)
   }
 
-  /// `Hosts.Entry.ipv6AllNodes(comment:)`.
+  /// `Hosts.Entry.ipv6AllNodes(comment:)`. Swift's `comment` defaults to
+  /// `nil`.
   pub fn ipv6_all_nodes(comment: Option<&str>) -> Result<Self, Error> {
     Self::named(ffi::HostsEntryName::Ipv6AllNodes, comment)
   }
 
-  /// `Hosts.Entry.ipv6AllRouters(comment:)`.
+  /// `Hosts.Entry.ipv6AllRouters(comment:)`. Swift's `comment` defaults to
+  /// `nil`.
   pub fn ipv6_all_routers(comment: Option<&str>) -> Result<Self, Error> {
     Self::named(ffi::HostsEntryName::Ipv6AllRouters, comment)
   }

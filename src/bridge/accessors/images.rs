@@ -2,7 +2,6 @@
 //! OCI `Platform`, `Descriptor`, `Index` and `ImageConfig`,
 //! `Image.Description` and `EXT4Unpacker`.
 
-use super::ext4;
 use crate::bridge::ffi;
 use crate::containerization;
 use crate::containerization::image;
@@ -26,9 +25,7 @@ impl ffi::CzOutcome {
       architecture: self.platform_architecture(),
       os: self.platform_os(),
       os_version: self.platform_os_version(),
-      os_features: self
-        .platform_has_os_features()
-        .then(|| self.platform_os_features()),
+      os_features: self.platform_os_features().optional(Self::strings),
       variant: self.platform_variant(),
     }
   }
@@ -184,21 +181,7 @@ impl image::EXT4Unpacker {
     copy capacity_in_bytes: u64;
   }
 
-  pub(crate) fn has_journal(&self) -> bool {
-    self.journal.is_some()
-  }
-
-  pub(crate) fn journal_size(&self) -> Option<u64> {
-    self.journal.and_then(|journal| journal.size)
-  }
-
-  pub(crate) fn has_journal_mode(&self) -> bool {
-    ext4::has_journal_mode(self.journal)
-  }
-
-  pub(crate) fn journal_mode(&self) -> ffi::JournalModeKind {
-    ext4::journal_mode(self.journal)
-  }
+  journal_getters!();
 }
 
 #[cfg(test)]

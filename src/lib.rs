@@ -165,6 +165,37 @@ macro_rules! opaque_debug {
   };
 }
 
+/// The two `From`s between a fieldless Rust enum and the bridge's enum for it,
+/// as in `same_variants!(Mode, ffi::VmnetMode { Shared, Host, Bridged })`. A
+/// variant the bridge names differently is written `Rust => Bridge`.
+macro_rules! same_variants {
+  ($rust:ty, $bridge:ty { $($variant:ident $(=> $renamed:ident)?),* $(,)? }) => {
+    impl From<$rust> for $bridge {
+      fn from(value: $rust) -> Self {
+        type Rust = $rust;
+
+        match value {
+          $(Rust::$variant => same_variants!(@bridge $variant $($renamed)?)),*
+        }
+      }
+    }
+
+    impl From<$bridge> for $rust {
+      fn from(value: $bridge) -> Self {
+        type Bridge = $bridge;
+
+        match value {
+          $(same_variants!(@pattern $variant $($renamed)?) => Self::$variant),*
+        }
+      }
+    }
+  };
+  (@bridge $variant:ident) => { Self::$variant };
+  (@bridge $variant:ident $renamed:ident) => { Self::$renamed };
+  (@pattern $variant:ident) => { Bridge::$variant };
+  (@pattern $variant:ident $renamed:ident) => { Bridge::$renamed };
+}
+
 pub mod cloud_hypervisor;
 pub mod containerization;
 pub mod containerization_archive;

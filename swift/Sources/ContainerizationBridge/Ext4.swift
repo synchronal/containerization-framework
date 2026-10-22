@@ -40,6 +40,8 @@ final class CzExt4Reader: @unchecked Sendable {
     let path = FilePath(path.toString())
 
     return CzOutcome {
+      // Rebuilt without its labels, as the exact unlabeled tuple that
+      // `inodeNumber` and `inodeBytes` cast to.
       let (number, inode) = try reader.stat(path, followSymlinks: followSymlinks)
       return (number, inode)
     }

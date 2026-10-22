@@ -20,7 +20,6 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::os::fd::AsRawFd;
 use std::os::fd::BorrowedFd;
-use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 use std::path::Path;
 use std::path::PathBuf;
@@ -93,16 +92,15 @@ impl fmt::Display for EntryType {
   }
 }
 
-impl From<ffi::FdOpsEntryType> for EntryType {
-  fn from(entry_type: ffi::FdOpsEntryType) -> Self {
-    match entry_type {
-      ffi::FdOpsEntryType::Regular => Self::Regular,
-      ffi::FdOpsEntryType::Directory => Self::Directory,
-      ffi::FdOpsEntryType::Symlink => Self::Symlink,
-      ffi::FdOpsEntryType::Other => Self::Other,
-    }
+same_variants!(
+  EntryType,
+  ffi::FdOpsEntryType {
+    Regular,
+    Directory,
+    Symlink,
+    Other
   }
-}
+);
 
 /// `FileDescriptorOps.FileStatus`, an entry's metadata as `stat(2)` reports
 /// it without following a symlink.
@@ -129,18 +127,12 @@ pub enum SymlinkPolicy {
   FollowBeneath,
 }
 
-impl From<SymlinkPolicy> for ffi::FdOpsSymlinkPolicy {
-  fn from(policy: SymlinkPolicy) -> Self {
-    match policy {
-      SymlinkPolicy::Refuse => Self::Refuse,
-      SymlinkPolicy::FollowBeneath => Self::FollowBeneath,
-    }
-  }
-}
+same_variants!(SymlinkPolicy, ffi::FdOpsSymlinkPolicy { Refuse, FollowBeneath });
 
 /// The defaulted arguments of
 /// `FileDescriptorOps.mkdir(_:_:permissions:makeIntermediates:completion:)`.
-/// [`Default`] uses Swift's defaults.
+/// [`Default`] uses Swift's defaults: no permissions, so 0o755, and no
+/// intermediate directories.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct MkdirOptions {
   /// The permissions of each directory created. `None` uses 0o755.
@@ -160,7 +152,7 @@ pub fn entry_type(fd: BorrowedFd<'_>, name: &OsStr) -> Result<Option<EntryType>,
 
 /// `FileDescriptorOps.openDirectory(_:_:)`.
 pub fn open_directory(fd: BorrowedFd<'_>, name: &OsStr) -> Result<OwnedFd, error::Error> {
-  opened(
+  platform::owned_fd(
     ffi::cz_fd_ops_open_directory(fd.as_raw_fd(), component(name)?),
     format!("open the directory {}", name.display()),
   )
@@ -223,7 +215,7 @@ pub fn status_relative_path(
 
 /// `FileDescriptorOps.openFile(_:_:)`.
 pub fn open_file(fd: BorrowedFd<'_>, name: &OsStr) -> Result<OwnedFd, error::Error> {
-  opened(
+  platform::owned_fd(
     ffi::cz_fd_ops_open_file(fd.as_raw_fd(), component(name)?),
     format!("open the file {}", name.display()),
   )
@@ -235,7 +227,7 @@ pub fn open_file_relative_path(
   relative_path: &Path,
   symlinks: SymlinkPolicy,
 ) -> Result<OwnedFd, error::Error> {
-  opened(
+  platform::owned_fd(
     ffi::cz_fd_ops_open_file_relative_path(fd.as_raw_fd(), platform::path(relative_path)?, symlinks.into()),
     format!("open the file {}", relative_path.display()),
   )
@@ -244,7 +236,7 @@ pub fn open_file_relative_path(
 /// `FileDescriptorOps.createFile(_:_:permissions:)`. `None` uses Swift's
 /// default of 0o644.
 pub fn create_file(fd: BorrowedFd<'_>, name: &OsStr, permissions: Option<u16>) -> Result<OwnedFd, error::Error> {
-  opened(
+  platform::owned_fd(
     ffi::cz_fd_ops_create_file(
       fd.as_raw_fd(),
       component(name)?,
@@ -291,12 +283,12 @@ pub fn enumerate(
   fd: BorrowedFd<'_>,
   body: impl FnMut(&Path, EntryType, BorrowedFd<'_>) -> Result<(), error::Error> + 'static,
 ) -> Result<(), error::Error> {
-  let body = platform::Enumerate::new(body);
-  let thrown = body.thrown.clone();
-
-  thrown
-    .outcome(ffi::cz_fd_ops_enumerate(fd.as_raw_fd(), body), "enumerate a directory")
-    .map(drop)
+  platform::enumerating(
+    body,
+    |body| ffi::cz_fd_ops_enumerate(fd.as_raw_fd(), body),
+    "enumerate a directory",
+  )
+  .map(drop)
 }
 
 /// `FileDescriptorOps.getCanonicalPath(_:)`.
@@ -318,33 +310,26 @@ pub fn mkdir(
   options: MkdirOptions,
   completion: impl FnOnce(BorrowedFd<'_>) -> Result<(), error::Error> + 'static,
 ) -> Result<(), error::Error> {
-  let completion = platform::WithDescriptor::new(completion);
-  let thrown = completion.thrown.clone();
+  let path = platform::path(relative_path)?;
 
-  thrown
-    .outcome(
+  platform::with_descriptor(
+    completion,
+    |completion| {
       ffi::cz_fd_ops_mkdir(
         fd.as_raw_fd(),
-        platform::path(relative_path)?,
+        path,
         options.permissions.is_some(),
         options.permissions.unwrap_or_default(),
         options.make_intermediates,
         completion,
-      ),
-      format!("make the directory {}", relative_path.display()),
-    )
-    .map(drop)
+      )
+    },
+    format!("make the directory {}", relative_path.display()),
+  )
+  .map(drop)
 }
 
 /// `name` as Swift takes it. Swift refuses a name that isn't one component.
 fn component(name: &OsStr) -> Result<&str, error::Error> {
   platform::path(Path::new(name))
-}
-
-/// The descriptor that the throwing Swift call opened, or what it threw as a
-/// failure of `action`.
-fn opened(outcome: ffi::CzOutcome, action: String) -> Result<OwnedFd, error::Error> {
-  // SAFETY: Swift opened the descriptor for the caller, and nothing else
-  // holds it.
-  platform::outcome(outcome, action).map(|outcome| unsafe { OwnedFd::from_raw_fd(outcome.int32()) })
 }

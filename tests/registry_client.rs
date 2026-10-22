@@ -16,7 +16,7 @@ const TAG: &str = "3";
 
 #[test]
 fn resolves_and_fetches_an_index() {
-  let client = cfw::containerization_oci::client::RegistryClient::new(support::store::IMAGE, false, None)
+  let client = cfw::containerization_oci::client::RegistryClient::new(support::store::IMAGE, Default::default())
     .expect("a client for the suite's registry");
   let directory = tempfile::tempdir().expect("a temporary directory");
 
@@ -64,7 +64,7 @@ fn makes_a_client_for_a_host() {
 
 #[test]
 fn says_which_reference_it_could_not_make_a_client_for() {
-  let error = cfw::containerization_oci::client::RegistryClient::new("Not A Reference", false, None)
+  let error = cfw::containerization_oci::client::RegistryClient::new("Not A Reference", Default::default())
     .expect_err("a malformed reference");
 
   assert!(error.to_string().contains("Not A Reference"), "{error}");

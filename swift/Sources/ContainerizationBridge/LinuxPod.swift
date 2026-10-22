@@ -21,7 +21,7 @@ func linuxPod(
     let configuration = try LinuxPod.Configuration(configuration)
 
     return CzLinuxPod(
-      try LinuxPod(id, vmm: vmm.manager, vm: VMResources(cpus: Int(vmCpus), memoryInBytes: vmMemoryInBytes)) {
+      try LinuxPod(id, vmm: vmm.manager, vm: VMResources(vmCpus, vmMemoryInBytes)) {
         $0 = configuration
       }
     )
@@ -41,6 +41,8 @@ final class CzLinuxPod: Sendable {
 
   func config(seed: RustPodConfiguration, receive: RustConfigurePod) {
     fill(seed, from: pod.config)
+    // `receive` is from Rust's `platform::filled`, which only keeps the value
+    // and so never fails.
     _ = receive.call(seed)
   }
 
@@ -61,22 +63,15 @@ final class CzLinuxPod: Sendable {
     seed: RustPodContainerConfiguration,
     configuration: RustConfigurePodContainer
   ) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
     let rootfs = Containerization.Mount(rootfs)
-    // Not `Sendable`, but only the closure below uses them, and the pod calls
-    // it once, while `blocking` waits.
-    nonisolated(unsafe) let seed = seed
-    nonisolated(unsafe) let configuration = configuration
+    let configure = configuring(
+      seed,
+      call: { configuration.call($0) },
+      make: { try LinuxPod.ContainerConfiguration($0) }
+    )
 
-    return CzOutcome {
-      try blocking {
-        try await pod.addContainer(id, rootfs: rootfs) { config in
-          if configuration.call(seed) { throw BridgeError.bodyFailed }
-          config = try LinuxPod.ContainerConfiguration(seed)
-        }
-      }
-    }
+    return .awaiting { try await self.pod.addContainer(id, rootfs: rootfs, configuration: configure) }
   }
 
   func create() -> CzOutcome {
@@ -137,11 +132,10 @@ final class CzLinuxPod: Sendable {
     }
   }
 
-  /// Swift's `listContainers` doesn't throw, so `blocking` can't fail here.
   func listContainers() -> RustVec<RustString> {
-    let pod = pod
-
-    return rustStrings((try? blocking { await pod.listContainers() }) ?? [])
+    // Swift's `listContainers` doesn't throw, and `blocking` throws only
+    // `noOutcome`, which can't happen.
+    rustStrings(try! blocking { await self.pod.listContainers() })
   }
 
   func statistics(hasContainerIDs: Bool, containerIDs: RustVec<RustString>, categories: Int64) -> CzOutcome {

@@ -128,10 +128,10 @@ fn shares_a_volume_between_its_containers() {
   );
 
   let statistics = pod
-    .statistics(
-      Some(&["writer"]),
-      cfw::containerization::container::StatCategory::PROCESS,
-    )
+    .statistics(cfw::containerization::container::linux_pod::StatisticsOptions {
+      container_ids: Some(&["writer"]),
+      categories: cfw::containerization::container::StatCategory::PROCESS,
+    })
     .expect("the pod should report statistics");
   let [writer] = statistics.as_slice() else {
     panic!("the pod should report the one container asked for, not {statistics:?}");

@@ -7,40 +7,46 @@ use crate::containerization_ext4::ext4::formatter;
 use crate::containerization_ext4::ext4::journal_config;
 use crate::platform;
 
+/// The getters for an options value's `journal`, which the formatter's and
+/// the unpacker's options share.
+macro_rules! journal_getters {
+  () => {
+    pub(crate) fn has_journal(&self) -> bool {
+      self.journal.is_some()
+    }
+
+    pub(crate) fn journal_size(&self) -> Option<u64> {
+      self.journal.and_then(|journal| journal.size)
+    }
+
+    pub(crate) fn has_journal_mode(&self) -> bool {
+      self
+        .journal
+        .and_then(|journal| journal.default_mode)
+        .is_some()
+    }
+
+    /// Swift calls this only when [`Self::has_journal_mode`] is true.
+    pub(crate) fn journal_mode(&self) -> $crate::bridge::ffi::JournalModeKind {
+      $crate::bridge::accessors::ext4::journal_mode(self.journal)
+    }
+  };
+}
+
 impl formatter::FormatterOptions {
   getters! {
     copy block_size: u32;
     copy min_disk_size: u64;
   }
 
-  pub(crate) fn has_journal(&self) -> bool {
-    self.journal.is_some()
-  }
-
-  pub(crate) fn journal_size(&self) -> Option<u64> {
-    self.journal.and_then(|journal| journal.size)
-  }
-
-  pub(crate) fn has_journal_mode(&self) -> bool {
-    has_journal_mode(self.journal)
-  }
-
-  pub(crate) fn journal_mode(&self) -> ffi::JournalModeKind {
-    journal_mode(self.journal)
-  }
+  journal_getters!();
 }
 
-// What the formatter's and the unpacker's options share, read the same way.
-
-pub(super) fn has_journal_mode(journal: Option<journal_config::JournalConfig>) -> bool {
-  journal.and_then(|journal| journal.default_mode).is_some()
-}
-
-/// Swift asks for this only when [`has_journal_mode`] is true.
+/// The kind of a journal's default mode, which [`journal_getters`] reads.
 pub(super) fn journal_mode(journal: Option<journal_config::JournalConfig>) -> ffi::JournalModeKind {
   match journal
     .and_then(|journal| journal.default_mode)
-    .expect("Swift asks for the mode only after `has_journal_mode`")
+    .unwrap_or_else(|| unreachable!("Swift asks for the mode only after `has_journal_mode`"))
   {
     journal_config::JournalMode::Writeback => ffi::JournalModeKind::Writeback,
     journal_config::JournalMode::Ordered => ffi::JournalModeKind::Ordered,
@@ -60,7 +66,6 @@ mod tests {
   use crate::bridge::ffi;
   use crate::containerization_ext4::FileTimestamps;
   use crate::containerization_ext4::ext4;
-  use crate::containerization_io;
   use std::mem::offset_of;
   use std::mem::size_of;
   use std::time::Duration;
@@ -143,13 +148,5 @@ mod tests {
         "{date:?}"
       );
     }
-  }
-
-  #[test]
-  fn copies_swifts_read_stream_buffer_size() {
-    assert_eq!(
-      ffi::cz_read_stream_buffer_size() as usize,
-      containerization_io::ReadStream::BUFFER_SIZE
-    );
   }
 }

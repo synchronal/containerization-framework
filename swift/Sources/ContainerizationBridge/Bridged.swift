@@ -137,7 +137,10 @@ public final class CzOutcome: @unchecked Sendable {
 
   func integer() -> Int64 { taken() }
 
-  /// A `UInt64`, or the bytes a delete freed.
+  /// A `UInt64`, or the bytes freed from a delete's unlabeled
+  /// `([String], UInt64)`, which Rust reads with `strings` and this. The
+  /// labeled result of `cleanUpOrphanedBlobs` is rebuilt unlabeled to be
+  /// that exact shape.
   func number() -> UInt64 {
     if let deleted = value as? ([String], UInt64) {
       return deleted.1
@@ -155,7 +158,8 @@ public final class CzOutcome: @unchecked Sendable {
 
   func text() -> String { taken() }
 
-  /// A `[String]`, or the digests a delete removed.
+  /// A `[String]`, or the digests removed from a delete's unlabeled
+  /// `([String], UInt64)`, as `number` reads it.
   func strings() -> RustVec<RustString> {
     if let deleted = value as? ([String], UInt64) {
       return rustStrings(deleted.0)
@@ -168,7 +172,9 @@ public final class CzOutcome: @unchecked Sendable {
     (taken() as Data?) != nil
   }
 
-  /// A `Data?`, or a `[UInt8]`.
+  /// A `Data` or `Data?`, as content and registry reads return, or a
+  /// `[UInt8]`, as an address's `bytes` returns. A `nil` reads as empty, so
+  /// Rust asks `hasBytes` first where it can be one.
   func bytes() -> RustVec<UInt8> {
     if let bytes = value as? [UInt8] {
       return rustVec(bytes)

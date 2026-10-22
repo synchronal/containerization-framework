@@ -17,7 +17,8 @@ use std::fmt;
 use std::path::Path;
 
 /// The defaulted arguments of `ContainerManager`'s initializers, after the
-/// image store or root. [`Default`] uses Swift's defaults.
+/// image store or root. [`Default`] uses Swift's defaults: no network, no
+/// Rosetta, and no nested virtualization.
 #[derive(Debug, Default)]
 pub struct ContainerManagerOptions {
   /// Swift's `Network?`, of which `VmnetNetwork` is the conforming type on
@@ -29,7 +30,9 @@ pub struct ContainerManagerOptions {
 
 /// `ContainerManager.create(_:image:...)`'s defaulted arguments, between the
 /// image and the configuration, which `create(_:reference:...)` shares.
-/// [`Default`] uses Swift's defaults.
+/// [`Default`] uses Swift's defaults: an 8 GiB root filesystem, no writable
+/// layer, writable, networked, `VMResources.default`, and no progress
+/// handler.
 pub struct CreateOptions {
   pub rootfs_size_in_bytes: u64,
   pub writable_layer_size_in_bytes: Option<u64>,
@@ -67,7 +70,8 @@ impl fmt::Debug for CreateOptions {
 }
 
 /// `ContainerManager.create(_:image:rootfs:...)`'s defaulted arguments, between
-/// the rootfs and the configuration. [`Default`] uses Swift's defaults.
+/// the rootfs and the configuration. [`Default`] uses Swift's defaults: no
+/// writable layer, networked, and `VMResources.default`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CreateWithRootfsOptions {
   pub writable_layer: Option<Mount>,
@@ -86,6 +90,11 @@ impl Default for CreateWithRootfsOptions {
 }
 
 /// `ContainerManager`.
+///
+/// Swift's is a struct, but it isn't [`Clone`]. A Swift copy keeps its own
+/// copy of the network's allocations while sharing the network's address
+/// allocators, so two copies could each hand out an address and neither
+/// could release the other's.
 pub struct ContainerManager {
   handle: ffi::CzContainerManager,
 }
@@ -179,7 +188,8 @@ impl ContainerManager {
   }
 
   /// `ContainerManager(vmm:network:logger:)`, which uses
-  /// [`image::ImageStore::default_store`].
+  /// [`image::ImageStore::default_store`]. Swift's `network` defaults to
+  /// `nil`.
   pub fn with_vmm(vmm: &vm::VZVirtualMachineManager, network: Option<network::VmnetNetwork>) -> Result<Self, Error> {
     Self::made(
       ffi::cz_container_manager_with_vmm(vmm.handle.duplicate(), network_crossing(network)),

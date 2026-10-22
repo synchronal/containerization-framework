@@ -27,6 +27,8 @@ final class CzLinuxContainer: Sendable {
 
   func config(seed: RustLinuxContainerConfiguration, receive: RustConfigure) {
     fill(seed, from: container.config)
+    // `receive` is from Rust's `platform::filled`, which only keeps the value
+    // and so never fails.
     _ = receive.call(seed)
   }
 
@@ -174,7 +176,7 @@ func linuxContainer(
         rootfs: rootfs,
         writableLayer: writableLayer,
         vmm: vmm.manager,
-        vm: VMResources(cpus: Int(vmCpus), memoryInBytes: vmMemoryInBytes),
+        vm: VMResources(vmCpus, vmMemoryInBytes),
         configuration: try LinuxContainer.Configuration(configuration)
       )
     )

@@ -15,23 +15,7 @@ pub enum Direction {
   OutOf,
 }
 
-impl From<Direction> for ffi::SocketDirection {
-  fn from(direction: Direction) -> Self {
-    match direction {
-      Direction::Into => Self::Into,
-      Direction::OutOf => Self::OutOf,
-    }
-  }
-}
-
-impl From<ffi::SocketDirection> for Direction {
-  fn from(direction: ffi::SocketDirection) -> Self {
-    match direction {
-      ffi::SocketDirection::Into => Self::Into,
-      ffi::SocketDirection::OutOf => Self::OutOf,
-    }
-  }
-}
+same_variants!(Direction, ffi::SocketDirection { Into, OutOf });
 
 /// `UnixSocketConfiguration`.
 ///
@@ -49,9 +33,9 @@ unsafe impl Sync for UnixSocketConfiguration {}
 impl UnixSocketConfiguration {
   /// `UnixSocketConfiguration(source:destination:)`, with the other arguments
   /// left at their defaults.
-  pub fn new(source: impl AsRef<Path>, destination: impl AsRef<Path>) -> Result<Self, Error> {
-    let source = platform::path(source.as_ref())?;
-    let destination = platform::path(destination.as_ref())?;
+  pub fn new(source: &Path, destination: &Path) -> Result<Self, Error> {
+    let source = platform::path(source)?;
+    let destination = platform::path(destination)?;
     let outcome = platform::outcome(
       ffi::cz_unix_socket_configuration_new(source, destination),
       format!("configure a socket relay from {source} to {destination}"),
@@ -74,8 +58,8 @@ impl UnixSocketConfiguration {
 
   /// Sets `UnixSocketConfiguration.source`. It fails if the path isn't UTF-8,
   /// which Swift's `String` requires.
-  pub fn set_source(&mut self, source: impl AsRef<Path>) -> Result<(), Error> {
-    self.handle.set_source(platform::path(source.as_ref())?);
+  pub fn set_source(&mut self, source: &Path) -> Result<(), Error> {
+    self.handle.set_source(platform::path(source)?);
     Ok(())
   }
 
@@ -86,10 +70,8 @@ impl UnixSocketConfiguration {
 
   /// Sets `UnixSocketConfiguration.destination`. It fails if the path isn't
   /// UTF-8, which Swift's `String` requires.
-  pub fn set_destination(&mut self, destination: impl AsRef<Path>) -> Result<(), Error> {
-    self
-      .handle
-      .set_destination(platform::path(destination.as_ref())?);
+  pub fn set_destination(&mut self, destination: &Path) -> Result<(), Error> {
+    self.handle.set_destination(platform::path(destination)?);
     Ok(())
   }
 
@@ -138,7 +120,10 @@ impl fmt::Debug for UnixSocketConfiguration {
 
 /// Two configurations are equal when their five public fields are equal,
 /// including `id`, so only a configuration and its copies are equal. Swift's
-/// type isn't `Equatable`.
+/// type isn't `Equatable`. Rust has this so that
+/// [`super::linux_container::Configuration`] and
+/// [`super::linux_pod::ContainerConfiguration`], which hold sockets, can
+/// derive `PartialEq` and `Eq`.
 impl PartialEq for UnixSocketConfiguration {
   fn eq(&self, other: &Self) -> bool {
     self.id() == other.id()

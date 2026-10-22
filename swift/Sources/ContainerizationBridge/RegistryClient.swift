@@ -76,10 +76,9 @@ final class CzRegistryClient: Sendable {
     let client = client
 
     return CzOutcome {
-      let (size, digest) = try blocking {
-        try await client.fetchBlob(name: name, descriptor: descriptor, into: file, progress: progress)
-      }
-      return Written(size: size, digest: digest.digestString)
+      Written(
+        try blocking { try await client.fetchBlob(name: name, descriptor: descriptor, into: file, progress: progress) }
+      )
     }
   }
 

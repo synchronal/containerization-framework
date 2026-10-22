@@ -1,6 +1,7 @@
 //! `LinuxPod`, its nested `LinuxPod.Configuration`,
-//! `LinuxPod.ContainerConfiguration` and `LinuxPod.PodVolume`, and the
-//! volume's `Source` in [`pod_volume`].
+//! `LinuxPod.ContainerConfiguration` and `LinuxPod.PodVolume`, the volume's
+//! `Source` in [`pod_volume`], and the [`StatisticsOptions`] that
+//! `statistics` takes.
 
 use super::ContainerStatistics;
 use super::LinuxContainer;
@@ -18,8 +19,27 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
+
+/// `LinuxPod.statistics(containerIDs:categories:)`'s defaulted arguments.
+/// [`Default`] uses Swift's defaults: every container, and
+/// [`StatCategory::ALL`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StatisticsOptions<'a> {
+  /// The containers to report on. `None` asks for every container's
+  /// statistics.
+  pub container_ids: Option<&'a [&'a str]>,
+  pub categories: StatCategory,
+}
+
+impl Default for StatisticsOptions<'_> {
+  fn default() -> Self {
+    Self {
+      container_ids: None,
+      categories: StatCategory::ALL,
+    }
+  }
+}
 
 /// `LinuxPod.Configuration`, without `extensions`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -127,7 +147,8 @@ impl LinuxPod {
   /// `LinuxPod(_:vmm:vm:logger:configuration:)`, whose closure changes a
   /// `LinuxPod.Configuration()`. It runs here, before Swift is called, and
   /// Swift's closure takes what it made. Unlike Swift's, it runs even when
-  /// Swift then rejects the id as too long.
+  /// Swift then rejects the id as too long. Swift's `vm` defaults to
+  /// `VMResources.default`.
   pub fn new(
     id: &str,
     vmm: &vm::VZVirtualMachineManager,
@@ -244,7 +265,8 @@ impl LinuxPod {
     .map(drop)
   }
 
-  /// `LinuxPod.waitContainer(_:timeoutInSeconds:)`.
+  /// `LinuxPod.waitContainer(_:timeoutInSeconds:)`. Swift's
+  /// `timeoutInSeconds` defaults to `nil`.
   pub fn wait_container(
     &self,
     container_id: &str,
@@ -305,18 +327,13 @@ impl LinuxPod {
     self.handle.list_containers()
   }
 
-  /// `LinuxPod.statistics(containerIDs:categories:)`. `None` asks for every
-  /// container's statistics.
-  pub fn statistics(
-    &self,
-    container_ids: Option<&[&str]>,
-    categories: StatCategory,
-  ) -> Result<Vec<ContainerStatistics>, Error> {
+  /// `LinuxPod.statistics(containerIDs:categories:)`.
+  pub fn statistics(&self, options: StatisticsOptions<'_>) -> Result<Vec<ContainerStatistics>, Error> {
     platform::outcome(
       self.handle.statistics(
-        container_ids.is_some(),
-        strings(container_ids.unwrap_or_default()),
-        categories.raw_value,
+        options.container_ids.is_some(),
+        strings(options.container_ids.unwrap_or_default()),
+        options.categories.raw_value,
       ),
       format!("read pod {}'s statistics", self.id()),
     )
@@ -326,13 +343,10 @@ impl LinuxPod {
   /// `LinuxPod.dialVsock(port:)`. The caller owns the connection's
   /// descriptor.
   pub fn dial_vsock(&self, port: u32) -> Result<OwnedFd, Error> {
-    platform::outcome(
+    platform::owned_fd(
       self.handle.dial_vsock(port),
       format!("dial vsock port {port} in pod {}", self.id()),
     )
-    // SAFETY: Swift's `FileHandle` doesn't close its descriptor, and
-    // forgets it once it crosses.
-    .map(|outcome| unsafe { OwnedFd::from_raw_fd(outcome.int32()) })
   }
 
   /// `LinuxPod.withVirtualMachineInstance(_:)`. Like Swift's, it fails unless

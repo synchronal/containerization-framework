@@ -8,7 +8,7 @@ pub enum JournalMode {
   Journal,
 }
 
-/// `EXT4.JournalConfig`. [`Default`] is Swift's `JournalConfig.default`.
+/// `EXT4.JournalConfig`. [`Default`] uses Swift's `JournalConfig.default`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct JournalConfig {
   pub size: Option<u64>,

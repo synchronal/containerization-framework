@@ -55,7 +55,8 @@ impl LinuxProcess {
     platform::outcome(self.handle.close_stdin(), format!("close {}'s stdin", self.id())).map(drop)
   }
 
-  /// `LinuxProcess.wait(timeoutInSeconds:)`.
+  /// `LinuxProcess.wait(timeoutInSeconds:)`. Swift's `timeoutInSeconds`
+  /// defaults to `nil`.
   pub fn wait(&self, timeout_in_seconds: Option<i64>) -> Result<ExitStatus, Error> {
     platform::outcome(self.handle.wait(timeout_in_seconds), format!("wait for {}", self.id()))
       .and_then(|outcome| ExitStatus::from_outcome(&outcome))

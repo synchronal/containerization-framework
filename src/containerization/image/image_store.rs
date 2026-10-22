@@ -1,6 +1,6 @@
-//! `ImageStore`, and the options for its `pull`, `platforms` and `push`es:
-//! [`PullOptions`], [`PlatformsOptions`], [`PushOptions`] and
-//! [`PushAllOptions`].
+//! `ImageStore`, and the options for its `pull`, `platforms`, `push`es and
+//! `getInitImage`: [`PullOptions`], [`PlatformsOptions`], [`PushOptions`],
+//! [`PushAllOptions`] and [`GetInitImageOptions`].
 
 use super::Description;
 use super::Image;
@@ -15,8 +15,9 @@ use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// `ImageStore.pull(reference:...)`'s defaulted arguments. [`Default`] is
-/// Swift's defaults.
+/// `ImageStore.pull(reference:...)`'s defaulted arguments. [`Default`] uses
+/// Swift's defaults: three concurrent downloads, not insecure, and every
+/// other argument `nil`.
 pub struct PullOptions {
   pub platform: Option<containerization_oci::image::Platform>,
   pub insecure: bool,
@@ -51,15 +52,15 @@ impl fmt::Debug for PullOptions {
 }
 
 /// `ImageStore.platforms(reference:...)`'s defaulted arguments. [`Default`]
-/// is Swift's defaults.
+/// uses Swift's defaults: not insecure, and no `auth`.
 #[derive(Debug, Default)]
 pub struct PlatformsOptions {
   pub insecure: bool,
   pub auth: Option<containerization_oci::client::Authentication>,
 }
 
-/// `ImageStore.push(reference:...)`'s defaulted arguments. [`Default`] is
-/// Swift's defaults.
+/// `ImageStore.push(reference:...)`'s defaulted arguments. [`Default`] uses
+/// Swift's defaults: not insecure, and every other argument `nil`.
 #[derive(Default)]
 pub struct PushOptions {
   pub platform: Option<containerization_oci::image::Platform>,
@@ -80,8 +81,9 @@ impl fmt::Debug for PushOptions {
   }
 }
 
-/// `ImageStore.push(references:...)`'s defaulted arguments. [`Default`] is
-/// Swift's defaults.
+/// `ImageStore.push(references:...)`'s defaulted arguments. [`Default`] uses
+/// Swift's defaults: three concurrent uploads, not insecure, and every other
+/// argument `nil`.
 pub struct PushAllOptions {
   pub platform: Option<containerization_oci::image::Platform>,
   pub insecure: bool,
@@ -115,6 +117,24 @@ impl fmt::Debug for PushAllOptions {
   }
 }
 
+/// `ImageStore.getInitImage(reference:...)`'s defaulted arguments.
+/// [`Default`] uses Swift's defaults: no `auth` and no `progress`.
+#[derive(Default)]
+pub struct GetInitImageOptions {
+  pub auth: Option<containerization_oci::client::Authentication>,
+  pub progress: Option<containerization_extras::ProgressHandler>,
+}
+
+/// Leaves out the progress handler, which is a closure.
+impl fmt::Debug for GetInitImageOptions {
+  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter
+      .debug_struct("GetInitImageOptions")
+      .field("auth", &self.auth)
+      .finish_non_exhaustive()
+  }
+}
+
 /// `ImageStore`.
 pub struct ImageStore {
   pub(crate) handle: ffi::CzImageStore,
@@ -127,7 +147,8 @@ unsafe impl Send for ImageStore {}
 unsafe impl Sync for ImageStore {}
 
 impl ImageStore {
-  /// `ImageStore(path:)`.
+  /// `ImageStore(path:)`, with Swift's default `contentStore` of `nil`, which
+  /// makes a content store in `path`'s `content` directory.
   pub fn new(path: &Path) -> Result<Self, Error> {
     let outcome = platform::outcome(
       ffi::cz_image_store_new(platform::path(path)?),
@@ -168,7 +189,7 @@ impl ImageStore {
     PathBuf::from(self.handle.path())
   }
 
-  /// `ImageStore.get(reference:pull:)`.
+  /// `ImageStore.get(reference:pull:)`. Swift's `pull` defaults to `false`.
   pub fn get(&self, reference: &str, pull: bool) -> Result<Image, Error> {
     platform::outcome(self.handle.get(reference, pull), format!("get {reference}")).map(|outcome| Image {
       handle: outcome.image(),
@@ -190,7 +211,8 @@ impl ImageStore {
     platform::outcome(self.handle.list(), "list images").map(|outcome| images(&outcome))
   }
 
-  /// `ImageStore.delete(reference:performCleanup:)`.
+  /// `ImageStore.delete(reference:performCleanup:)`. Swift's
+  /// `performCleanup` defaults to `false`.
   pub fn delete(&self, reference: &str, perform_cleanup: bool) -> Result<(), Error> {
     platform::outcome(
       self.handle.delete(reference, perform_cleanup),
@@ -281,16 +303,11 @@ impl ImageStore {
   }
 
   /// `ImageStore.getInitImage(reference:auth:progress:)`.
-  pub fn get_init_image(
-    &self,
-    reference: &str,
-    auth: Option<&containerization_oci::client::Authentication>,
-    progress: Option<containerization_extras::ProgressHandler>,
-  ) -> Result<InitImage, Error> {
-    let auth = containerization_oci::client::Authentication::crossing(auth)?;
+  pub fn get_init_image(&self, reference: &str, options: GetInitImageOptions) -> Result<InitImage, Error> {
+    let auth = containerization_oci::client::Authentication::crossing(options.auth.as_ref())?;
 
     platform::outcome(
-      platform::progressing(progress, |progress| {
+      platform::progressing(options.progress, |progress| {
         self.handle.get_init_image(reference, auth, progress)
       }),
       format!("get init image {reference}"),
@@ -300,7 +317,8 @@ impl ImageStore {
     })
   }
 
-  /// `ImageStore.save(references:out:platform:)`.
+  /// `ImageStore.save(references:out:platform:)`. Swift's `platform`
+  /// defaults to `nil`.
   pub fn save(
     &self,
     references: &[&str],
@@ -329,7 +347,8 @@ impl ImageStore {
     })
   }
 
-  /// `ImageStore.load(from:progress:)`.
+  /// `ImageStore.load(from:progress:)`. Swift's `progress` defaults to
+  /// `nil`.
   pub fn load(
     &self,
     directory: &Path,

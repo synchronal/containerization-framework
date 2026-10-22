@@ -44,6 +44,7 @@ impl KernelImage {
   }
 
   /// `KernelImage.create(reference:binaries:labels:imageStore:contentStore:)`.
+  /// Swift's `labels` defaults to `[:]`.
   pub fn create(
     reference: &str,
     binaries: &[vm::Kernel],
@@ -64,5 +65,14 @@ impl KernelImage {
     .map(|outcome| Self {
       handle: outcome.kernel_image(),
     })
+  }
+}
+
+/// Swift's `KernelImage` is a struct, so a copy names the same image.
+impl Clone for KernelImage {
+  fn clone(&self) -> Self {
+    Self {
+      handle: self.handle.duplicate(),
+    }
   }
 }

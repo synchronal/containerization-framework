@@ -13,7 +13,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 /// `EXT4.Formatter(_:blockSize:minDiskSize:journal:)`'s defaulted arguments.
-/// [`Default`] uses Swift's defaults.
+/// [`Default`] uses Swift's defaults: 4096-byte blocks, a 256 KiB minimum
+/// disk size, and no journal.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FormatterOptions {
   pub block_size: u32,
@@ -32,7 +33,8 @@ impl Default for FormatterOptions {
 }
 
 /// `EXT4.Formatter.create(path:link:mode:ts:buf:uid:gid:xattrs:recursion:)`'s
-/// defaulted arguments. [`Default`] uses Swift's defaults. Swift's `buf` is a
+/// defaulted arguments. [`Default`] uses Swift's defaults: timestamps of now,
+/// no recursion, and every other argument `nil`. Swift's `buf` is a
 /// `ReadableStream`; here it is the file's bytes, which Swift reads through an
 /// `InputStream`. Swift's `fileBuffer` is a raw scratch buffer, and is left
 /// out.
@@ -48,7 +50,8 @@ pub struct CreateOptions<'a> {
 }
 
 /// `EXT4.Formatter.unpack(source:format:compression:progress:)`'s defaulted
-/// arguments. [`Default`] uses Swift's defaults.
+/// arguments. [`Default`] uses Swift's defaults: the restricted pax format,
+/// gzip compression, and no progress handler.
 pub struct UnpackOptions {
   pub format: containerization_archive::Format,
   pub compression: containerization_archive::Filter,

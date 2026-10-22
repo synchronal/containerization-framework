@@ -29,7 +29,7 @@ impl InitImage {
   }
 
   /// `InitImage.create(reference:rootfs:platform:labels:imageStore:contentStore:)`.
-  /// `rootfs` is a `.tar.gz` file.
+  /// `rootfs` is a `.tar.gz` file. Swift's `labels` defaults to `[:]`.
   pub fn create(
     reference: &str,
     rootfs: &Path,
@@ -66,5 +66,14 @@ impl InitImage {
       format!("unpack {} to {}", self.name(), at.display()),
     )
     .map(|outcome| outcome.mount())
+  }
+}
+
+/// Swift's `InitImage` is a struct, so a copy names the same image.
+impl Clone for InitImage {
+  fn clone(&self) -> Self {
+    Self {
+      handle: self.handle.duplicate(),
+    }
   }
 }

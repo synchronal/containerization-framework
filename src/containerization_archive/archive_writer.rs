@@ -14,7 +14,7 @@ use std::os::fd::RawFd;
 use std::path::Path;
 
 /// The defaulted arguments of `ArchiveWriter(format:filter:options:locales:file:)`.
-/// Its [`Default`] matches Swift's defaults: no options, and
+/// [`Default`] uses Swift's defaults: no options, and
 /// `ArchiveWriterConfiguration.defaultLocales`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ArchiveWriterOptions {

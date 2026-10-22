@@ -2,6 +2,7 @@
 //! registry entries and `ProcNetSnmp`, and getters for the `Binfmt.Entry`
 //! Swift reads.
 
+use crate::bridge::accessors;
 use crate::bridge::ffi;
 use crate::containerization_os;
 use crate::containerization_os::file_descriptor_ops;
@@ -25,9 +26,7 @@ impl binfmt::Entry {
 impl ffi::CzOutcome {
   /// The `Stat` an outcome holds.
   pub(crate) fn stat(&self) -> containerization_os::Stat {
-    let [dev, ino, mode, nlink, uid, gid, rdev] = self.stat_unsigned()[..] else {
-      panic!("Swift sends a `Stat`'s seven unsigned fields");
-    };
+    let [dev, ino, mode, nlink, uid, gid, rdev] = accessors::fixed(self.stat_unsigned(), "a `Stat`'s unsigned fields");
     let [
       size,
       blksize,
@@ -38,10 +37,7 @@ impl ffi::CzOutcome {
       mtime_nanos,
       ctime,
       ctime_nanos,
-    ] = self.stat_signed()[..]
-    else {
-      panic!("Swift sends a `Stat`'s nine signed fields");
-    };
+    ] = accessors::fixed(self.stat_signed(), "a `Stat`'s signed fields");
     let time = |seconds, nanoseconds: i64| containerization_os::TimeSpec {
       seconds,
       nanoseconds: nanoseconds as i32,
@@ -69,9 +65,11 @@ impl ffi::CzOutcome {
     let counters = self
       .proc_net_snmp_counters()
       .list(|counters| counters.optional(Self::proc_net_snmp_counters_value));
-    let [Some(tcp), Some(udp), Some(icmp), Some(ip), udp6, icmp6, ip6] = counters[..] else {
-      panic!("Swift sends `ProcNetSnmp`'s tcp, udp, icmp and ip counters, then the three IPv6 ones");
+    let [tcp, udp, icmp, ip, udp6, icmp6, ip6] = accessors::fixed(counters, "`ProcNetSnmp`'s protocols");
+    let required = |counters: Option<_>| {
+      counters.unwrap_or_else(|| unreachable!("Swift sends `ProcNetSnmp`'s tcp, udp, icmp and ip counters"))
     };
+    let [tcp, udp, icmp, ip] = [tcp, udp, icmp, ip].map(required);
 
     proc_net_snmp::ProcNetSnmp {
       tcp,
@@ -86,9 +84,10 @@ impl ffi::CzOutcome {
 
   /// The `ProcNetSnmp.Counters` an outcome holds.
   fn proc_net_snmp_counters_value(&self) -> proc_net_snmp::Counters {
-    let [received_packets, transmitted_packets] = self.proc_net_snmp_counters_numbers()[..] else {
-      panic!("Swift sends a `ProcNetSnmp.Counters`' two packet counts");
-    };
+    let [received_packets, transmitted_packets] = accessors::fixed(
+      self.proc_net_snmp_counters_numbers(),
+      "a `ProcNetSnmp.Counters`' packet counts",
+    );
     let optional = self
       .proc_net_snmp_counters_optional_numbers()
       .list(|number| number.optional(Self::number));
@@ -99,10 +98,7 @@ impl ffi::CzOutcome {
       transmitted_drops,
       received_errors,
       transmitted_errors,
-    ] = optional[..]
-    else {
-      panic!("Swift sends a `ProcNetSnmp.Counters`' six optional counters");
-    };
+    ] = accessors::fixed(optional, "a `ProcNetSnmp.Counters`' optional counters");
 
     proc_net_snmp::Counters {
       received_packets,

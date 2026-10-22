@@ -10,6 +10,20 @@ use crate::containerization::process;
 use crate::containerization::vm;
 use crate::containerization_oci::runtime;
 
+impl From<&mount::RuntimeOptions> for ffi::RuntimeKind {
+  fn from(options: &mount::RuntimeOptions) -> Self {
+    match options {
+      mount::RuntimeOptions::Virtioblk(_) => Self::Virtioblk,
+      mount::RuntimeOptions::Virtiofs(_) => Self::Virtiofs,
+      mount::RuntimeOptions::Shared => Self::Shared,
+      mount::RuntimeOptions::Any(_) => Self::Generic,
+    }
+  }
+}
+
+/// The `RuntimeOptions` of a kind, carrying `options` unless the kind is
+/// `Shared`. Unlike the other direction this isn't a `From`, since the kind
+/// alone doesn't hold the options.
 fn runtime_options_of(kind: ffi::RuntimeKind, options: Vec<String>) -> mount::RuntimeOptions {
   match kind {
     ffi::RuntimeKind::Virtioblk => mount::RuntimeOptions::Virtioblk(options),
@@ -46,12 +60,7 @@ impl container::Mount {
   }
 
   pub(crate) fn runtime_kind(&self) -> ffi::RuntimeKind {
-    match self.runtime_options {
-      mount::RuntimeOptions::Virtioblk(_) => ffi::RuntimeKind::Virtioblk,
-      mount::RuntimeOptions::Virtiofs(_) => ffi::RuntimeKind::Virtiofs,
-      mount::RuntimeOptions::Shared => ffi::RuntimeKind::Shared,
-      mount::RuntimeOptions::Any(_) => ffi::RuntimeKind::Generic,
-    }
+    (&self.runtime_options).into()
   }
 
   pub(crate) fn runtime_options_len(&self) -> usize {
@@ -210,11 +219,12 @@ pub(super) fn seccomp_mode(profile: &linux_container::configuration::SeccompProf
   }
 }
 
-/// Swift asks for this only when the mode is `Profile`.
+/// The `LinuxSeccomp` a custom profile holds, which Swift reads to rebuild
+/// the profile after [`seccomp_mode`] names it.
 pub(super) fn custom_seccomp(profile: &linux_container::configuration::SeccompProfile) -> &runtime::LinuxSeccomp {
   match profile {
     linux_container::configuration::SeccompProfile::Profile(profile) => profile,
-    _ => panic!("Swift asks for the profile only when the mode is `Profile`"),
+    _ => unreachable!("Swift asks for the profile only when the mode is `Profile`"),
   }
 }
 
@@ -226,6 +236,7 @@ mod tests {
   use crate::containerization::container::mount;
   use crate::containerization::process;
   use crate::containerization_oci::runtime;
+  use std::path::Path;
 
   #[test]
   fn copies_swifts_container_defaults() {
@@ -333,7 +344,8 @@ mod tests {
     configuration
       .process_mut()
       .set_arguments(vec!["/bin/true".into()]);
-    let socket = container::UnixSocketConfiguration::new("/host.sock", "/guest.sock").expect("a socket configuration");
+    let socket = container::UnixSocketConfiguration::new(Path::new("/host.sock"), Path::new("/guest.sock"))
+      .expect("a socket configuration");
     configuration.clear_sockets();
     configuration.push_socket(socket.handle.duplicate());
 

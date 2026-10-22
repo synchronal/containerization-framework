@@ -3,7 +3,8 @@
 
 use std::collections::BTreeMap;
 
-/// `ImageConfig`. Its `Default` is `ImageConfig()`, which holds nothing.
+/// `ImageConfig`. [`Default`] uses Swift's `ImageConfig()`, which holds
+/// nothing.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ImageConfig {
   pub user: Option<String>,
@@ -32,7 +33,7 @@ impl Rootfs {
   }
 }
 
-/// `History`. Its `Default` is `History()`, which holds nothing.
+/// `History`. [`Default`] uses Swift's `History()`, which holds nothing.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct History {
   pub created: Option<String>,

@@ -38,7 +38,8 @@ impl LocalContentStore {
 
   /// `LocalContentStore.delete(digests:)`: the digests deleted, and the bytes
   /// freed.
-  pub fn delete(&self, digests: Vec<String>) -> Result<(Vec<String>, u64), Error> {
+  pub fn delete(&self, digests: &[&str]) -> Result<(Vec<String>, u64), Error> {
+    let digests = digests.iter().map(|digest| digest.to_string()).collect();
     let outcome = platform::outcome(self.handle.delete_digests(digests), "delete content")?;
 
     Ok((outcome.strings(), outcome.number()))
@@ -46,7 +47,8 @@ impl LocalContentStore {
 
   /// `LocalContentStore.delete(keeping:)`: the digests deleted, and the bytes
   /// freed.
-  pub fn delete_keeping(&self, keeping: Vec<String>) -> Result<(Vec<String>, u64), Error> {
+  pub fn delete_keeping(&self, keeping: &[&str]) -> Result<(Vec<String>, u64), Error> {
+    let keeping = keeping.iter().map(|digest| digest.to_string()).collect();
     let outcome = platform::outcome(self.handle.delete_keeping(keeping), "delete content")?;
 
     Ok((outcome.strings(), outcome.number()))

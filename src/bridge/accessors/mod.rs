@@ -15,9 +15,12 @@
 //!
 //! A shape swift-bridge can't return becomes a set of getters. An optional
 //! nested value is read through `has_x` and `x`, and a list through `x_len`
-//! and `x_at`. A map is read as its length and the key and value at an
-//! index, and an enum as its kind and then its payload. Swift asks for an
-//! index only below the length.
+//! and `x_at`. A list of records is read as its length and a getter for each
+//! field of the element at an index, which is named for one element, as
+//! `rlimits_len` and `rlimit_type_at` are. A map is read the same way, as its
+//! length and the key and value at an index, so that `annotations_len` goes
+//! with `annotation_key_at` and `annotation_value_at`. An enum is read as its
+//! kind and then its payload. Swift asks for an index only below the length.
 //!
 //! Swift never makes a Rust value. It fills one that Rust hands it, clearing
 //! and pushing what it holds, so that it can hand back a configuration it
@@ -44,9 +47,10 @@
 ///   element at an index. `T` is `str` for a `Vec<String>`.
 /// - `optional_list x: T => has_x, x_len, x_at;` lends an `Option<Vec<T>>`
 ///   the same way, with a length of zero when it is `None`.
-/// - `map x => x_len, x_key_at, x_value_at;` lends a `BTreeMap<String, String>`
-///   as its length and the key and value at an index.
-/// - `optional_map x => has_x, x_len, x_key_at, x_value_at;` lends an
+/// - `map x => x_len, key_at, value_at;` lends a `BTreeMap<String, String>`
+///   as its length and the key and value at an index, whose getters are
+///   named for one entry.
+/// - `optional_map x => has_x, x_len, key_at, value_at;` lends an
 ///   `Option<BTreeMap<String, String>>` the same way.
 ///
 /// An entry can carry doc comments, which go on the getter it is named for.
@@ -176,8 +180,10 @@ mod addresses;
 mod archive;
 mod cloud_hypervisor;
 mod container;
+#[macro_use]
 mod ext4;
 mod images;
+mod io;
 mod os;
 mod spec;
 
@@ -202,7 +208,7 @@ fn lossy_path(path: &Path) -> String {
 fn present<T>(value: &Option<T>) -> &T {
   value
     .as_ref()
-    .expect("Swift asks for an optional field only after its `has_` getter")
+    .unwrap_or_else(|| unreachable!("Swift asks for an optional field only after its `has_` getter"))
 }
 
 /// The `index`th entry of a sorted map.
@@ -211,7 +217,24 @@ fn entry_at<T>(map: &BTreeMap<String, T>, index: usize) -> (&str, &T) {
     .iter()
     .nth(index)
     .map(|(key, value)| (key.as_str(), value))
-    .expect("Swift asks for an entry only below the length")
+    .unwrap_or_else(|| unreachable!("Swift asks for an entry only below the length"))
+}
+
+/// The `N` values Swift sends for a fixed set of fields, `what` naming them
+/// in the message if Swift sends another number.
+fn fixed<T, const N: usize>(values: Vec<T>, what: &str) -> [T; N] {
+  let count = values.len();
+
+  values
+    .try_into()
+    .unwrap_or_else(|_| unreachable!("Swift sends {N} values for {what}, not {count}"))
+}
+
+/// Each case's raw value, in the order `all` lists them, for a test that
+/// checks them against Swift's.
+#[cfg(test)]
+fn raw_values<T: Copy>(all: &[T], raw_value: fn(T) -> &'static str) -> Vec<&'static str> {
+  all.iter().map(|case| raw_value(*case)).collect()
 }
 
 impl ffi::CzOutcome {

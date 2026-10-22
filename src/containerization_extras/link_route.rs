@@ -1,7 +1,7 @@
 use super::address;
 
 /// `LinkRoute`, which [`crate::containerization::vm::Vminitd::route_add_link`]
-/// installs. Its `Default` is Swift's `LinkRoute()`.
+/// installs. [`Default`] uses Swift's `LinkRoute()`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct LinkRoute {
   pub ipv4_destination: Option<address::IPv4Address>,

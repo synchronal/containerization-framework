@@ -14,6 +14,22 @@ pub struct CIDRv6 {
 }
 
 impl CIDRv6 {
+  /// A `CIDRv6?`, as it crosses to Swift: whether there is one, and it, or
+  /// an empty one that Swift doesn't read. (swift-bridge can't pass an
+  /// `Option` of a Rust type.)
+  pub(crate) fn crossing(cidr: Option<&Self>) -> (bool, Self) {
+    match cidr {
+      Some(cidr) => (true, cidr.clone()),
+      None => (
+        false,
+        Self {
+          address: IPv6Address::new(0, None),
+          prefix: Prefix { length: 0 },
+        },
+      ),
+    }
+  }
+
   /// `CIDRv6(_ cidr: String)`.
   pub fn parse(cidr: &str) -> Result<Self, Error> {
     platform::outcome(

@@ -16,6 +16,12 @@ final class CzVminitd: Sendable {
     self.agent = agent
   }
 
+  /// Another handle on the same agent connection, as a copy of Swift's
+  /// struct.
+  func duplicate() -> CzVminitd {
+    CzVminitd(agent)
+  }
+
   func standardSetup() -> CzOutcome {
     .awaiting { try await self.agent.standardSetup() }
   }

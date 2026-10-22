@@ -198,7 +198,7 @@ pub(super) fn push_hosts_entry(
 ) {
   hosts
     .as_mut()
-    .expect("Swift adds a hosts entry only after set_hosts")
+    .unwrap_or_else(|| unreachable!("Swift adds a hosts entry only after set_hosts"))
     .entries
     .push(hosts::Entry {
       ip_address,

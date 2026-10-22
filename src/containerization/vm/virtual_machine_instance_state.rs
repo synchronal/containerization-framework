@@ -10,14 +10,13 @@ pub enum VirtualMachineInstanceState {
   Unknown,
 }
 
-impl From<ffi::InstanceState> for VirtualMachineInstanceState {
-  fn from(state: ffi::InstanceState) -> Self {
-    match state {
-      ffi::InstanceState::Starting => Self::Starting,
-      ffi::InstanceState::Running => Self::Running,
-      ffi::InstanceState::Stopped => Self::Stopped,
-      ffi::InstanceState::Stopping => Self::Stopping,
-      ffi::InstanceState::Unknown => Self::Unknown,
-    }
+same_variants!(
+  VirtualMachineInstanceState,
+  ffi::InstanceState {
+    Starting,
+    Running,
+    Stopped,
+    Stopping,
+    Unknown,
   }
-}
+);

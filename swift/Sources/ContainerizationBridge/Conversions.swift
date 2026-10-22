@@ -54,6 +54,16 @@ func swiftCase<T: RawRepresentable>(_ rawValue: RustStr) -> T where T.RawValue =
   return value
 }
 
+/// The case a Rust caller named by its `rawValue`. Unlike `swiftCase`, which
+/// reads a raw value from Rust's own enum, this reads a string any caller may
+/// pass, so it throws, naming `what`, when no case has it.
+func parsedCase<T: RawRepresentable>(_ rawValue: String, _ what: String) throws -> T where T.RawValue == String {
+  guard let value = T(rawValue: rawValue) else {
+    throw BridgeError.malformed(what, rawValue)
+  }
+  return value
+}
+
 /// The file URL of a path Rust lends. Rust lends `nil` for a path that isn't
 /// UTF-8, which a `String` can't hold, and this throws, naming `what` and the
 /// path as `lossy` gives it.

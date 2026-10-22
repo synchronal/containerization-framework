@@ -20,19 +20,18 @@ pub enum LogLevel {
   Critical,
 }
 
-impl From<LogLevel> for ffi::LogLevel {
-  fn from(level: LogLevel) -> Self {
-    match level {
-      LogLevel::Trace => Self::Trace,
-      LogLevel::Debug => Self::Debug,
-      LogLevel::Info => Self::Info,
-      LogLevel::Notice => Self::Notice,
-      LogLevel::Warning => Self::Warning,
-      LogLevel::Error => Self::Error,
-      LogLevel::Critical => Self::Critical,
-    }
+same_variants!(
+  LogLevel,
+  ffi::LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Notice,
+    Warning,
+    Error,
+    Critical,
   }
-}
+);
 
 /// `Kernel.CommandLine`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,7 +46,8 @@ impl CommandLine {
     strings(&["console=hvc0", "tsc=reliable"])
   }
 
-  /// `Kernel.CommandLine(debug:panic:initArgs:)`.
+  /// `Kernel.CommandLine(debug:panic:initArgs:)`. Swift's `initArgs`
+  /// defaults to `[]`.
   pub fn new(debug: bool, panic: i64, init_args: Vec<String>) -> Self {
     let mut kernel_args = Self::kernel_defaults();
 

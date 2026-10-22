@@ -183,6 +183,8 @@ final class CzImageStore: Sendable {
     let store = store
 
     return CzOutcome {
+      // Rebuilt without its labels, as the exact `([String], UInt64)` of a
+      // content store's delete, which `strings` and `number` cast to.
       let (deleted, freed) = try blocking { try await store.cleanUpOrphanedBlobs() }
       return (deleted, freed)
     }
@@ -356,6 +358,11 @@ final class CzKernelImage: Sendable {
     self.image = image
   }
 
+  /// Another handle on the same kernel image, as a copy of Swift's struct.
+  func duplicate() -> CzKernelImage {
+    CzKernelImage(image)
+  }
+
   func name() -> String {
     image.name
   }
@@ -416,6 +423,11 @@ final class CzInitImage: Sendable {
 
   init(_ image: InitImage) {
     self.image = image
+  }
+
+  /// Another handle on the same init image, as a copy of Swift's struct.
+  func duplicate() -> CzInitImage {
+    CzInitImage(image)
   }
 
   func name() -> String {

@@ -36,7 +36,8 @@ impl Signal {
     Self::parsed(ffi::cz_signal_parse(name), name)
   }
 
-  /// `Signal(_:from:)`, looked up in `map` instead.
+  /// `Signal(_:from:)`, looked up in `map` instead of Swift's default,
+  /// `Signal.linux`.
   pub fn parse_from(name: &str, map: &BTreeMap<String, i32>) -> Result<Self, Error> {
     Self::parsed(
       ffi::cz_signal_parse_from(name, map.keys().cloned().collect(), map.values().copied().collect()),

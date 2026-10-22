@@ -1,7 +1,7 @@
 use crate::platform;
 use std::time::SystemTime;
 
-/// `FileTimestamps`. [`Default`] is Swift's `init()`, which sets every date
+/// `FileTimestamps`. [`Default`] uses Swift's `init()`, which sets every date
 /// to now.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FileTimestamps {
@@ -24,42 +24,51 @@ impl FileTimestamps {
     }
   }
 
-  /// `accessLo`.
+  /// `FileTimestamps.accessLo`, the low 32 bits of `access`'s seconds since
+  /// 1970, as an ext4 inode stores them.
   pub fn access_lo(&self) -> u32 {
     lo(self.access)
   }
 
-  /// `accessHi`.
+  /// `FileTimestamps.accessHi`, `access`'s ext4 extra field: two bits
+  /// counting how often the seconds wrapped, and 30 bits of nanoseconds.
   pub fn access_hi(&self) -> u32 {
     hi(self.access)
   }
 
-  /// `modificationLo`.
+  /// `FileTimestamps.modificationLo`, the low 32 bits of `modification`'s
+  /// seconds since 1970, as an ext4 inode stores them.
   pub fn modification_lo(&self) -> u32 {
     lo(self.modification)
   }
 
-  /// `modificationHi`.
+  /// `FileTimestamps.modificationHi`, `modification`'s ext4 extra field: two
+  /// bits counting how often the seconds wrapped, and 30 bits of
+  /// nanoseconds.
   pub fn modification_hi(&self) -> u32 {
     hi(self.modification)
   }
 
-  /// `creationLo`.
+  /// `FileTimestamps.creationLo`, the low 32 bits of `creation`'s seconds
+  /// since 1970, as an ext4 inode stores them.
   pub fn creation_lo(&self) -> u32 {
     lo(self.creation)
   }
 
-  /// `creationHi`.
+  /// `FileTimestamps.creationHi`, `creation`'s ext4 extra field: two bits
+  /// counting how often the seconds wrapped, and 30 bits of nanoseconds.
   pub fn creation_hi(&self) -> u32 {
     hi(self.creation)
   }
 
-  /// `nowLo`.
+  /// `FileTimestamps.nowLo`, the low 32 bits of `now`'s seconds since 1970,
+  /// as an ext4 inode stores them.
   pub fn now_lo(&self) -> u32 {
     lo(self.now)
   }
 
-  /// `nowHi`.
+  /// `FileTimestamps.nowHi`, `now`'s ext4 extra field: two bits counting how
+  /// often the seconds wrapped, and 30 bits of nanoseconds.
   pub fn now_hi(&self) -> u32 {
     hi(self.now)
   }

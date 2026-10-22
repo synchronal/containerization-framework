@@ -102,7 +102,7 @@ pub fn initfs() -> cfw::containerization::container::Mount {
     let partial = path.with_extension("ext4.partial");
     let _ = std::fs::remove_file(&partial);
     image_store()
-      .get_init_image(INITFS_REFERENCE, None, None)
+      .get_init_image(INITFS_REFERENCE, Default::default())
       .unwrap_or_else(|error| panic!("{INITFS_REFERENCE} should pull: {error}"))
       .init_block(&partial, cfw::containerization::vm::SystemPlatform::LINUX_ARM)
       .unwrap_or_else(|error| panic!("{INITFS_REFERENCE} should unpack to {}: {error}", partial.display()));

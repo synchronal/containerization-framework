@@ -1,5 +1,5 @@
-//! `VmnetNetwork`, the operating [`Mode`] it takes, and the [`Interface`]s it
-//! makes.
+//! `VmnetNetwork`, the [`VmnetNetworkOptions`] and operating [`Mode`] it
+//! takes, and the [`Interface`]s it makes.
 
 use crate::containerization_extras;
 use crate::error::Error;
@@ -19,14 +19,16 @@ pub enum Mode {
   Bridged,
 }
 
-impl From<Mode> for ffi::VmnetMode {
-  fn from(mode: Mode) -> Self {
-    match mode {
-      Mode::Shared => Self::Shared,
-      Mode::Host => Self::Host,
-      Mode::Bridged => Self::Bridged,
-    }
-  }
+same_variants!(Mode, ffi::VmnetMode { Shared, Host, Bridged });
+
+/// The defaulted arguments of `VmnetNetwork(mode:subnet:prefixV6:)`, which
+/// are all of them. [`Default`] uses Swift's defaults: [`Mode::Shared`], and
+/// no subnet or prefix, which leaves vmnet to choose them.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VmnetNetworkOptions {
+  pub mode: Mode,
+  pub subnet: Option<containerization_extras::address::CIDRv4>,
+  pub prefix_v6: Option<containerization_extras::address::CIDRv6>,
 }
 
 /// `VmnetNetwork.Interface`, attached to the network that made it.
@@ -96,7 +98,9 @@ impl fmt::Debug for Interface {
 }
 
 /// Two interfaces are equal when their six public fields are. Swift's type
-/// isn't `Equatable`, and the network it attaches to is private.
+/// isn't `Equatable`, and the network it attaches to is private. Rust has
+/// this so that [`super::Interface`], and the container configurations that
+/// hold it, can derive `PartialEq` and `Eq`.
 impl PartialEq for Interface {
   fn eq(&self, other: &Self) -> bool {
     self.ipv4_address() == other.ipv4_address()
@@ -132,27 +136,14 @@ impl fmt::Debug for VmnetNetwork {
 }
 
 impl VmnetNetwork {
-  /// `VmnetNetwork(mode:subnet:prefixV6:)`. A `None` subnet or prefix is
-  /// left to vmnet to choose.
-  pub fn new(
-    mode: Mode,
-    subnet: Option<containerization_extras::address::CIDRv4>,
-    prefix_v6: Option<containerization_extras::address::CIDRv6>,
-  ) -> Result<Self, Error> {
-    let (has_prefix_v6, prefix_v6) = match prefix_v6 {
-      Some(prefix_v6) => (true, prefix_v6),
-      None => (
-        false,
-        containerization_extras::address::CIDRv6 {
-          address: containerization_extras::address::IPv6Address::new(0, None),
-          prefix: containerization_extras::address::Prefix { length: 0 },
-        },
-      ),
-    };
+  /// `VmnetNetwork(mode:subnet:prefixV6:)`.
+  pub fn new(options: VmnetNetworkOptions) -> Result<Self, Error> {
+    let subnet = options.subnet;
+    let (has_prefix_v6, prefix_v6) = containerization_extras::address::CIDRv6::crossing(options.prefix_v6.as_ref());
 
     let outcome = platform::outcome(
       ffi::cz_vmnet_network_new(
-        mode.into(),
+        options.mode.into(),
         subnet.map(|subnet| subnet.address.value),
         subnet.map_or(0, |subnet| subnet.prefix.length),
         has_prefix_v6,

@@ -206,8 +206,14 @@ fn parses_network_protocol_counters() {
   let netstat = "IpExt: InNoRoutes InOctets OutOctets\nIpExt: 8 4000 3000\n";
   let snmp6 = "Ip6InReceives 50\nIp6InOctets 1000\nIp6OutRequests 40\nUdp6InDatagrams 60\nIcmp6InMsgs 6\n";
 
-  let counters = cfw::containerization_os::linux::ProcNetSnmp::new(snmp, Some(netstat), Some(snmp6))
-    .expect("the counters should parse");
+  let counters = cfw::containerization_os::linux::ProcNetSnmp::new(
+    snmp,
+    cfw::containerization_os::linux::proc_net_snmp::ProcNetSnmpOptions {
+      netstat: Some(netstat),
+      snmp6: Some(snmp6),
+    },
+  )
+  .expect("the counters should parse");
 
   assert_eq!(
     counters.udp,
@@ -232,7 +238,7 @@ fn parses_network_protocol_counters() {
   assert_eq!(counters.udp6.expect("snmp6 was given").received_packets, 60);
 
   let without_ipv6 =
-    cfw::containerization_os::linux::ProcNetSnmp::new(snmp, None, None).expect("the counters should parse");
+    cfw::containerization_os::linux::ProcNetSnmp::new(snmp, Default::default()).expect("the counters should parse");
   assert_eq!(without_ipv6.ip6, None);
   assert_eq!(
     without_ipv6.ip.received_bytes,

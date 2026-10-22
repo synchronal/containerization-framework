@@ -24,6 +24,8 @@ pub struct Vminitd {
   pub(crate) handle: ffi::CzVminitd,
 }
 
+opaque_debug!(Vminitd);
+
 // Swift's `Vminitd` is `Sendable`.
 unsafe impl Send for Vminitd {}
 unsafe impl Sync for Vminitd {}
@@ -337,4 +339,12 @@ impl Vminitd {
   }
 }
 
-opaque_debug!(Vminitd);
+/// Swift's `Vminitd` is a struct, so a copy shares the connection, and
+/// [`Vminitd::close`] on either closes it for both.
+impl Clone for Vminitd {
+  fn clone(&self) -> Self {
+    Self {
+      handle: self.handle.duplicate(),
+    }
+  }
+}

@@ -10,12 +10,4 @@ pub enum FilesystemOperation {
   Trim,
 }
 
-impl From<FilesystemOperation> for ffi::FilesystemOperationKind {
-  fn from(operation: FilesystemOperation) -> Self {
-    match operation {
-      FilesystemOperation::Freeze => Self::Freeze,
-      FilesystemOperation::Thaw => Self::Thaw,
-      FilesystemOperation::Trim => Self::Trim,
-    }
-  }
-}
+same_variants!(FilesystemOperation, ffi::FilesystemOperationKind { Freeze, Thaw, Trim });

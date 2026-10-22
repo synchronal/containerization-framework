@@ -90,7 +90,7 @@ pub struct NetworkStatistics {
 }
 
 /// `ContainerStatistics.NetworkProtocolCounters`, the packet and byte counters
-/// for one protocol. [`Default`] is Swift's initializer with its defaults:
+/// for one protocol. [`Default`] uses Swift's initializer's defaults:
 /// zero packets, and every other counter `None`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct NetworkProtocolCounters {

@@ -18,7 +18,8 @@ pub struct EXT4Unpacker {
 }
 
 impl EXT4Unpacker {
-  /// `EXT4Unpacker(capacityInBytes:journal:)`.
+  /// `EXT4Unpacker(capacityInBytes:journal:)`. Swift's `journal` defaults to
+  /// `nil`.
   pub fn new(capacity_in_bytes: u64, journal: Option<ext4::JournalConfig>) -> Self {
     Self {
       capacity_in_bytes,
@@ -26,7 +27,8 @@ impl EXT4Unpacker {
     }
   }
 
-  /// `EXT4Unpacker.unpack(_:for:at:progress:)`.
+  /// `EXT4Unpacker.unpack(_:for:at:progress:)`. Swift's `progress` defaults
+  /// to `nil`.
   pub fn unpack(
     &self,
     image: &Image,

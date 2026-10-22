@@ -26,7 +26,8 @@ pub struct Mount {
 }
 
 impl Mount {
-  /// `Mount.share(source:destination:options:runtimeOptions:)`.
+  /// `Mount.share(source:destination:options:runtimeOptions:)`. Swift's
+  /// `options` and `runtimeOptions` default to `[]`.
   pub fn share(
     source: impl Into<String>,
     destination: impl Into<String>,
@@ -43,6 +44,7 @@ impl Mount {
   }
 
   /// `Mount.block(format:source:destination:options:runtimeOptions:)`.
+  /// Swift's `options` and `runtimeOptions` default to `[]`.
   pub fn block(
     format: impl Into<String>,
     source: impl Into<String>,
@@ -59,7 +61,8 @@ impl Mount {
     }
   }
 
-  /// `Mount.any(type:source:destination:options:runtimeOptions:)`.
+  /// `Mount.any(type:source:destination:options:runtimeOptions:)`. Swift's
+  /// `options` and `runtimeOptions` default to `[]`.
   pub fn any(
     r#type: impl Into<String>,
     source: impl Into<String>,
@@ -76,7 +79,8 @@ impl Mount {
     }
   }
 
-  /// `Mount.sharedMount(name:destination:options:)`.
+  /// `Mount.sharedMount(name:destination:options:)`. Swift's `options`
+  /// defaults to `[]`.
   pub fn shared_mount(name: impl Into<String>, destination: impl Into<String>, options: &[&str]) -> Self {
     Self {
       r#type: "none".to_string(),

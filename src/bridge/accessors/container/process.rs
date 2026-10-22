@@ -47,45 +47,49 @@ impl process::LinuxCapabilities {
   }
 }
 
-fn rlimit_kind(kind: linux_rlimit::Kind) -> ffi::RlimitKind {
-  match kind {
-    linux_rlimit::Kind::AddressSpace => ffi::RlimitKind::AddressSpace,
-    linux_rlimit::Kind::CoreFileSize => ffi::RlimitKind::CoreFileSize,
-    linux_rlimit::Kind::CpuTime => ffi::RlimitKind::CpuTime,
-    linux_rlimit::Kind::DataSize => ffi::RlimitKind::DataSize,
-    linux_rlimit::Kind::FileSize => ffi::RlimitKind::FileSize,
-    linux_rlimit::Kind::Locks => ffi::RlimitKind::Locks,
-    linux_rlimit::Kind::LockedMemory => ffi::RlimitKind::LockedMemory,
-    linux_rlimit::Kind::MessageQueue => ffi::RlimitKind::MessageQueue,
-    linux_rlimit::Kind::Nice => ffi::RlimitKind::Nice,
-    linux_rlimit::Kind::OpenFiles => ffi::RlimitKind::OpenFiles,
-    linux_rlimit::Kind::NumberOfProcesses => ffi::RlimitKind::NumberOfProcesses,
-    linux_rlimit::Kind::ResidentSetSize => ffi::RlimitKind::ResidentSetSize,
-    linux_rlimit::Kind::RealtimePriority => ffi::RlimitKind::RealtimePriority,
-    linux_rlimit::Kind::RealtimeTimeout => ffi::RlimitKind::RealtimeTimeout,
-    linux_rlimit::Kind::SignalsPending => ffi::RlimitKind::SignalsPending,
-    linux_rlimit::Kind::StackSize => ffi::RlimitKind::StackSize,
+impl From<linux_rlimit::Kind> for ffi::RlimitKind {
+  fn from(kind: linux_rlimit::Kind) -> Self {
+    match kind {
+      linux_rlimit::Kind::AddressSpace => Self::AddressSpace,
+      linux_rlimit::Kind::CoreFileSize => Self::CoreFileSize,
+      linux_rlimit::Kind::CpuTime => Self::CpuTime,
+      linux_rlimit::Kind::DataSize => Self::DataSize,
+      linux_rlimit::Kind::FileSize => Self::FileSize,
+      linux_rlimit::Kind::Locks => Self::Locks,
+      linux_rlimit::Kind::LockedMemory => Self::LockedMemory,
+      linux_rlimit::Kind::MessageQueue => Self::MessageQueue,
+      linux_rlimit::Kind::Nice => Self::Nice,
+      linux_rlimit::Kind::OpenFiles => Self::OpenFiles,
+      linux_rlimit::Kind::NumberOfProcesses => Self::NumberOfProcesses,
+      linux_rlimit::Kind::ResidentSetSize => Self::ResidentSetSize,
+      linux_rlimit::Kind::RealtimePriority => Self::RealtimePriority,
+      linux_rlimit::Kind::RealtimeTimeout => Self::RealtimeTimeout,
+      linux_rlimit::Kind::SignalsPending => Self::SignalsPending,
+      linux_rlimit::Kind::StackSize => Self::StackSize,
+    }
   }
 }
 
-fn linux_rlimit_kind(kind: ffi::RlimitKind) -> linux_rlimit::Kind {
-  match kind {
-    ffi::RlimitKind::AddressSpace => linux_rlimit::Kind::AddressSpace,
-    ffi::RlimitKind::CoreFileSize => linux_rlimit::Kind::CoreFileSize,
-    ffi::RlimitKind::CpuTime => linux_rlimit::Kind::CpuTime,
-    ffi::RlimitKind::DataSize => linux_rlimit::Kind::DataSize,
-    ffi::RlimitKind::FileSize => linux_rlimit::Kind::FileSize,
-    ffi::RlimitKind::Locks => linux_rlimit::Kind::Locks,
-    ffi::RlimitKind::LockedMemory => linux_rlimit::Kind::LockedMemory,
-    ffi::RlimitKind::MessageQueue => linux_rlimit::Kind::MessageQueue,
-    ffi::RlimitKind::Nice => linux_rlimit::Kind::Nice,
-    ffi::RlimitKind::OpenFiles => linux_rlimit::Kind::OpenFiles,
-    ffi::RlimitKind::NumberOfProcesses => linux_rlimit::Kind::NumberOfProcesses,
-    ffi::RlimitKind::ResidentSetSize => linux_rlimit::Kind::ResidentSetSize,
-    ffi::RlimitKind::RealtimePriority => linux_rlimit::Kind::RealtimePriority,
-    ffi::RlimitKind::RealtimeTimeout => linux_rlimit::Kind::RealtimeTimeout,
-    ffi::RlimitKind::SignalsPending => linux_rlimit::Kind::SignalsPending,
-    ffi::RlimitKind::StackSize => linux_rlimit::Kind::StackSize,
+impl From<ffi::RlimitKind> for linux_rlimit::Kind {
+  fn from(kind: ffi::RlimitKind) -> Self {
+    match kind {
+      ffi::RlimitKind::AddressSpace => Self::AddressSpace,
+      ffi::RlimitKind::CoreFileSize => Self::CoreFileSize,
+      ffi::RlimitKind::CpuTime => Self::CpuTime,
+      ffi::RlimitKind::DataSize => Self::DataSize,
+      ffi::RlimitKind::FileSize => Self::FileSize,
+      ffi::RlimitKind::Locks => Self::Locks,
+      ffi::RlimitKind::LockedMemory => Self::LockedMemory,
+      ffi::RlimitKind::MessageQueue => Self::MessageQueue,
+      ffi::RlimitKind::Nice => Self::Nice,
+      ffi::RlimitKind::OpenFiles => Self::OpenFiles,
+      ffi::RlimitKind::NumberOfProcesses => Self::NumberOfProcesses,
+      ffi::RlimitKind::ResidentSetSize => Self::ResidentSetSize,
+      ffi::RlimitKind::RealtimePriority => Self::RealtimePriority,
+      ffi::RlimitKind::RealtimeTimeout => Self::RealtimeTimeout,
+      ffi::RlimitKind::SignalsPending => Self::SignalsPending,
+      ffi::RlimitKind::StackSize => Self::StackSize,
+    }
   }
 }
 
@@ -157,7 +161,7 @@ impl process::LinuxProcessConfiguration {
 
   pub(crate) fn push_rlimit(&mut self, kind: ffi::RlimitKind, hard: u64, soft: u64) {
     self.rlimits.push(process::LinuxRLimit {
-      kind: linux_rlimit_kind(kind),
+      kind: kind.into(),
       hard,
       soft,
     });
@@ -175,7 +179,7 @@ impl process::LinuxProcessConfiguration {
   }
 
   pub(crate) fn rlimit_kind_at(&self, index: usize) -> ffi::RlimitKind {
-    rlimit_kind(self.rlimits[index].kind)
+    self.rlimits[index].kind.into()
   }
 
   pub(crate) fn rlimit_hard_at(&self, index: usize) -> u64 {
@@ -198,7 +202,7 @@ impl process::LinuxProcessConfiguration {
 
 impl process::LinuxRLimit {
   pub(crate) fn kind(&self) -> ffi::RlimitKind {
-    rlimit_kind(self.kind)
+    self.kind.into()
   }
 
   getters! {

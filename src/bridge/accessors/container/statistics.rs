@@ -1,5 +1,6 @@
 //! Getters for the container statistics Swift reports.
 
+use crate::bridge::accessors;
 use crate::bridge::ffi;
 use crate::containerization::container;
 use crate::containerization::container::container_statistics;
@@ -134,11 +135,10 @@ impl ffi::CzOutcome {
       }),
       network_protocols: self.statistics_network_protocols().optional(|protocols| {
         let counters = protocols.list(|counters| counters.optional(Self::network_protocol_counters));
-        let count = counters.len();
-        let [tcp, udp, icmp, ip, udp6, icmp6, ip6] = counters
-          .try_into()
-          .unwrap_or_else(|_| panic!("Swift's protocol statistics have {count} protocols, not 7"));
-        let required = |counters: Option<_>| counters.expect("Swift's tcp, udp, icmp and ip counters aren't optional");
+        let [tcp, udp, icmp, ip, udp6, icmp6, ip6] = accessors::fixed(counters, "the protocol statistics' protocols");
+        let required = |counters: Option<_>| {
+          counters.unwrap_or_else(|| unreachable!("Swift sends the tcp, udp, icmp and ip counters"))
+        };
         container_statistics::NetworkProtocolStatistics {
           tcp: required(tcp),
           udp: required(udp),
@@ -182,12 +182,7 @@ impl ffi::CzOutcome {
 
   /// The `UInt64` fields of the statistics held, which number `N`.
   fn statistics_fields<const N: usize>(&self) -> [u64; N] {
-    let fields = self.statistics_numbers();
-    let count = fields.len();
-
-    fields
-      .try_into()
-      .unwrap_or_else(|_| panic!("Swift's statistics have {count} numbers, not {N}"))
+    accessors::fixed(self.statistics_numbers(), "the statistics' numbers")
   }
 
   /// The `UInt64?` fields of the statistics held, which number `N`.
@@ -195,10 +190,7 @@ impl ffi::CzOutcome {
     let fields = self
       .statistics_optional_numbers()
       .list(|number| number.optional(Self::number));
-    let count = fields.len();
 
-    fields
-      .try_into()
-      .unwrap_or_else(|_| panic!("Swift's statistics have {count} optional numbers, not {N}"))
+    accessors::fixed(fields, "the statistics' optional numbers")
   }
 }

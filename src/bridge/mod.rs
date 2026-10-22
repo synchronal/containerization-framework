@@ -788,10 +788,8 @@ pub(crate) mod ffi {
     fn platform_os(self: &CzOutcome) -> String;
     #[swift_bridge(swift_name = "platformOsVersion")]
     fn platform_os_version(self: &CzOutcome) -> Option<String>;
-    #[swift_bridge(swift_name = "platformHasOsFeatures")]
-    fn platform_has_os_features(self: &CzOutcome) -> bool;
     #[swift_bridge(swift_name = "platformOsFeatures")]
-    fn platform_os_features(self: &CzOutcome) -> Vec<String>;
+    fn platform_os_features(self: &CzOutcome) -> CzOutcome;
     #[swift_bridge(swift_name = "platformVariant")]
     fn platform_variant(self: &CzOutcome) -> Option<String>;
 
@@ -2641,6 +2639,7 @@ pub(crate) mod ffi {
     type CzKernelImage;
     #[swift_bridge(swift_name = "kernelImage")]
     fn kernel_image(self: &CzOutcome) -> CzKernelImage;
+    fn duplicate(self: &CzKernelImage) -> CzKernelImage;
     fn name(self: &CzKernelImage) -> String;
     fn kernel(self: &CzKernelImage, platform: RustSystemPlatform) -> CzOutcome;
     // For a test that compares Rust's copy with it.
@@ -2661,6 +2660,7 @@ pub(crate) mod ffi {
     type CzInitImage;
     #[swift_bridge(swift_name = "initImage")]
     fn init_image(self: &CzOutcome) -> CzInitImage;
+    fn duplicate(self: &CzInitImage) -> CzInitImage;
     fn name(self: &CzInitImage) -> String;
     #[swift_bridge(swift_name = "initBlock")]
     fn init_block(self: &CzInitImage, at: &str, platform: RustSystemPlatform) -> CzOutcome;
@@ -2826,6 +2826,7 @@ pub(crate) mod ffi {
     // `[ContainerStatistics]` and `stat`'s a `Stat`.
     type CzVminitd;
     fn vminitd(self: &CzOutcome) -> CzVminitd;
+    fn duplicate(self: &CzVminitd) -> CzVminitd;
     #[swift_bridge(swift_name = "standardSetup")]
     fn standard_setup(self: &CzVminitd) -> CzOutcome;
     fn close(self: &CzVminitd) -> CzOutcome;

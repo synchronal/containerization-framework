@@ -10,11 +10,4 @@ pub enum VirtiofsLayout {
   PerTag,
 }
 
-impl From<ffi::VirtiofsLayoutKind> for VirtiofsLayout {
-  fn from(layout: ffi::VirtiofsLayoutKind) -> Self {
-    match layout {
-      ffi::VirtiofsLayoutKind::Unified => Self::Unified,
-      ffi::VirtiofsLayoutKind::PerTag => Self::PerTag,
-    }
-  }
-}
+same_variants!(VirtiofsLayout, ffi::VirtiofsLayoutKind { Unified, PerTag });

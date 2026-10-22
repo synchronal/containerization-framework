@@ -3,6 +3,7 @@
 //===----------------------------------------------------------------------===//
 
 import ContainerizationOCI
+import Crypto
 import Foundation
 
 func openContentWriter(base: RustStr) -> CzOutcome {
@@ -24,19 +25,13 @@ final class CzContentWriter: @unchecked Sendable {
   func write(data: RustVec<UInt8>) -> CzOutcome {
     let data = Data(data)
 
-    return CzOutcome {
-      let (size, digest) = try writer.write(data)
-      return Written(size: size, digest: digest.digestString)
-    }
+    return CzOutcome { Written(try writer.write(data)) }
   }
 
   func create(from: RustStr) -> CzOutcome {
     let url = URL(filePath: from.toString())
 
-    return CzOutcome {
-      let (size, digest) = try writer.create(from: url)
-      return Written(size: size, digest: digest.digestString)
-    }
+    return CzOutcome { Written(try writer.create(from: url)) }
   }
 }
 
@@ -44,16 +39,19 @@ func copyContent(from: RustStr, destination: RustStr) -> CzOutcome {
   let url = URL(filePath: from.toString())
   let destination = URL(filePath: destination.toString())
 
-  return CzOutcome {
-    let (size, digest) = try ContentWriter.copy(from: url, destination: destination)
-    return Written(size: size, digest: digest.digestString)
-  }
+  return CzOutcome { Written(try ContentWriter.copy(from: url, destination: destination)) }
 }
 
 /// What a `ContentWriter` wrote.
 struct Written {
   let size: Int64
   let digest: String
+
+  /// The size and digest a write returns.
+  init(_ written: (Int64, SHA256.Digest)) {
+    size = written.0
+    digest = written.1.digestString
+  }
 }
 
 extension CzOutcome {

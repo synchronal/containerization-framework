@@ -1,11 +1,22 @@
-//! `ProcNetSnmp`, and its nested `ProcNetSnmp.Counters`.
+//! `ProcNetSnmp`, its nested `ProcNetSnmp.Counters`, and the
+//! [`ProcNetSnmpOptions`] its initializer takes.
 
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 
+/// The defaulted arguments of `ProcNetSnmp(snmp:netstat:snmp6:)`.
+/// [`Default`] uses Swift's defaults, which are both `nil`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ProcNetSnmpOptions<'a> {
+  /// The contents of `/proc/net/netstat`.
+  pub netstat: Option<&'a str>,
+  /// The contents of `/proc/net/snmp6`.
+  pub snmp6: Option<&'a str>,
+}
+
 /// `ProcNetSnmp.Counters`, the traffic counters for one protocol. [`Default`]
-/// is Swift's `init()`: zero packets, and every other counter `None`.
+/// uses Swift's `init()`: zero packets, and every other counter `None`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Counters {
   pub received_packets: u64,
@@ -27,7 +38,7 @@ pub struct Counters {
 /// `ProcNetSnmp`, the protocol traffic counters of a network namespace, as
 /// the kernel reports them in `/proc/net/snmp`, `/proc/net/netstat` and
 /// `/proc/net/snmp6`. They cover the whole namespace, including loopback,
-/// and not one interface. [`Default`] is Swift's `init()`: every counter at
+/// and not one interface. [`Default`] uses Swift's `init()`: every counter at
 /// its default, and no IPv6 counters.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ProcNetSnmp {
@@ -53,16 +64,21 @@ impl ProcNetSnmp {
   /// `/proc/net/snmp` and, if given, `/proc/net/netstat` and
   /// `/proc/net/snmp6`. Swift matches fields by name, so columns that newer
   /// kernels add don't break parsing.
-  pub fn new(snmp: &str, netstat: Option<&str>, snmp6: Option<&str>) -> Result<Self, Error> {
+  pub fn new(snmp: &str, options: ProcNetSnmpOptions<'_>) -> Result<Self, Error> {
     platform::outcome(
-      ffi::cz_proc_net_snmp_new(snmp, netstat.map(str::to_string), snmp6.map(str::to_string)),
+      ffi::cz_proc_net_snmp_new(
+        snmp,
+        options.netstat.map(str::to_string),
+        options.snmp6.map(str::to_string),
+      ),
       "parse network protocol counters",
     )
     .map(|outcome| outcome.proc_net_snmp())
   }
 
   /// `ProcNetSnmp.read(pid:)`, which reads the counters of the network
-  /// namespace of process `pid`, or of the calling thread for `None`. Only
+  /// namespace of process `pid`, or of the calling thread for `None`, which
+  /// is Swift's default. Only
   /// Linux has these files, so on macOS it fails.
   pub fn read(pid: Option<i32>) -> Result<Self, Error> {
     platform::outcome(ffi::cz_proc_net_snmp_read(pid), "read network protocol counters")

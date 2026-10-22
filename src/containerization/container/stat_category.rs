@@ -30,13 +30,14 @@ impl StatCategory {
     Self { raw_value }
   }
 
-  /// `contains(_:)`.
+  /// `StatCategory.contains(_:)`, which is true when every category in
+  /// `member` is in this one.
   pub const fn contains(self, member: Self) -> bool {
     self.raw_value & member.raw_value == member.raw_value
   }
 }
 
-/// `union(_:)`.
+/// `StatCategory.union(_:)`, the categories in either.
 impl BitOr for StatCategory {
   type Output = Self;
 

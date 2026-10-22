@@ -19,6 +19,7 @@ uninhabited!(CzVirtualMachineInstance {
 });
 
 uninhabited!(CzVminitd {
+  fn duplicate() -> CzVminitd;
   fn standard_setup() -> CzOutcome;
   fn close() -> CzOutcome;
   fn filesystem_operation(FilesystemOperationKind, &str, Option<String>) -> CzOutcome;

@@ -27,7 +27,7 @@ impl fmt::Debug for KeychainQueryResult {
 }
 
 /// `KeychainQuery`, which reads and writes internet passwords in the macOS
-/// keychain. Swift's `accessGroup` arguments default to `nil`.
+/// keychain.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct KeychainQuery;
 
@@ -37,8 +37,9 @@ impl KeychainQuery {
     Self
   }
 
-  /// `save(securityDomain:accessGroup:hostname:username:password:)`, which
-  /// replaces any entry for `hostname`.
+  /// `KeychainQuery.save(securityDomain:accessGroup:hostname:username:password:)`,
+  /// which replaces any entry for `hostname`. Swift's `accessGroup` defaults
+  /// to `nil`.
   pub fn save(
     &self,
     security_domain: &str,
@@ -60,8 +61,9 @@ impl KeychainQuery {
     .map(drop)
   }
 
-  /// `delete(securityDomain:accessGroup:hostname:)`, which succeeds when there
-  /// is no entry.
+  /// `KeychainQuery.delete(securityDomain:accessGroup:hostname:)`, which
+  /// succeeds when there is no entry. Swift's `accessGroup` defaults to
+  /// `nil`.
   pub fn delete(&self, security_domain: &str, access_group: Option<&str>, hostname: &str) -> Result<(), Error> {
     platform::outcome(
       ffi::cz_keychain_query_delete(security_domain, access_group.map(str::to_string), hostname),
@@ -70,7 +72,8 @@ impl KeychainQuery {
     .map(drop)
   }
 
-  /// `get(securityDomain:accessGroup:hostname:)`.
+  /// `KeychainQuery.get(securityDomain:accessGroup:hostname:)`, which is
+  /// `None` when there is no entry. Swift's `accessGroup` defaults to `nil`.
   pub fn get(
     &self,
     security_domain: &str,
@@ -89,7 +92,8 @@ impl KeychainQuery {
     })
   }
 
-  /// `list(securityDomain:accessGroup:)`.
+  /// `KeychainQuery.list(securityDomain:accessGroup:)`, the entries for
+  /// `security_domain`. Swift's `accessGroup` defaults to `nil`.
   pub fn list(&self, security_domain: &str, access_group: Option<&str>) -> Result<Vec<RegistryInfo>, Error> {
     platform::outcome(
       ffi::cz_keychain_query_list(security_domain, access_group.map(str::to_string)),
@@ -98,7 +102,8 @@ impl KeychainQuery {
     .and_then(|outcome| outcome.registry_infos())
   }
 
-  /// `exists(securityDomain:accessGroup:hostname:)`.
+  /// `KeychainQuery.exists(securityDomain:accessGroup:hostname:)`. Swift's
+  /// `accessGroup` defaults to `nil`.
   pub fn exists(&self, security_domain: &str, access_group: Option<&str>, hostname: &str) -> Result<bool, Error> {
     platform::outcome(
       ffi::cz_keychain_query_exists(security_domain, access_group.map(str::to_string), hostname),

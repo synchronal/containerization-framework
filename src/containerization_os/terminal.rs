@@ -67,17 +67,17 @@ impl Terminal {
     })
   }
 
-  /// `handle`'s descriptor, which the terminal doesn't own.
+  /// `Terminal.handle`'s descriptor, which the terminal doesn't own.
   pub fn handle(&self) -> RawFd {
     self.handle.handle()
   }
 
-  /// `write(_:)`.
+  /// `Terminal.write(_:)`.
   pub fn write(&self, data: &[u8]) -> Result<(), Error> {
     platform::outcome(self.handle.write(data.to_vec()), "write to a terminal").map(drop)
   }
 
-  /// `size`.
+  /// `Terminal.size`, the terminal's current window size.
   pub fn size(&self) -> Result<Size, Error> {
     platform::outcome(self.handle.size(), "read a terminal's size").map(|outcome| Size {
       width: outcome.terminal_size_width(),
@@ -85,7 +85,7 @@ impl Terminal {
     })
   }
 
-  /// `resize(from:)`.
+  /// `Terminal.resize(from:)`, which gives this terminal `pty`'s size.
   pub fn resize_from(&self, pty: &Terminal) -> Result<(), Error> {
     platform::outcome(
       self.handle.resize_from(pty.handle.duplicate()),
@@ -94,43 +94,45 @@ impl Terminal {
     .map(drop)
   }
 
-  /// `resize(size:)`.
+  /// `Terminal.resize(size:)`.
   pub fn resize(&self, size: Size) -> Result<(), Error> {
     platform::outcome(self.handle.resize_size(size.width, size.height), "resize a terminal").map(drop)
   }
 
-  /// `resize(width:height:)`.
+  /// `Terminal.resize(width:height:)`.
   pub fn resize_width_height(&self, width: u16, height: u16) -> Result<(), Error> {
     platform::outcome(self.handle.resize(width, height), "resize a terminal").map(drop)
   }
 
-  /// `setraw()`.
+  /// `Terminal.setraw()`, which puts the terminal in raw mode.
   pub fn setraw(&self) -> Result<(), Error> {
     platform::outcome(self.handle.setraw(), "put a terminal in raw mode").map(drop)
   }
 
-  /// `enableEcho()`.
+  /// `Terminal.enableEcho()`, which shows typed characters on the terminal.
   pub fn enable_echo(&self) -> Result<(), Error> {
     platform::outcome(self.handle.enable_echo(), "enable a terminal's echo").map(drop)
   }
 
-  /// `disableEcho()`.
+  /// `Terminal.disableEcho()`, which stops showing typed characters on the
+  /// terminal.
   pub fn disable_echo(&self) -> Result<(), Error> {
     platform::outcome(self.handle.disable_echo(), "disable a terminal's echo").map(drop)
   }
 
-  /// `close()`.
+  /// `Terminal.close()`, which closes the terminal's descriptor.
   pub fn close(&self) -> Result<(), Error> {
     platform::outcome(self.handle.close(), "close a terminal").map(drop)
   }
 
-  /// `reset()`, which restores the attributes the terminal had when it was
-  /// made with `set_init_state`, and otherwise does nothing.
+  /// `Terminal.reset()`, which restores the attributes the terminal had when
+  /// it was made with `set_init_state`, and otherwise does nothing.
   pub fn reset(&self) -> Result<(), Error> {
     platform::outcome(self.handle.reset(), "reset a terminal").map(drop)
   }
 
-  /// `tryReset()`, which calls [`Terminal::reset`] and ignores its error.
+  /// `Terminal.tryReset()`, which calls [`Terminal::reset`] and ignores its
+  /// error.
   pub fn try_reset(&self) {
     self.handle.try_reset();
   }

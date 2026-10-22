@@ -96,7 +96,9 @@ func referenceResolveDomain(domain: RustStr) -> CzOutcome {
 // MARK: ParsedDigest
 
 extension ParsedDigest {
-  /// The `encoded` Rust holds, which Swift validated.
+  /// The `encoded` Rust holds. Swift validated it when Rust made it, and
+  /// validates it again here, since `ParsedDigest` has no init that trusts a
+  /// string.
   init(bridged encoded: String) throws {
     try self.init(parsingPathComponent: encoded)
   }

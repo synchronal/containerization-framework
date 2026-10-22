@@ -10,7 +10,8 @@ use crate::platform;
 use crate::platform::ffi;
 
 /// The defaulted arguments of `VZVirtualMachineManager`'s initializer, after
-/// the initial filesystem. [`Default`] uses Swift's defaults. `group` and
+/// the initial filesystem. [`Default`] uses Swift's defaults: no Rosetta and
+/// no nested virtualization. `group` and
 /// `logger` are SwiftNIO's and swift-log's, and are left at `nil`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct VZVirtualMachineManagerOptions {
@@ -22,6 +23,11 @@ pub struct VZVirtualMachineManagerOptions {
 pub struct VZVirtualMachineManager {
   pub(crate) handle: ffi::CzVirtualMachineManager,
 }
+
+opaque_debug!(
+  /// Leaves out the fields, which Swift keeps private.
+  VZVirtualMachineManager
+);
 
 // Swift's `VZVirtualMachineManager` is `Sendable`.
 unsafe impl Send for VZVirtualMachineManager {}
@@ -69,8 +75,3 @@ impl Clone for VZVirtualMachineManager {
     }
   }
 }
-
-opaque_debug!(
-  /// Leaves out the fields, which Swift keeps private.
-  VZVirtualMachineManager
-);

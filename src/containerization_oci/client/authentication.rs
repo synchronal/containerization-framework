@@ -10,6 +10,11 @@ pub struct Authentication {
   pub(crate) handle: ffi::CzAuthentication,
 }
 
+opaque_debug!(
+  /// Without the credentials, which Rust can't read.
+  Authentication
+);
+
 // Swift's `Authentication` is `Sendable`.
 unsafe impl Send for Authentication {}
 unsafe impl Sync for Authentication {}
@@ -30,22 +35,7 @@ impl Authentication {
   pub fn token(&self) -> Result<String, Error> {
     platform::outcome(self.handle.token(), "make an authentication token").map(|outcome| outcome.text())
   }
-}
 
-impl Clone for Authentication {
-  fn clone(&self) -> Self {
-    Self {
-      handle: self.handle.duplicate(),
-    }
-  }
-}
-
-opaque_debug!(
-  /// Without the credentials, which Rust can't read.
-  Authentication
-);
-
-impl Authentication {
   /// An `Authentication?`, as it crosses to Swift.
   pub(crate) fn crossing(auth: Option<&Self>) -> Result<ffi::CzAuthentication, Error> {
     match auth {
@@ -53,6 +43,16 @@ impl Authentication {
       None => {
         platform::outcome(ffi::cz_no_authentication(), "pass no authentication").map(|outcome| outcome.authentication())
       }
+    }
+  }
+}
+
+/// Swift's conforming type, `BasicAuthentication`, is a struct, so a copy
+/// holds the same credentials.
+impl Clone for Authentication {
+  fn clone(&self) -> Self {
+    Self {
+      handle: self.handle.duplicate(),
     }
   }
 }

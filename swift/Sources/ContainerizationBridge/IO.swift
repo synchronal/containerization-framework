@@ -60,7 +60,9 @@ final class CzDataStream: @unchecked Sendable {
   func next() -> CzOutcome {
     // Not `Sendable`, but only the task below uses it until it finishes.
     nonisolated(unsafe) var iterator = iterator
-    let chunk: Data? = (try? blocking { await iterator.next() }) ?? nil
+    // The body doesn't throw, and `blocking` throws only `noOutcome`, which
+    // can't happen.
+    let chunk = try! blocking { await iterator.next() }
     self.iterator = iterator
 
     return CzOutcome.holding(chunk)

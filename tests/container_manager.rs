@@ -13,13 +13,9 @@ use support::container::Container;
 
 /// A shared network, or `None` with the reason printed when vmnet refuses.
 fn vmnet_network(test: &str) -> Option<cfw::containerization::network::VmnetNetwork> {
-  cfw::containerization::network::VmnetNetwork::new(
-    cfw::containerization::network::vmnet_network::Mode::Shared,
-    None,
-    None,
-  )
-  .inspect_err(|error| eprintln!("skipping {test}: vmnet made no network: {error}"))
-  .ok()
+  cfw::containerization::network::VmnetNetwork::new(Default::default())
+    .inspect_err(|error| eprintln!("skipping {test}: vmnet made no network: {error}"))
+    .ok()
 }
 
 #[test]

@@ -12,8 +12,8 @@ pub struct Reference {
 
 opaque_debug!(Reference);
 
-/// The defaulted arguments of `Reference(path:domain:tag:digest:)`. As in
-/// Swift, they default to `None`.
+/// The defaulted arguments of `Reference(path:domain:tag:digest:)`.
+/// [`Default`] uses Swift's defaults, which are all `nil`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReferenceOptions {
   pub domain: Option<String>,

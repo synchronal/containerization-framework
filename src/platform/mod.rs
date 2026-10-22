@@ -26,6 +26,8 @@ use crate::error::Error;
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::os::fd::BorrowedFd;
+use std::os::fd::FromRawFd;
+use std::os::fd::OwnedFd;
 use std::panic::AssertUnwindSafe;
 use std::path::Path;
 use std::sync::Arc;
@@ -176,6 +178,45 @@ pub(crate) fn configured<T>(
   thrown.outcome(returned, action)
 }
 
+/// What a throwing Swift call returned, when `call` hands it `body` as its
+/// `(FileDescriptor) throws -> Void` closure, or what it threw as a failure of
+/// `action`, as `Thrown::outcome` reads it.
+pub(crate) fn with_descriptor(
+  body: impl FnOnce(BorrowedFd<'_>) -> Result<(), Error> + 'static,
+  call: impl FnOnce(WithDescriptor) -> ffi::CzOutcome,
+  action: impl Into<String>,
+) -> Result<ffi::CzOutcome, Error> {
+  let body = WithDescriptor::new(body);
+  let thrown = body.thrown.clone();
+  let returned = call(body);
+
+  thrown.outcome(returned, action)
+}
+
+/// What a throwing Swift call returned, when `call` hands it `body` as
+/// `FileDescriptorOps.enumerate(_:_:)`'s body, or what it threw as a failure
+/// of `action`, as `Thrown::outcome` reads it.
+pub(crate) fn enumerating(
+  body: impl FnMut(&Path, file_descriptor_ops::EntryType, BorrowedFd<'_>) -> Result<(), Error> + 'static,
+  call: impl FnOnce(Enumerate) -> ffi::CzOutcome,
+  action: impl Into<String>,
+) -> Result<ffi::CzOutcome, Error> {
+  let body = Enumerate::new(body);
+  let thrown = body.thrown.clone();
+  let returned = call(body);
+
+  thrown.outcome(returned, action)
+}
+
+/// The descriptor that a Swift call handed over, or what it threw as a
+/// failure of `action`. Every bridge call whose descriptor reaches here gives
+/// it up as it crosses, so the caller is its only owner.
+pub(crate) fn owned_fd(outcome: ffi::CzOutcome, action: impl Into<String>) -> Result<OwnedFd, Error> {
+  // SAFETY: Swift opened the descriptor for the caller, or its `FileHandle`
+  // doesn't close it and forgets it once it crosses, so nothing else holds it.
+  self::outcome(outcome, action).map(|outcome| unsafe { OwnedFd::from_raw_fd(outcome.int32()) })
+}
+
 /// Runs `call` with a closure that keeps the value Swift hands it, and
 /// returns what `call` returned along with that value, if Swift handed one.
 pub(crate) fn filled<T: Default + Send + 'static, R>(call: impl FnOnce(Configure<T>) -> R) -> (R, Option<T>) {
@@ -248,11 +289,11 @@ type DirectoryBody = Box<dyn FnOnce(BorrowedFd<'_>) -> Result<(), Error>>;
 /// calls it at most once, with a directory it keeps open for the call.
 pub(crate) struct WithDescriptor {
   body: Mutex<Option<DirectoryBody>>,
-  pub(crate) thrown: Thrown,
+  thrown: Thrown,
 }
 
 impl WithDescriptor {
-  pub(crate) fn new(body: impl FnOnce(BorrowedFd<'_>) -> Result<(), Error> + 'static) -> Self {
+  fn new(body: impl FnOnce(BorrowedFd<'_>) -> Result<(), Error> + 'static) -> Self {
     Self {
       body: Mutex::new(Some(Box::new(body))),
       thrown: Thrown::default(),
@@ -285,11 +326,11 @@ type EnumerateBody = Box<dyn FnMut(&Path, file_descriptor_ops::EntryType, Borrow
 /// open for the call.
 pub(crate) struct Enumerate {
   body: Mutex<EnumerateBody>,
-  pub(crate) thrown: Thrown,
+  thrown: Thrown,
 }
 
 impl Enumerate {
-  pub(crate) fn new(
+  fn new(
     body: impl FnMut(&Path, file_descriptor_ops::EntryType, BorrowedFd<'_>) -> Result<(), Error> + 'static,
   ) -> Self {
     Self {

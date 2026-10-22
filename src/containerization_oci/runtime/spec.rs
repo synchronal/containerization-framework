@@ -7,7 +7,7 @@ use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
 
-/// `Spec`. Its `Default` is `Spec()`, which holds nothing.
+/// `Spec`. [`Default`] uses Swift's `Spec()`, which holds nothing.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Spec {
   pub version: String,
@@ -21,7 +21,8 @@ pub struct Spec {
   pub linux: Option<Linux>,
 }
 
-/// `Process`. Its `Default` is `Process()`, which runs nothing in `/` as root.
+/// `Process`. [`Default`] uses Swift's `Process()`, which runs nothing in
+/// `/` as root.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Process {
   pub cwd: String,
@@ -86,7 +87,8 @@ pub struct User {
 }
 
 /// The OCI `LinuxCapabilities`, not
-/// [`crate::containerization::process::LinuxCapabilities`]. Its `Default` holds nothing.
+/// [`crate::containerization::process::LinuxCapabilities`]. [`Default`] uses
+/// Swift's `LinuxCapabilities()`, which holds nothing.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LinuxCapabilities {
   pub bounding: Option<Vec<String>>,
@@ -210,7 +212,7 @@ impl Hooks {
   }
 }
 
-/// `Linux`. Its `Default` is `Linux()`, which holds nothing.
+/// `Linux`. [`Default`] uses Swift's `Linux()`, which holds nothing.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Linux {
   pub uid_mappings: Vec<LinuxIDMapping>,
@@ -415,7 +417,8 @@ impl LinuxBlockIO {
   }
 }
 
-/// `LinuxMemory`. Its `Default` is `LinuxMemory()`, which holds nothing.
+/// `LinuxMemory`. [`Default`] uses Swift's `LinuxMemory()`, which holds
+/// nothing.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct LinuxMemory {
   pub limit: Option<i64>,
@@ -429,7 +432,7 @@ pub struct LinuxMemory {
   pub check_before_update: Option<bool>,
 }
 
-/// `LinuxCPU`. Its `Default` is `LinuxCPU()`, which holds nothing.
+/// `LinuxCPU`. [`Default`] uses Swift's `LinuxCPU()`, which holds nothing.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct LinuxCPU {
   pub shares: Option<u64>,
@@ -487,8 +490,8 @@ impl LinuxRdma {
   }
 }
 
-/// `LinuxResources`. Its `Default` is `LinuxResources()`, which holds nothing
-/// but an empty `unified`.
+/// `LinuxResources`. [`Default`] uses Swift's `LinuxResources()`, which
+/// holds nothing but an empty `unified`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinuxResources {
   pub devices: Vec<LinuxDeviceCgroup>,

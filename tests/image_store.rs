@@ -515,7 +515,7 @@ fn unpacks_an_init_image() {
   let at = directory.path().join("initfs.ext4");
 
   let init_image = store
-    .get_init_image(support::store::INITFS_REFERENCE, None, None)
+    .get_init_image(support::store::INITFS_REFERENCE, Default::default())
     .expect("the init image");
   let mount = init_image
     .init_block(&at, cfw::containerization::vm::SystemPlatform::LINUX_ARM)

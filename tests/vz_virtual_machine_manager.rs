@@ -6,6 +6,7 @@
 mod support;
 
 use containerization_framework as cfw;
+use std::path::Path;
 
 /// Runs `/bin/true` in `container`, returning its exit code.
 fn run_true(container: &cfw::containerization::container::LinuxContainer, id: &str) -> i32 {
@@ -161,8 +162,8 @@ fn stops_a_socket_relay_by_the_configuration_that_started_it() {
   agent.standard_setup().expect("the guest should set up");
 
   let socket = cfw::containerization::container::UnixSocketConfiguration::new(
-    host.path().join("relayed.sock"),
-    "/tmp/cfw-relay/relayed.sock",
+    &host.path().join("relayed.sock"),
+    Path::new("/tmp/cfw-relay/relayed.sock"),
   )
   .expect("a socket configuration");
   assert_eq!(
@@ -202,9 +203,11 @@ fn pauses_and_resumes_a_container_on_its_own_manager() {
   let container = cfw::containerization::container::LinuxContainer::new_with(
     name,
     rootfs,
-    None,
     &vmm,
-    support::vm(),
+    cfw::containerization::container::linux_container::LinuxContainerOptions {
+      vm: support::vm(),
+      ..Default::default()
+    },
     support::container::keep_alive,
   )
   .expect("a container should be made on the VM manager");
@@ -250,9 +253,11 @@ fn makes_a_container_from_a_configuration() {
   let container = cfw::containerization::container::LinuxContainer::new(
     "cfw-test-vmm-configured",
     rootfs.clone(),
-    None,
     &vmm,
-    support::vm(),
+    cfw::containerization::container::linux_container::LinuxContainerOptions {
+      vm: support::vm(),
+      ..Default::default()
+    },
     configuration,
   )
   .expect("a container should be made from a configuration");
@@ -269,9 +274,11 @@ fn makes_a_container_from_a_configuration() {
     cfw::containerization::container::LinuxContainer::new(
       "cfw-test-vmm-not-a-block",
       rootfs,
-      Some(not_a_block),
       &vmm,
-      support::vm(),
+      cfw::containerization::container::linux_container::LinuxContainerOptions {
+        writable_layer: Some(not_a_block),
+        vm: support::vm(),
+      },
       Default::default(),
     )
     .is_err(),

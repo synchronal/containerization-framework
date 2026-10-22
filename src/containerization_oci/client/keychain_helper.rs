@@ -12,7 +12,8 @@ pub struct KeychainHelper {
 }
 
 impl KeychainHelper {
-  /// `KeychainHelper(securityDomain:accessGroup:)`.
+  /// `KeychainHelper(securityDomain:accessGroup:)`. Swift's `accessGroup`
+  /// defaults to `nil`.
   pub fn new(security_domain: impl Into<String>, access_group: Option<String>) -> Self {
     Self {
       security_domain: security_domain.into(),

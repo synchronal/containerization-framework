@@ -34,21 +34,26 @@ func noAuthentication() -> CzOutcome {
   CzOutcome { CzAuthentication(nil) }
 }
 
+/// The `KeychainHelper` each of Rust's keychain calls makes for itself.
+private func keychainHelper(_ securityDomain: RustStr, _ accessGroup: RustString?) -> KeychainHelper {
+  KeychainHelper(securityDomain: securityDomain.toString(), accessGroup: accessGroup?.toString())
+}
+
 func keychainHelperLookup(securityDomain: RustStr, accessGroup: RustString?, hostname: RustStr) -> CzOutcome {
-  let helper = KeychainHelper(securityDomain: securityDomain.toString(), accessGroup: accessGroup?.toString())
+  let helper = keychainHelper(securityDomain, accessGroup)
   let hostname = hostname.toString()
 
   return CzOutcome { CzAuthentication(try helper.lookup(hostname: hostname)) }
 }
 
 func keychainHelperList(securityDomain: RustStr, accessGroup: RustString?) -> CzOutcome {
-  let helper = KeychainHelper(securityDomain: securityDomain.toString(), accessGroup: accessGroup?.toString())
+  let helper = keychainHelper(securityDomain, accessGroup)
 
   return CzOutcome { try helper.list() }
 }
 
 func keychainHelperDelete(securityDomain: RustStr, accessGroup: RustString?, hostname: RustStr) -> CzOutcome {
-  let helper = KeychainHelper(securityDomain: securityDomain.toString(), accessGroup: accessGroup?.toString())
+  let helper = keychainHelper(securityDomain, accessGroup)
   let hostname = hostname.toString()
 
   return CzOutcome { try helper.delete(hostname: hostname) }
@@ -61,7 +66,7 @@ func keychainHelperSave(
   username: RustStr,
   password: RustStr
 ) -> CzOutcome {
-  let helper = KeychainHelper(securityDomain: securityDomain.toString(), accessGroup: accessGroup?.toString())
+  let helper = keychainHelper(securityDomain, accessGroup)
   let hostname = hostname.toString()
   let username = username.toString()
   let password = password.toString()

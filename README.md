@@ -144,7 +144,10 @@ does:
   arguments are fields of `container::container_manager::CreateOptions`, whose
   `Default` uses Swift's default values. An initializer's options struct is
   named after its type, such as `ContainerManagerOptions`, and a method's is
-  named after the Rust method, such as `CreateWithRootfsOptions`.
+  named after the Rust method, such as `CreateWithRootfsOptions`. Only a
+  function with two or more defaulted arguments takes an options struct. One
+  with a single defaulted argument takes it as a plain parameter, and its doc
+  gives Swift's default.
 - Rust has no overloading either. Where Swift overloads a name, the second
   Rust method adds a suffix naming the argument that tells them apart:
   `ContainerManager.create(_:image:rootfs:...)` is `create_with_rootfs`, and

@@ -115,12 +115,8 @@ extension CzOutcome {
     (taken() as Platform).osVersion
   }
 
-  func platformHasOsFeatures() -> Bool {
-    (taken() as Platform).osFeatures != nil
-  }
-
-  func platformOsFeatures() -> RustVec<RustString> {
-    rustStrings((taken() as Platform).osFeatures ?? [])
+  func platformOsFeatures() -> CzOutcome {
+    CzOutcome.holding((taken() as Platform).osFeatures)
   }
 
   func platformVariant() -> String? {

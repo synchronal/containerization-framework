@@ -1,5 +1,7 @@
-//! `LinuxContainer`, its nested `LinuxContainer.Configuration`, and the
-//! configuration's `SeccompProfile` in [`configuration`].
+//! `LinuxContainer`, its nested `LinuxContainer.Configuration`, the
+//! configuration's `SeccompProfile` in [`configuration`], and the options
+//! its initializers and copies take: [`LinuxContainerOptions`],
+//! [`CopyInOptions`] and [`CopyOutOptions`].
 
 use super::ContainerStatistics;
 use super::Mount;
@@ -15,7 +17,6 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 use std::path::Path;
 
@@ -89,9 +90,20 @@ pub mod configuration {
   }
 }
 
+/// The defaulted arguments of `LinuxContainer`'s initializers, after the VM
+/// manager. [`Default`] uses Swift's defaults: no writable layer, and
+/// `VMResources.default`. Swift's `logger` is swift-log's, and is left at
+/// `nil`.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct LinuxContainerOptions {
+  pub writable_layer: Option<Mount>,
+  pub vm: vm::VMResources,
+}
+
 /// The defaulted arguments of
 /// `LinuxContainer.copyIn(from:to:mode:createParents:chunkSize:)`.
-/// [`Default`] uses Swift's defaults.
+/// [`Default`] uses Swift's defaults: mode `0o644`, parents are created, and
+/// chunks are [`LinuxContainer::DEFAULT_COPY_CHUNK_SIZE`] bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CopyInOptions {
   pub mode: u32,
@@ -110,8 +122,9 @@ impl Default for CopyInOptions {
 }
 
 /// The defaulted arguments of
-/// `LinuxContainer.copyOut(from:to:createParents:chunkSize:)`. [`Default`] is
-/// Swift's defaults.
+/// `LinuxContainer.copyOut(from:to:createParents:chunkSize:)`. [`Default`]
+/// uses Swift's defaults: parents are created, and chunks are
+/// [`LinuxContainer::DEFAULT_COPY_CHUNK_SIZE`] bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CopyOutOptions {
   pub create_parents: bool,
@@ -150,12 +163,12 @@ impl LinuxContainer {
   pub fn new(
     id: &str,
     rootfs: Mount,
-    writable_layer: Option<Mount>,
     vmm: &vm::VZVirtualMachineManager,
-    vm: vm::VMResources,
+    options: LinuxContainerOptions,
     configuration: Configuration,
   ) -> Result<Self, Error> {
-    let (has_writable_layer, writable_layer) = writable_layer_crossing(writable_layer);
+    let vm = options.vm;
+    let (has_writable_layer, writable_layer) = writable_layer_crossing(options.writable_layer);
 
     platform::outcome(
       ffi::cz_linux_container_new(
@@ -181,15 +194,14 @@ impl LinuxContainer {
   pub fn new_with(
     id: &str,
     rootfs: Mount,
-    writable_layer: Option<Mount>,
     vmm: &vm::VZVirtualMachineManager,
-    vm: vm::VMResources,
+    options: LinuxContainerOptions,
     configuration: impl FnOnce(&mut Configuration) -> Result<(), Error>,
   ) -> Result<Self, Error> {
     let mut config = Configuration::default();
     configuration(&mut config)?;
 
-    Self::new(id, rootfs, writable_layer, vmm, vm, config)
+    Self::new(id, rootfs, vmm, options, config)
   }
 
   /// `LinuxContainer.id`.
@@ -258,7 +270,8 @@ impl LinuxContainer {
     platform::outcome(self.handle.kill(signal.raw_value), format!("signal {}", self.id())).map(drop)
   }
 
-  /// `LinuxContainer.wait(timeoutInSeconds:)`.
+  /// `LinuxContainer.wait(timeoutInSeconds:)`. Swift's `timeoutInSeconds`
+  /// defaults to `nil`.
   pub fn wait(&self, timeout_in_seconds: Option<i64>) -> Result<process::ExitStatus, Error> {
     platform::outcome(self.handle.wait(timeout_in_seconds), format!("wait for {}", self.id()))
       .and_then(|outcome| process::ExitStatus::from_outcome(&outcome))
@@ -314,13 +327,10 @@ impl LinuxContainer {
   /// `LinuxContainer.dialVsock(port:)`. The caller owns the connection's
   /// descriptor.
   pub fn dial_vsock(&self, port: u32) -> Result<OwnedFd, Error> {
-    platform::outcome(
+    platform::owned_fd(
       self.handle.dial_vsock(port),
       format!("dial vsock port {port} in {}", self.id()),
     )
-    // SAFETY: Swift's `FileHandle` doesn't close its descriptor, and
-    // forgets it once it crosses.
-    .map(|outcome| unsafe { OwnedFd::from_raw_fd(outcome.int32()) })
   }
 
   /// `LinuxContainer.withVirtualMachineInstance(_:)`. Like Swift's, it fails
@@ -345,7 +355,8 @@ impl LinuxContainer {
     platform::outcome(self.handle.close_stdin(), format!("close {}'s stdin", self.id())).map(drop)
   }
 
-  /// `LinuxContainer.statistics(categories:)`.
+  /// `LinuxContainer.statistics(categories:)`. Swift's `categories` defaults
+  /// to [`StatCategory::ALL`].
   pub fn statistics(&self, categories: StatCategory) -> Result<ContainerStatistics, Error> {
     platform::outcome(
       self.handle.statistics(categories.raw_value),

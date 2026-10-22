@@ -41,8 +41,9 @@ final class FileReader: ReaderStream, @unchecked Sendable {
   /// A failed read ends the stream as end of file does. It reads with
   /// `read(2)` rather than `availableData`, which raises an Objective-C
   /// exception when the read fails, as it does on a pty whose terminal has
-  /// closed (EIO) or a reset socket. Swift cannot catch that, so it aborted
-  /// the process, and with it the VM and every other process in it.
+  /// closed (EIO) or a reset socket. Swift cannot catch that exception, which
+  /// would abort the process, and with it the VM and every other process in
+  /// it.
   func stream() -> AsyncStream<Data> {
     let descriptor = handle.fileDescriptor
     let buffer = ReadBuffer()
@@ -136,23 +137,46 @@ final class Output: Sendable {
   }
 }
 
-/// The closure a container's or a pod's `exec` takes. It fills `seed` with the
-/// configuration Swift seeded, lets Rust's closure change it, and takes it
-/// back, keeping its writers in `output`.
+/// The `(inout Value) throws -> Void` closure a Swift API takes, made from
+/// Rust's closure. It fills `seed` with the value Swift seeded, lets Rust's
+/// closure change it through `call`, and takes back what `make` builds from
+/// it. A `seed` that Rust already filled takes no `fill`.
+func configuring<Seed, Value>(
+  _ seed: Seed,
+  fill: @escaping (Seed, Value) -> Void = { _, _ in },
+  call: @escaping (Seed) -> Bool,
+  make: @escaping (Seed) throws -> Value
+) -> @Sendable (inout Value) throws -> Void {
+  // Not `Sendable`, but only the closure below uses them, and each Swift API
+  // that takes it calls it once, while `blocking` waits.
+  nonisolated(unsafe) let seed = seed
+  nonisolated(unsafe) let fill = fill
+  nonisolated(unsafe) let call = call
+  nonisolated(unsafe) let make = make
+
+  return { value in
+    fill(seed, value)
+    if call(seed) { throw BridgeError.bodyFailed }
+    value = try make(seed)
+  }
+}
+
+/// The closure a container's or a pod's `exec` takes. It is `configuring`'s,
+/// keeping the writers of the configuration it makes in `output`.
 func configured(
   _ seed: RustLinuxProcessConfiguration,
   by configuration: RustConfigureProcess,
   keeping output: Output
 ) -> @Sendable (inout LinuxProcessConfiguration) throws -> Void {
-  // Not `Sendable`, but only this closure uses them, and an `exec` calls it
-  // once, while `blocking` waits.
-  nonisolated(unsafe) let seed = seed
-  nonisolated(unsafe) let configuration = configuration
+  let configure = configuring(
+    seed,
+    fill: { fill($0, from: $1) },
+    call: { configuration.call($0) },
+    make: { try LinuxProcessConfiguration($0) }
+  )
 
   return { config in
-    fill(seed, from: config)
-    if configuration.call(seed) { throw BridgeError.bodyFailed }
-    config = try LinuxProcessConfiguration(seed)
+    try configure(&config)
     output.keep(config)
   }
 }

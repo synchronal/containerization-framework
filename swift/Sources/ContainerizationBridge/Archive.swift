@@ -64,24 +64,15 @@ func archiveDefaultLocales() -> RustVec<RustString> {
 }
 
 func archiveFormat(_ rawValue: String) throws -> Format {
-  guard let format = Format(rawValue: rawValue) else {
-    throw BridgeError.malformed("archive format", rawValue)
-  }
-  return format
+  try parsedCase(rawValue, "archive format")
 }
 
 func archiveFilter(_ rawValue: String) throws -> Filter {
-  guard let filter = Filter(rawValue: rawValue) else {
-    throw BridgeError.malformed("archive filter", rawValue)
-  }
-  return filter
+  try parsedCase(rawValue, "archive filter")
 }
 
 private func xattrFormat(_ rawValue: String) throws -> Options.XattrFormat {
-  guard let format = Options.XattrFormat(rawValue: rawValue) else {
-    throw BridgeError.malformed("extended attribute format", rawValue)
-  }
-  return format
+  try parsedCase(rawValue, "extended attribute format")
 }
 
 extension ArchiveWriterConfiguration {

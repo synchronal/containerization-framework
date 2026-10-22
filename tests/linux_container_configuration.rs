@@ -386,9 +386,11 @@ fn carries_a_seccomp_profile_of_its_own() {
   let carried = cfw::containerization::container::LinuxContainer::new(
     "cfw-test-config-seccomp-profile-carried",
     cfw::containerization::container::Mount::block("ext4", "/rootfs.ext4", "/", &[], &[]),
-    None,
     &support::store::vmm(),
-    support::vm(),
+    cfw::containerization::container::linux_container::LinuxContainerOptions {
+      vm: support::vm(),
+      ..Default::default()
+    },
     cfw::containerization::container::linux_container::Configuration {
       oci_runtime_path: Some("/sbin/runc".into()),
       seccomp_profile: profile.clone(),

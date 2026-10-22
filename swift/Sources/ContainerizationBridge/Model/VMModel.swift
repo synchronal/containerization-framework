@@ -21,6 +21,13 @@ extension BootLog {
   }
 }
 
+extension VMResources {
+  /// The resources Rust passes as a vCPU count and a memory size.
+  init(_ cpus: UInt32, _ memoryInBytes: UInt64) {
+    self.init(cpus: Int(cpus), memoryInBytes: memoryInBytes)
+  }
+}
+
 extension VMConfiguration {
   init(_ configuration: RustVmConfigurationRef) throws {
     self.init(

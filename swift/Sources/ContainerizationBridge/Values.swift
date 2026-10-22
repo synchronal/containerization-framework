@@ -146,6 +146,8 @@ func linuxProcessConfigurationFromImageConfig(
 
   return CzOutcome {
     fill(seed, from: LinuxProcessConfiguration(from: config))
+    // `receive` is from Rust's `platform::filled`, which only keeps the value
+    // and so never fails.
     _ = receive.call(seed)
     return ()
   }
@@ -160,6 +162,8 @@ func linuxProcessConfigurationSetTerminalIO(
     var configuration = try LinuxProcessConfiguration(process)
     configuration.setTerminalIO(terminal: terminal.terminal)
     fill(process, from: configuration)
+    // `receive` is from Rust's `platform::filled`, which only keeps the value
+    // and so never fails.
     _ = receive.call(process)
     return ()
   }

@@ -29,7 +29,8 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/apple/containerization.git", exact: containerization),
-    // Containerization's own requirements: the bridge imports both.
+    // Containerization's own requirements: the bridge imports all three.
+    .package(url: "https://github.com/apple/swift-crypto.git", "3.0.0"..<"5.0.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.10.1"),
     .package(url: "https://github.com/apple/swift-system.git", from: "1.6.4"),
   ],
@@ -45,6 +46,7 @@ let package = Package(
         .product(name: "ContainerizationIO", package: "containerization"),
         .product(name: "ContainerizationOCI", package: "containerization"),
         .product(name: "ContainerizationOS", package: "containerization"),
+        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "SystemPackage", package: "swift-system"),
       ],
