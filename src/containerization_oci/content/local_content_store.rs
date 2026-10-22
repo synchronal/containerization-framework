@@ -2,25 +2,15 @@ use super::Content;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::PoisonError;
 
 /// `LocalContentStore`.
 pub struct LocalContentStore {
   pub(crate) handle: ffi::CzLocalContentStore,
 }
 
-impl fmt::Debug for LocalContentStore {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("LocalContentStore")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(LocalContentStore);
 
 // Swift's `LocalContentStore` is an actor.
 unsafe impl Send for LocalContentStore {}
@@ -69,30 +59,15 @@ impl LocalContentStore {
   /// `ingest` returns that error. It may call back into this crate, as Swift's
   /// `async` closure may.
   pub fn ingest(&self, body: impl FnOnce(&Path) -> Result<(), Error> + Send + 'static) -> Result<Vec<String>, Error> {
-    let failure = Arc::new(Mutex::new(None));
-    let slot = Arc::clone(&failure);
-    let panic = platform::Panic::default();
-    let caught = panic.clone();
-    let outcome = self.handle.ingest(Box::new(move |directory: String| {
-      caught
-        .catch(|| body(Path::new(&directory)))
-        .is_some_and(|result| {
-          result
-            .map_err(|error| *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(error))
-            .is_ok()
-        })
+    let thrown = platform::Thrown::default();
+    let keeper = thrown.clone();
+    let returned = self.handle.ingest(Box::new(move |directory: String| {
+      keeper.threw(|| body(Path::new(&directory)))
     }));
 
-    panic.resume();
-    platform::outcome(outcome, "ingest content")
+    thrown
+      .outcome(returned, "ingest content")
       .map(|outcome| outcome.strings())
-      .map_err(|error| {
-        failure
-          .lock()
-          .unwrap_or_else(PoisonError::into_inner)
-          .take()
-          .unwrap_or(error)
-      })
   }
 
   /// `LocalContentStore.newIngestSession()`: the session's id, and the

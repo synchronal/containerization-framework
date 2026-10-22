@@ -23,223 +23,90 @@ handles!(CzImageStore, CzImages, CzImage, CzInitImage, CzKernelImage);
 
 failing!(cz_image_store_new(&str), cz_image_store_default());
 
-/// `ImageStore(path:contentStore:)` and `Image(description:contentStore:)`.
-impl CzLocalContentStore {
-  pub(crate) fn image_store(&self, _path: &str) -> CzOutcome {
-    match self.0 {}
-  }
+// `ImageStore(path:contentStore:)` and `Image(description:contentStore:)`.
+uninhabited!(CzLocalContentStore {
+  fn image_store(&str) -> CzOutcome;
+  fn image(image::Description) -> CzImage;
+});
 
-  pub(crate) fn image(&self, _description: image::Description) -> CzImage {
-    match self.0 {}
-  }
-}
+uninhabited!(CzImageStore {
+  fn path() -> String;
+  fn create_init_image(
+    &str,
+    &str,
+    containerization_oci::image::Platform,
+    Vec<String>,
+    Vec<String>,
+    CzLocalContentStore,
+  ) -> CzOutcome;
+  fn create_kernel_image(&str, Vec<vm::Kernel>, Vec<String>, Vec<String>, CzLocalContentStore) -> CzOutcome;
+  fn get(&str, bool) -> CzOutcome;
+  fn get_or_nil(&str) -> CzOutcome;
+  fn list() -> CzOutcome;
+  fn delete(&str, bool) -> CzOutcome;
+  fn tag(&str, &str) -> CzOutcome;
+  fn pull(
+    &str,
+    bool,
+    containerization_oci::image::Platform,
+    bool,
+    CzAuthentication,
+    platform::Progress,
+    usize,
+  ) -> CzOutcome;
+  fn platforms(&str, bool, CzAuthentication) -> CzOutcome;
+  fn push(
+    &str,
+    bool,
+    containerization_oci::image::Platform,
+    bool,
+    CzAuthentication,
+    platform::Progress,
+  ) -> CzOutcome;
+  fn push_all(
+    Vec<String>,
+    bool,
+    containerization_oci::image::Platform,
+    bool,
+    CzAuthentication,
+    usize,
+    platform::Progress,
+  ) -> CzOutcome;
+  fn get_init_image(&str, CzAuthentication, platform::Progress) -> CzOutcome;
+  fn save(Vec<String>, &str, bool, containerization_oci::image::Platform) -> CzOutcome;
+  fn clean_up_orphaned_blobs() -> CzOutcome;
+  fn calculate_orphaned_blobs_size() -> CzOutcome;
+  fn create(image::Description) -> CzOutcome;
+  fn load(&str, platform::Progress) -> CzOutcome;
+});
 
-impl CzImageStore {
-  pub(crate) fn path(&self) -> String {
-    match self.0 {}
-  }
+uninhabited!(CzImages {
+  fn len() -> usize;
+  fn at(usize) -> CzImage;
+});
 
-  pub(crate) fn create_init_image(
-    &self,
-    _reference: &str,
-    _rootfs: &str,
-    _platform: containerization_oci::image::Platform,
-    _label_keys: Vec<String>,
-    _label_values: Vec<String>,
-    _content_store: CzLocalContentStore,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
+uninhabited!(CzImage {
+  fn duplicate() -> CzImage;
+  fn init_image() -> CzInitImage;
+  fn kernel_image() -> CzKernelImage;
+  fn reference() -> String;
+  fn digest() -> String;
+  fn media_type() -> String;
+  fn descriptor() -> CzOutcome;
+  fn index() -> CzOutcome;
+  fn manifest(containerization_oci::image::Platform) -> CzOutcome;
+  fn descriptor_for(containerization_oci::image::Platform) -> CzOutcome;
+  fn config(containerization_oci::image::Platform) -> CzOutcome;
+  fn referenced_digests() -> CzOutcome;
+  fn get_content(&str) -> CzOutcome;
+});
 
-  pub(crate) fn create_kernel_image(
-    &self,
-    _reference: &str,
-    _binaries: Vec<vm::Kernel>,
-    _label_keys: Vec<String>,
-    _label_values: Vec<String>,
-    _content_store: CzLocalContentStore,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
+uninhabited!(CzKernelImage {
+  fn name() -> String;
+  fn kernel(vm::SystemPlatform) -> CzOutcome;
+});
 
-  pub(crate) fn get(&self, _reference: &str, _pull: bool) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn get_or_nil(&self, _reference: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn list(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn delete(&self, _reference: &str, _perform_cleanup: bool) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn tag(&self, _existing: &str, _new: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn pull(
-    &self,
-    _reference: &str,
-    _has_platform: bool,
-    _platform: containerization_oci::image::Platform,
-    _insecure: bool,
-    _auth: CzAuthentication,
-    _progress: platform::Progress,
-    _max_concurrent_downloads: usize,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn platforms(&self, _reference: &str, _insecure: bool, _auth: CzAuthentication) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn push(
-    &self,
-    _reference: &str,
-    _has_platform: bool,
-    _platform: containerization_oci::image::Platform,
-    _insecure: bool,
-    _auth: CzAuthentication,
-    _progress: platform::Progress,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn push_all(
-    &self,
-    _references: Vec<String>,
-    _has_platform: bool,
-    _platform: containerization_oci::image::Platform,
-    _insecure: bool,
-    _auth: CzAuthentication,
-    _max_concurrent_uploads: usize,
-    _progress: platform::Progress,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn get_init_image(
-    &self,
-    _reference: &str,
-    _auth: CzAuthentication,
-    _progress: platform::Progress,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn save(
-    &self,
-    _references: Vec<String>,
-    _out: &str,
-    _has_platform: bool,
-    _platform: containerization_oci::image::Platform,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn clean_up_orphaned_blobs(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn calculate_orphaned_blobs_size(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create(&self, _description: image::Description) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn load(&self, _from: &str, _progress: platform::Progress) -> CzOutcome {
-    match self.0 {}
-  }
-}
-
-impl CzImages {
-  pub(crate) fn len(&self) -> usize {
-    match self.0 {}
-  }
-
-  pub(crate) fn at(&self, _index: usize) -> CzImage {
-    match self.0 {}
-  }
-}
-
-impl CzImage {
-  pub(crate) fn duplicate(&self) -> CzImage {
-    match self.0 {}
-  }
-
-  pub(crate) fn init_image(&self) -> CzInitImage {
-    match self.0 {}
-  }
-
-  pub(crate) fn kernel_image(&self) -> CzKernelImage {
-    match self.0 {}
-  }
-
-  pub(crate) fn reference(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn digest(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn media_type(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn descriptor(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn index(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn manifest(&self, _platform: containerization_oci::image::Platform) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn descriptor_for(&self, _platform: containerization_oci::image::Platform) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn config(&self, _platform: containerization_oci::image::Platform) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn referenced_digests(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn get_content(&self, _digest: &str) -> CzOutcome {
-    match self.0 {}
-  }
-}
-
-impl CzKernelImage {
-  pub(crate) fn name(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn kernel(&self, _platform: vm::SystemPlatform) -> CzOutcome {
-    match self.0 {}
-  }
-}
-
-impl CzInitImage {
-  pub(crate) fn name(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn init_block(&self, _at: &str, _platform: vm::SystemPlatform) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzInitImage {
+  fn name() -> String;
+  fn init_block(&str, vm::SystemPlatform) -> CzOutcome;
+});

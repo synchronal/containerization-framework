@@ -18,7 +18,6 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::fmt;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 
@@ -118,11 +117,7 @@ pub struct LinuxPod {
   pub(crate) handle: ffi::CzLinuxPod,
 }
 
-impl fmt::Debug for LinuxPod {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("LinuxPod").finish_non_exhaustive()
-  }
-}
+opaque_debug!(LinuxPod);
 
 // Swift's `LinuxPod` is `Sendable`.
 unsafe impl Send for LinuxPod {}

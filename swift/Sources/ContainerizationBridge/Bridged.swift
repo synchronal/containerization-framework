@@ -52,6 +52,13 @@ public final class CzOutcome: @unchecked Sendable {
     CzOutcome { absent(part) }
   }
 
+  /// An outcome holding what an async `body` returns, or the message of what
+  /// it throws, waiting for it through `blocking`. A wrapper's `body` may
+  /// capture `self`, because each wrapper is a `Sendable` final class.
+  static func awaiting<T>(_ body: @escaping @Sendable () async throws -> T) -> CzOutcome {
+    CzOutcome { try blocking(body) }
+  }
+
   func error() -> String? {
     failure
   }

@@ -90,13 +90,7 @@ pub struct ContainerManager {
   handle: ffi::CzContainerManager,
 }
 
-impl fmt::Debug for ContainerManager {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("ContainerManager")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(ContainerManager);
 
 // Swift's `ContainerManager` is `Sendable`; `create`, `release_network` and
 // `delete` take `&mut self` as Swift's are `mutating`.

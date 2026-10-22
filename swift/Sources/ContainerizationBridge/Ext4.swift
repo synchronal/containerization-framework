@@ -290,9 +290,7 @@ func unpackExt4(
   let at = URL(filePath: at.toString())
   let progress = progressHandler(progress)
 
-  return CzOutcome {
-    try blocking { try await unpacker.unpack(image, for: platform, at: at, progress: progress) }
-  }
+  return .awaiting { try await unpacker.unpack(image, for: platform, at: at, progress: progress) }
 }
 
 // For unit tests that compare Rust's copies with Swift's values.

@@ -3,7 +3,6 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -13,11 +12,7 @@ pub struct ReadStream {
   handle: ffi::CzReadStream,
 }
 
-impl fmt::Debug for ReadStream {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("ReadStream").finish_non_exhaustive()
-  }
-}
+opaque_debug!(ReadStream);
 
 // Swift's `ReadStream` is a class that isn't `Sendable`; Rust's isn't `Sync`,
 // so one call runs at a time.
@@ -77,11 +72,7 @@ pub struct DataStream<'a> {
   stream: PhantomData<&'a ReadStream>,
 }
 
-impl fmt::Debug for DataStream<'_> {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("DataStream").finish_non_exhaustive()
-  }
-}
+opaque_debug!(DataStream<'_>);
 
 impl Iterator for DataStream<'_> {
   type Item = Vec<u8>;

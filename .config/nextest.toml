@@ -1,6 +1,8 @@
 experimental = ["setup-scripts"]
 
-# Downloads the kernel the VM suites boot, and tells them where it is.
+# Downloads the kernel the VM suites boot, and tells them where it is. This
+# filter must list the same suites as the `containers` override below, so a new
+# suite that boots a VM goes in both.
 [scripts.setup.prepare-integration]
 command = { command-line = "bin/dev/prepare-integration", relative-to = "workspace-root" }
 slow-timeout = { period = "120s", terminate-after = 5 }

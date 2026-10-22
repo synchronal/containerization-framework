@@ -1,16 +1,11 @@
 use crate::platform::ffi;
-use std::fmt;
 
 /// `FileInfo`, which [`super::file::info`] reads. Each getter reads Swift's.
 pub struct FileInfo {
   pub(super) handle: ffi::CzFileInfo,
 }
 
-impl fmt::Debug for FileInfo {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("FileInfo").finish_non_exhaustive()
-  }
-}
+opaque_debug!(FileInfo);
 
 // Swift's `FileInfo` is `Sendable`.
 unsafe impl Send for FileInfo {}

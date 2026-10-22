@@ -213,7 +213,7 @@ pub(crate) struct Thrown {
 
 impl Thrown {
   /// Runs `body`, and says whether it threw. Its error or panic is kept.
-  fn threw(&self, body: impl FnOnce() -> Result<(), Error>) -> bool {
+  pub(crate) fn threw(&self, body: impl FnOnce() -> Result<(), Error>) -> bool {
     match self.panic.catch(body) {
       Some(Ok(())) => false,
       Some(Err(error)) => {

@@ -178,21 +178,19 @@ final class CzContainerManager: @unchecked Sendable {
     let progress = progressHandler(progress)
     let configure = configuredContainer(seed, by: configuration)
 
-    return CzOutcome {
+    return .awaiting {
       CzLinuxContainer(
-        try blocking {
-          try await self.manager.create(
-            id,
-            reference: reference,
-            rootfsSizeInBytes: rootfsSizeInBytes,
-            writableLayerSizeInBytes: writableLayerSizeInBytes,
-            readOnly: readOnly,
-            networking: networking,
-            vm: vm,
-            progress: progress,
-            configuration: configure
-          )
-        }
+        try await self.manager.create(
+          id,
+          reference: reference,
+          rootfsSizeInBytes: rootfsSizeInBytes,
+          writableLayerSizeInBytes: writableLayerSizeInBytes,
+          readOnly: readOnly,
+          networking: networking,
+          vm: vm,
+          progress: progress,
+          configuration: configure
+        )
       )
     }
   }
@@ -220,21 +218,19 @@ final class CzContainerManager: @unchecked Sendable {
     let progress = progressHandler(progress)
     let configure = configuredContainer(seed, by: configuration)
 
-    return CzOutcome {
+    return .awaiting {
       CzLinuxContainer(
-        try blocking {
-          try await self.manager.create(
-            id,
-            image: image,
-            rootfsSizeInBytes: rootfsSizeInBytes,
-            writableLayerSizeInBytes: writableLayerSizeInBytes,
-            readOnly: readOnly,
-            networking: networking,
-            vm: vm,
-            progress: progress,
-            configuration: configure
-          )
-        }
+        try await self.manager.create(
+          id,
+          image: image,
+          rootfsSizeInBytes: rootfsSizeInBytes,
+          writableLayerSizeInBytes: writableLayerSizeInBytes,
+          readOnly: readOnly,
+          networking: networking,
+          vm: vm,
+          progress: progress,
+          configuration: configure
+        )
       )
     }
   }
@@ -257,19 +253,17 @@ final class CzContainerManager: @unchecked Sendable {
     let vm = VMResources(cpus: Int(options.vmCpus()), memoryInBytes: options.vmMemoryInBytes())
     let configure = configuredContainer(seed, by: configuration)
 
-    return CzOutcome {
+    return .awaiting {
       CzLinuxContainer(
-        try blocking {
-          try await self.manager.create(
-            id,
-            image: image,
-            rootfs: rootfs,
-            writableLayer: writableLayer,
-            networking: networking,
-            vm: vm,
-            configuration: configure
-          )
-        }
+        try await self.manager.create(
+          id,
+          image: image,
+          rootfs: rootfs,
+          writableLayer: writableLayer,
+          networking: networking,
+          vm: vm,
+          configuration: configure
+        )
       )
     }
   }

@@ -116,6 +116,18 @@ macro_rules! failing {
   };
 }
 
+/// Declares a handle's methods, by their argument types after `&self`. None
+/// of them runs, since the handle is uninhabited.
+macro_rules! uninhabited {
+  ($handle:ident { $(fn $name:ident($($type:ty),* $(,)?) $(-> $output:ty)?;)* }) => {
+    impl $handle {
+      $(pub(crate) fn $name(&self, $(_: $type),*) $(-> $output)? {
+        match self.0 {}
+      })*
+    }
+  };
+}
+
 // One file per Swift file, as `bridge::ffi` has one `extern "Swift"` block
 // per Swift file. A reader `taken!` declares is in the file of the Swift
 // model whose getters it reads. The files that hold only readers declare no

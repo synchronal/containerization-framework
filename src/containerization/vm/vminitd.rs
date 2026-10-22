@@ -10,7 +10,6 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::fmt;
 
 /// `Vminitd`, the client of the agent running in the guest.
 /// [`super::VZVirtualMachineInstance::dial_agent`] makes one.
@@ -338,8 +337,4 @@ impl Vminitd {
   }
 }
 
-impl fmt::Debug for Vminitd {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("Vminitd").finish_non_exhaustive()
-  }
-}
+opaque_debug!(Vminitd);

@@ -8,16 +8,10 @@ use crate::containerization_oci::runtime;
 use crate::containerization_os;
 
 impl runtime::User {
-  pub(crate) fn uid(&self) -> u32 {
-    self.uid
-  }
-
-  pub(crate) fn gid(&self) -> u32 {
-    self.gid
-  }
-
-  pub(crate) fn umask(&self) -> Option<u32> {
-    self.umask
+  getters! {
+    copy uid: u32;
+    copy gid: u32;
+    copy umask: Option<u32>;
   }
 
   pub(crate) fn additional_gids_len(&self) -> usize {
@@ -28,8 +22,8 @@ impl runtime::User {
     self.additional_gids[index]
   }
 
-  pub(crate) fn username(&self) -> &str {
-    &self.username
+  getters! {
+    str username;
   }
 }
 
@@ -169,28 +163,11 @@ impl process::LinuxProcessConfiguration {
     });
   }
 
-  pub(crate) fn arguments_len(&self) -> usize {
-    self.arguments.len()
-  }
-
-  pub(crate) fn arguments_at(&self, index: usize) -> &str {
-    &self.arguments[index]
-  }
-
-  pub(crate) fn environment_variables_len(&self) -> usize {
-    self.environment_variables.len()
-  }
-
-  pub(crate) fn environment_variables_at(&self, index: usize) -> &str {
-    &self.environment_variables[index]
-  }
-
-  pub(crate) fn working_directory(&self) -> &str {
-    &self.working_directory
-  }
-
-  pub(crate) fn user(&self) -> &runtime::User {
-    &self.user
+  getters! {
+    list arguments: str => arguments_len, arguments_at;
+    list environment_variables: str => environment_variables_len, environment_variables_at;
+    str working_directory;
+    borrow user: runtime::User;
   }
 
   pub(crate) fn rlimits_len(&self) -> usize {
@@ -209,28 +186,13 @@ impl process::LinuxProcessConfiguration {
     self.rlimits[index].soft
   }
 
-  pub(crate) fn no_new_privileges(&self) -> bool {
-    self.no_new_privileges
-  }
-
-  pub(crate) fn capabilities(&self) -> &process::LinuxCapabilities {
-    &self.capabilities
-  }
-
-  pub(crate) fn terminal(&self) -> bool {
-    self.terminal
-  }
-
-  pub(crate) fn stdin(&self) -> Option<i32> {
-    self.stdin
-  }
-
-  pub(crate) fn stdout(&self) -> Option<i32> {
-    self.stdout
-  }
-
-  pub(crate) fn stderr(&self) -> Option<i32> {
-    self.stderr
+  getters! {
+    copy no_new_privileges: bool;
+    borrow capabilities: process::LinuxCapabilities;
+    copy terminal: bool;
+    copy stdin: Option<i32>;
+    copy stdout: Option<i32>;
+    copy stderr: Option<i32>;
   }
 }
 
@@ -239,12 +201,9 @@ impl process::LinuxRLimit {
     rlimit_kind(self.kind)
   }
 
-  pub(crate) fn hard(&self) -> u64 {
-    self.hard
-  }
-
-  pub(crate) fn soft(&self) -> u64 {
-    self.soft
+  getters! {
+    copy hard: u64;
+    copy soft: u64;
   }
 }
 

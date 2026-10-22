@@ -45,78 +45,37 @@ pub(crate) fn cz_ext4_unpack(
   match image.0 {}
 }
 
-impl CzExt4Reader {
-  pub(crate) fn super_block(&self) -> Vec<u8> {
-    match self.0 {}
-  }
+uninhabited!(CzExt4Reader {
+  fn super_block() -> Vec<u8>;
+  fn exists(&str, bool) -> bool;
+  fn stat(&str, bool) -> CzOutcome;
+  fn list_directory(&str) -> CzOutcome;
+  fn read_file(&str, u64, Option<usize>, bool) -> CzOutcome;
+  fn export(&str) -> CzOutcome;
+});
 
-  pub(crate) fn exists(&self, _path: &str, _follow_symlinks: bool) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn stat(&self, _path: &str, _follow_symlinks: bool) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn list_directory(&self, _path: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn read_file(&self, _at: &str, _offset: u64, _count: Option<usize>, _follow_symlinks: bool) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn export(&self, _archive: &str) -> CzOutcome {
-    match self.0 {}
-  }
-}
-
-impl CzExt4Formatter {
-  pub(crate) fn link(&self, _link: &str, _target: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn unlink(&self, _path: &str, _directory_whiteout: bool) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create(
-    &self,
-    _path: &str,
-    _link: Option<String>,
-    _mode: u16,
-    _access: f64,
-    _modification: f64,
-    _creation: f64,
-    _now: f64,
-    _has_buf: bool,
-    _buf: Vec<u8>,
-    _uid: Option<u32>,
-    _gid: Option<u32>,
-    _has_xattrs: bool,
-    _xattr_names: Vec<String>,
-    _xattr_lengths: Vec<u64>,
-    _xattr_values: Vec<u8>,
-    _recursion: bool,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn close(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn unpack(
-    &self,
-    _source: &str,
-    _format: &str,
-    _compression: &str,
-    _progress: platform::Progress,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn unpack_reader(&self, _reader: CzArchiveReader, _progress: platform::Progress) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzExt4Formatter {
+  fn link(&str, &str) -> CzOutcome;
+  fn unlink(&str, bool) -> CzOutcome;
+  fn create(
+    &str,
+    Option<String>,
+    u16,
+    f64,
+    f64,
+    f64,
+    f64,
+    bool,
+    Vec<u8>,
+    Option<u32>,
+    Option<u32>,
+    bool,
+    Vec<String>,
+    Vec<u64>,
+    Vec<u8>,
+    bool,
+  ) -> CzOutcome;
+  fn close() -> CzOutcome;
+  fn unpack(&str, &str, &str, platform::Progress) -> CzOutcome;
+  fn unpack_reader(CzArchiveReader, platform::Progress) -> CzOutcome;
+});

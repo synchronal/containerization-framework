@@ -4,7 +4,6 @@ use crate::containerization_os::terminal;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 
 /// `LinuxProcess`. [`crate::containerization::container::LinuxContainer::exec`],
 /// [`crate::containerization::container::LinuxContainer::exec_with`] and
@@ -14,13 +13,7 @@ pub struct LinuxProcess {
   pub(crate) handle: ffi::CzLinuxProcess,
 }
 
-impl fmt::Debug for LinuxProcess {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("LinuxProcess")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(LinuxProcess);
 
 // Swift's `LinuxProcess` is `Sendable`.
 unsafe impl Send for LinuxProcess {}

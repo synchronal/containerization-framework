@@ -65,8 +65,7 @@ fn makes_a_client_for_a_host() {
 #[test]
 fn says_which_reference_it_could_not_make_a_client_for() {
   let error = cfw::containerization_oci::client::RegistryClient::new("Not A Reference", false, None)
-    .err()
-    .expect("a malformed reference");
+    .expect_err("a malformed reference");
 
   assert!(error.to_string().contains("Not A Reference"), "{error}");
 }

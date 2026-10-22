@@ -61,8 +61,7 @@ fn refuses_a_length_swifts_int_cannot_hold() {
 
   let error = content
     .data_range(0, usize::MAX)
-    .err()
-    .expect("a length above Int.max");
+    .expect_err("a length above Int.max");
 
   assert!(error.to_string().contains("length"), "{error}");
 }
@@ -125,8 +124,7 @@ fn returns_the_error_its_body_returned_and_ingests_nothing() {
       written.send(digest).expect("the test is listening");
       Err(cfw::Error::failed("finish the body", "it gave up"))
     })
-    .err()
-    .expect("a failed body");
+    .expect_err("a failed body");
   let digest = writer_saw.recv().expect("the body ran");
 
   assert_eq!(error.action(), "finish the body");
@@ -158,8 +156,7 @@ fn resumes_a_panic_in_its_body_on_the_callers_thread() {
   let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     store.ingest(|_| panic!("the body gave up"))
   }))
-  .err()
-  .expect("the body's panic should reach the caller");
+  .expect_err("the body's panic should reach the caller");
 
   assert_eq!(panicked.downcast_ref::<&str>(), Some(&"the body gave up"));
 }
@@ -235,8 +232,7 @@ fn copies_a_file_and_reads_it_without_a_store() {
 #[test]
 fn says_which_file_it_could_not_open_as_content() {
   let error = cfw::containerization_oci::content::Content::open("/nowhere/at/all".as_ref())
-    .err()
-    .expect("a file that doesn't exist");
+    .expect_err("a file that doesn't exist");
 
   assert!(error.to_string().contains("/nowhere/at/all"), "{error}");
   assert!(error.is_code(cfw::containerization_error::Code::NotFound), "{error}");
@@ -245,8 +241,7 @@ fn says_which_file_it_could_not_open_as_content() {
 #[test]
 fn says_which_directory_a_content_writer_could_not_write_into() {
   let error = cfw::containerization_oci::content::ContentWriter::new("/nowhere/at/all".as_ref())
-    .err()
-    .expect("a directory that doesn't exist");
+    .expect_err("a directory that doesn't exist");
 
   assert!(error.to_string().contains("/nowhere/at/all"), "{error}");
 }
@@ -255,8 +250,7 @@ fn says_which_directory_a_content_writer_could_not_write_into() {
 fn says_which_blob_it_could_not_get() {
   let error = support::store::content_store()
     .get("not-a-digest")
-    .err()
-    .expect("a malformed digest");
+    .expect_err("a malformed digest");
 
   assert!(error.to_string().contains("not-a-digest"), "{error}");
 }
@@ -297,5 +291,5 @@ fn finds_a_digests_path_in_a_directory() {
   let digest =
     cfw::containerization_oci::content::ParsedDigest::parse_path_component(&encoded).expect("a valid digest");
 
-  assert_eq!(digest.path(&root).expect("a path"), root.join(&encoded));
+  assert_eq!(digest.path(root).expect("a path"), root.join(&encoded));
 }

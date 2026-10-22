@@ -9,7 +9,6 @@ use super::WriteEntry;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::marker::PhantomData;
 use std::os::fd::RawFd;
 use std::path::Path;
@@ -37,13 +36,7 @@ pub struct ArchiveWriter {
   pub(crate) handle: ffi::CzArchiveWriter,
 }
 
-impl fmt::Debug for ArchiveWriter {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("ArchiveWriter")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(ArchiveWriter);
 
 // Swift's `ArchiveWriter` is a class that isn't `Sendable`; Rust's isn't
 // `Sync`, so one call runs at a time.

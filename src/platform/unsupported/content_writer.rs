@@ -13,12 +13,7 @@ handles!(CzContentWriter);
 
 failing!(cz_content_writer_new(&str), cz_content_writer_copy(&str, &str));
 
-impl CzContentWriter {
-  pub(crate) fn write(&self, _data: Vec<u8>) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create(&self, _from: &str) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzContentWriter {
+  fn write(Vec<u8>) -> CzOutcome;
+  fn create(&str) -> CzOutcome;
+});

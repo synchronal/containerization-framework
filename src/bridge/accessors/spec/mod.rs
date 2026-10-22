@@ -12,11 +12,9 @@ mod process;
 mod resources;
 mod seccomp;
 
-use crate::bridge::accessors::entry_at;
 use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
-use std::collections::BTreeMap;
 
 impl ffi::CzOutcome {
   /// The `Spec` an outcome holds, read field by field.
@@ -52,56 +50,14 @@ impl ffi::CzOutcome {
 }
 
 impl runtime::Spec {
-  pub(crate) fn version(&self) -> &str {
-    &self.version
-  }
-
-  pub(crate) fn has_hooks(&self) -> bool {
-    self.hooks.is_some()
-  }
-
-  pub(crate) fn hooks(&self) -> &runtime::Hooks {
-    present(&self.hooks)
-  }
-
-  pub(crate) fn has_process(&self) -> bool {
-    self.process.is_some()
-  }
-
-  pub(crate) fn process(&self) -> &runtime::Process {
-    present(&self.process)
-  }
-
-  pub(crate) fn hostname(&self) -> &str {
-    &self.hostname
-  }
-
-  pub(crate) fn domainname(&self) -> &str {
-    &self.domainname
-  }
-
-  pub(crate) fn mounts_len(&self) -> usize {
-    self.mounts.len()
-  }
-
-  pub(crate) fn mounts_at(&self, index: usize) -> &runtime::Mount {
-    &self.mounts[index]
-  }
-
-  pub(crate) fn has_annotations(&self) -> bool {
-    self.annotations.is_some()
-  }
-
-  pub(crate) fn annotations_len(&self) -> usize {
-    self.annotations.as_ref().map_or(0, BTreeMap::len)
-  }
-
-  pub(crate) fn annotation_key_at(&self, index: usize) -> &str {
-    entry_at(present(&self.annotations), index).0
-  }
-
-  pub(crate) fn annotation_value_at(&self, index: usize) -> &str {
-    entry_at(present(&self.annotations), index).1
+  getters! {
+    str version;
+    present hooks: runtime::Hooks => has_hooks;
+    present process: runtime::Process => has_process;
+    str hostname;
+    str domainname;
+    list mounts: runtime::Mount => mounts_len, mounts_at;
+    optional_map annotations => has_annotations, annotations_len, annotation_key_at, annotation_value_at;
   }
 
   pub(crate) fn has_root(&self) -> bool {
@@ -116,12 +72,8 @@ impl runtime::Spec {
     present(&self.root).readonly
   }
 
-  pub(crate) fn has_linux(&self) -> bool {
-    self.linux.is_some()
-  }
-
-  pub(crate) fn linux(&self) -> &runtime::Linux {
-    present(&self.linux)
+  getters! {
+    present linux: runtime::Linux => has_linux;
   }
 }
 

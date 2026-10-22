@@ -6,20 +6,13 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::fmt;
 
 /// `KernelImage`.
 pub struct KernelImage {
   handle: ffi::CzKernelImage,
 }
 
-impl fmt::Debug for KernelImage {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("KernelImage")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(KernelImage);
 
 // Swift's `KernelImage` is `Sendable`.
 unsafe impl Send for KernelImage {}

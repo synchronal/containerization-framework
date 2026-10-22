@@ -1,6 +1,5 @@
 //! The OCI runtime spec's mounts.
 
-use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
 
@@ -22,47 +21,12 @@ impl ffi::CzOutcome {
 }
 
 impl runtime::Mount {
-  pub(crate) fn mount_type(&self) -> &str {
-    &self.r#type
-  }
-
-  pub(crate) fn source(&self) -> &str {
-    &self.source
-  }
-
-  pub(crate) fn destination(&self) -> &str {
-    &self.destination
-  }
-
-  pub(crate) fn options_len(&self) -> usize {
-    self.options.len()
-  }
-
-  pub(crate) fn options_at(&self, index: usize) -> &str {
-    &self.options[index]
-  }
-
-  pub(crate) fn has_uid_mappings(&self) -> bool {
-    self.uid_mappings.is_some()
-  }
-
-  pub(crate) fn uid_mappings_len(&self) -> usize {
-    self.uid_mappings.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn uid_mappings_at(&self, index: usize) -> &runtime::LinuxIDMapping {
-    &present(&self.uid_mappings)[index]
-  }
-
-  pub(crate) fn has_gid_mappings(&self) -> bool {
-    self.gid_mappings.is_some()
-  }
-
-  pub(crate) fn gid_mappings_len(&self) -> usize {
-    self.gid_mappings.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn gid_mappings_at(&self, index: usize) -> &runtime::LinuxIDMapping {
-    &present(&self.gid_mappings)[index]
+  getters! {
+    str r#type => mount_type;
+    str source;
+    str destination;
+    list options: str => options_len, options_at;
+    optional_list uid_mappings: runtime::LinuxIDMapping => has_uid_mappings, uid_mappings_len, uid_mappings_at;
+    optional_list gid_mappings: runtime::LinuxIDMapping => has_gid_mappings, gid_mappings_len, gid_mappings_at;
   }
 }

@@ -11,7 +11,6 @@ use crate::containerization_oci::image;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::path::Path;
 
 /// The defaulted arguments of `RegistryClient(host:...)`. Its [`Default`]
@@ -44,13 +43,7 @@ pub struct RegistryClient {
   handle: ffi::CzRegistryClient,
 }
 
-impl fmt::Debug for RegistryClient {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("RegistryClient")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(RegistryClient);
 
 // Swift's `RegistryClient` is `Sendable`.
 unsafe impl Send for RegistryClient {}

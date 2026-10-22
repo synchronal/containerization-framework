@@ -274,17 +274,17 @@ fn runs_its_first_process_under_an_init() {
 
 #[test]
 fn writes_its_unified_cgroup_files() {
-  let container = Container::boot_with("cfw-test-config-unified", |configuration| {
+  let booted = Container::boot_with("cfw-test-config-unified", |configuration| {
     configuration.unified = [("memory.oom.group".to_string(), "1".to_string())].into();
   });
 
   assert_eq!(
-    container.container().config().unified,
+    booted.container().config().unified,
     [("memory.oom.group".to_string(), "1".to_string())].into(),
     "the files should read back from Swift"
   );
   assert_eq!(
-    container
+    booted
       .sh("oom-group", "cat /sys/fs/cgroup/memory.oom.group")
       .trim(),
     "1"
@@ -320,7 +320,7 @@ fn reads_back_the_boot_log_descriptor_it_was_given() {
   let boot_log = cfw::containerization::vm::BootLog::FileHandle(std::os::fd::AsRawFd::as_raw_fd(&file));
   let configured = boot_log.clone();
 
-  let container = Container::boot_with("cfw-test-config-boot-log-handle", move |configuration| {
+  let booted = Container::boot_with("cfw-test-config-boot-log-handle", move |configuration| {
     configuration.boot_log = Some(configured);
   });
 
@@ -330,7 +330,7 @@ fn reads_back_the_boot_log_descriptor_it_was_given() {
     log.display()
   );
   assert_eq!(
-    container.container().config().boot_log,
+    booted.container().config().boot_log,
     Some(boot_log),
     "the configuration should report the caller's descriptor, not Swift's duplicate"
   );

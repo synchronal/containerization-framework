@@ -12,7 +12,8 @@
 //! (`src/platform/unsupported`) that compiles, but fails every call that would
 //! reach Swift.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 /// swift-bridge's generated header directory; `bridging-header.h` imports it.

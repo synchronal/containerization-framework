@@ -3,20 +3,12 @@
 //! `ContainerizationOCI`'s runtime spec, each value crossing to Swift and
 //! back.
 
+mod support;
+
 use cfw::containerization_oci as oci;
 use containerization_framework as cfw;
-use std::collections::BTreeMap;
-
-fn strings(values: &[&str]) -> Vec<String> {
-  values.iter().map(|value| value.to_string()).collect()
-}
-
-fn map(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
-  entries
-    .iter()
-    .map(|(key, value)| (key.to_string(), value.to_string()))
-    .collect()
-}
+use support::map;
+use support::strings;
 
 /// A `Spec` with every field set, and none at its default.
 fn full_spec() -> oci::runtime::Spec {
@@ -373,6 +365,6 @@ fn converts_containerizations_types_to_ocis() {
     cfw::containerization::vm::SystemPlatform::LINUX_ARM
       .oci_platform()
       .expect("a platform"),
-    oci::image::Platform::parse("linux/arm64").expect("a platform")
+    support::platform("linux/arm64")
   );
 }

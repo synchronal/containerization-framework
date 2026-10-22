@@ -3,12 +3,11 @@
 //! `ContainerizationOCI`'s image values and references, each asked of Swift.
 //! None needs a store, so the suite reaches no registry.
 
+mod support;
+
 use cfw::containerization_oci as oci;
 use containerization_framework as cfw;
-
-fn platform(string: &str) -> oci::image::Platform {
-  oci::image::Platform::parse(string).expect("a valid platform")
-}
+use support::platform;
 
 #[test]
 fn parses_a_platform() {
@@ -135,9 +134,7 @@ fn makes_a_reference_from_its_parts() {
 
 #[test]
 fn rejects_a_malformed_reference() {
-  let error = oci::image::Reference::parse("Alpine")
-    .err()
-    .expect("an uppercase path");
+  let error = oci::image::Reference::parse("Alpine").expect_err("an uppercase path");
   assert!(error.is_code(cfw::containerization_error::Code::InvalidArgument));
   assert!(
     oci::image::Reference::parse("alpine")

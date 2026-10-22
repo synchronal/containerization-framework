@@ -51,8 +51,7 @@ fn says_which_file_it_could_not_stream() {
     "/nowhere/data.bin".as_ref(),
     cfw::containerization_io::ReadStream::BUFFER_SIZE,
   )
-  .err()
-  .expect("a file that doesn't exist");
+  .expect_err("a file that doesn't exist");
 
   assert!(error.to_string().contains("/nowhere/data.bin"), "{error}");
 }

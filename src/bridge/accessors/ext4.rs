@@ -8,12 +8,9 @@ use crate::containerization_ext4::ext4::journal_config;
 use crate::platform;
 
 impl formatter::FormatterOptions {
-  pub(crate) fn block_size(&self) -> u32 {
-    self.block_size
-  }
-
-  pub(crate) fn min_disk_size(&self) -> u64 {
-    self.min_disk_size
+  getters! {
+    copy block_size: u32;
+    copy min_disk_size: u64;
   }
 
   pub(crate) fn has_journal(&self) -> bool {

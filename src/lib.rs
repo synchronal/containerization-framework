@@ -151,6 +151,20 @@ macro_rules! raw_values {
   };
 }
 
+/// A `Debug` that prints only the type's name, for a handle on a Swift value
+/// whose fields Rust can't read. A lifetime follows the name of a type that
+/// borrows, as in `opaque_debug!(ArchiveEntryReader<'_>)`.
+macro_rules! opaque_debug {
+  ($(#[$meta:meta])* $name:ident $(<$lifetime:lifetime>)?) => {
+    $(#[$meta])*
+    impl std::fmt::Debug for $name $(<$lifetime>)? {
+      fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct(stringify!($name)).finish_non_exhaustive()
+      }
+    }
+  };
+}
+
 pub mod cloud_hypervisor;
 pub mod containerization;
 pub mod containerization_archive;
@@ -171,3 +185,8 @@ mod platform;
 mod bridge;
 
 pub use crate::error::Error;
+
+// Compiles the README's example as a doctest, so it can't drift from the API.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

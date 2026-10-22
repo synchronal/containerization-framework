@@ -70,27 +70,40 @@ extension Containerization.LinuxCapabilities {
   }
 }
 
-/// `LinuxRLimit.Kind` and the bridge's `RlimitKind`, case for case.
-var rlimitKinds: [(LinuxRLimit.Kind, RlimitKind)] {
-  [
-    (.addressSpace, .AddressSpace),
-    (.coreFileSize, .CoreFileSize),
-    (.cpuTime, .CpuTime),
-    (.dataSize, .DataSize),
-    (.fileSize, .FileSize),
-    (.locks, .Locks),
-    (.lockedMemory, .LockedMemory),
-    (.messageQueue, .MessageQueue),
-    (.nice, .Nice),
-    (.openFiles, .OpenFiles),
-    (.numberOfProcesses, .NumberOfProcesses),
-    (.residentSetSize, .ResidentSetSize),
-    (.realtimePriority, .RealtimePriority),
-    (.realtimeTimeout, .RealtimeTimeout),
-    (.signalsPending, .SignalsPending),
-    (.stackSize, .StackSize),
-  ]
+extension FilesystemOperation {
+  /// The operation the bridge's `FilesystemOperationKind` names.
+  init(_ kind: FilesystemOperationKind) {
+    self =
+      switch kind {
+      case .Freeze: .freeze
+      case .Thaw: .thaw
+      case .Trim: .trim
+      }
+  }
 }
+
+/// `LinuxRLimit.Kind` and the bridge's `RlimitKind`, case for case.
+///
+/// The generated `RlimitKind` isn't `Sendable`, though it has no payloads, and
+/// nothing mutates this constant.
+nonisolated(unsafe) let rlimitKinds: [(LinuxRLimit.Kind, RlimitKind)] = [
+  (.addressSpace, .AddressSpace),
+  (.coreFileSize, .CoreFileSize),
+  (.cpuTime, .CpuTime),
+  (.dataSize, .DataSize),
+  (.fileSize, .FileSize),
+  (.locks, .Locks),
+  (.lockedMemory, .LockedMemory),
+  (.messageQueue, .MessageQueue),
+  (.nice, .Nice),
+  (.openFiles, .OpenFiles),
+  (.numberOfProcesses, .NumberOfProcesses),
+  (.residentSetSize, .ResidentSetSize),
+  (.realtimePriority, .RealtimePriority),
+  (.realtimeTimeout, .RealtimeTimeout),
+  (.signalsPending, .SignalsPending),
+  (.stackSize, .StackSize),
+]
 
 extension LinuxProcessConfiguration {
   init(_ process: RustLinuxProcessConfigurationRef) throws {

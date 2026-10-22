@@ -113,40 +113,18 @@ impl ffi::CzOutcome {
 }
 
 impl runtime::LinuxResources {
-  pub(crate) fn devices_len(&self) -> usize {
-    self.devices.len()
-  }
-
-  pub(crate) fn devices_at(&self, index: usize) -> &runtime::LinuxDeviceCgroup {
-    &self.devices[index]
-  }
-
-  pub(crate) fn has_memory(&self) -> bool {
-    self.memory.is_some()
-  }
-
-  pub(crate) fn memory(&self) -> &runtime::LinuxMemory {
-    present(&self.memory)
-  }
-
-  pub(crate) fn has_cpu(&self) -> bool {
-    self.cpu.is_some()
-  }
-
-  pub(crate) fn cpu(&self) -> &runtime::LinuxCPU {
-    present(&self.cpu)
+  getters! {
+    list devices: runtime::LinuxDeviceCgroup => devices_len, devices_at;
+    present memory: runtime::LinuxMemory => has_memory;
+    present cpu: runtime::LinuxCPU => has_cpu;
   }
 
   pub(crate) fn pids_limit(&self) -> Option<i64> {
     self.pids.map(|pids| pids.limit)
   }
 
-  pub(crate) fn has_block_io(&self) -> bool {
-    self.block_io.is_some()
-  }
-
-  pub(crate) fn block_io(&self) -> &runtime::LinuxBlockIO {
-    present(&self.block_io)
+  getters! {
+    present block_io: runtime::LinuxBlockIO => has_block_io;
   }
 
   pub(crate) fn hugepage_limits_len(&self) -> usize {
@@ -201,106 +179,43 @@ impl runtime::LinuxResources {
     entry_at(present(&self.rdma), index).1.hca_objects
   }
 
-  pub(crate) fn has_unified(&self) -> bool {
-    self.unified.is_some()
-  }
-
-  pub(crate) fn unified_len(&self) -> usize {
-    self.unified.as_ref().map_or(0, BTreeMap::len)
-  }
-
-  pub(crate) fn unified_key_at(&self, index: usize) -> &str {
-    entry_at(present(&self.unified), index).0
-  }
-
-  pub(crate) fn unified_value_at(&self, index: usize) -> &str {
-    entry_at(present(&self.unified), index).1
+  getters! {
+    optional_map unified => has_unified, unified_len, unified_key_at, unified_value_at;
   }
 }
 
 impl runtime::LinuxMemory {
-  pub(crate) fn limit(&self) -> Option<i64> {
-    self.limit
-  }
-
-  pub(crate) fn reservation(&self) -> Option<i64> {
-    self.reservation
-  }
-
-  pub(crate) fn swap(&self) -> Option<i64> {
-    self.swap
-  }
-
-  pub(crate) fn kernel(&self) -> Option<i64> {
-    self.kernel
-  }
-
-  pub(crate) fn kernel_tcp(&self) -> Option<i64> {
-    self.kernel_tcp
-  }
-
-  pub(crate) fn swappiness(&self) -> Option<u64> {
-    self.swappiness
-  }
-
-  pub(crate) fn disable_oom_killer(&self) -> Option<bool> {
-    self.disable_oom_killer
-  }
-
-  pub(crate) fn use_hierarchy(&self) -> Option<bool> {
-    self.use_hierarchy
-  }
-
-  pub(crate) fn check_before_update(&self) -> Option<bool> {
-    self.check_before_update
+  getters! {
+    copy limit: Option<i64>;
+    copy reservation: Option<i64>;
+    copy swap: Option<i64>;
+    copy kernel: Option<i64>;
+    copy kernel_tcp: Option<i64>;
+    copy swappiness: Option<u64>;
+    copy disable_oom_killer: Option<bool>;
+    copy use_hierarchy: Option<bool>;
+    copy check_before_update: Option<bool>;
   }
 }
 
 impl runtime::LinuxCPU {
-  pub(crate) fn shares(&self) -> Option<u64> {
-    self.shares
-  }
-
-  pub(crate) fn quota(&self) -> Option<i64> {
-    self.quota
-  }
-
-  pub(crate) fn burst(&self) -> Option<u64> {
-    self.burst
-  }
-
-  pub(crate) fn period(&self) -> Option<u64> {
-    self.period
-  }
-
-  pub(crate) fn realtime_runtime(&self) -> Option<i64> {
-    self.realtime_runtime
-  }
-
-  pub(crate) fn realtime_period(&self) -> Option<i64> {
-    self.realtime_period
-  }
-
-  pub(crate) fn cpus(&self) -> &str {
-    &self.cpus
-  }
-
-  pub(crate) fn mems(&self) -> &str {
-    &self.mems
-  }
-
-  pub(crate) fn idle(&self) -> Option<i64> {
-    self.idle
+  getters! {
+    copy shares: Option<u64>;
+    copy quota: Option<i64>;
+    copy burst: Option<u64>;
+    copy period: Option<u64>;
+    copy realtime_runtime: Option<i64>;
+    copy realtime_period: Option<i64>;
+    str cpus;
+    str mems;
+    copy idle: Option<i64>;
   }
 }
 
 impl runtime::LinuxBlockIO {
-  pub(crate) fn weight(&self) -> Option<u16> {
-    self.weight
-  }
-
-  pub(crate) fn leaf_weight(&self) -> Option<u16> {
-    self.leaf_weight
+  getters! {
+    copy weight: Option<u16>;
+    copy leaf_weight: Option<u16>;
   }
 
   pub(crate) fn weight_device_len(&self) -> usize {
@@ -350,23 +265,11 @@ impl runtime::LinuxBlockIO {
 }
 
 impl runtime::LinuxDeviceCgroup {
-  pub(crate) fn allow(&self) -> bool {
-    self.allow
-  }
-
-  pub(crate) fn device_type(&self) -> &str {
-    &self.r#type
-  }
-
-  pub(crate) fn major(&self) -> Option<i64> {
-    self.major
-  }
-
-  pub(crate) fn minor(&self) -> Option<i64> {
-    self.minor
-  }
-
-  pub(crate) fn access(&self) -> Option<&str> {
-    self.access.as_deref()
+  getters! {
+    copy allow: bool;
+    str r#type => device_type;
+    copy major: Option<i64>;
+    copy minor: Option<i64>;
+    optional_str access;
   }
 }

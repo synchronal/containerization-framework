@@ -1,37 +1,52 @@
 #!/usr/bin/env bash
+#
+# Formats the bridge's Swift sources with swift-format, or checks that they
+# are formatted.
 
-format_swift() {
-  find ./swift -name '*.swift' -exec swift-format format --configuration .swift-format.json -i {} \;
+set -euo pipefail
+
+cd "$(dirname "$0")/../.."
+
+usage() {
+  echo "USAGE" >&2
+  echo "  $0 --all" >&2
+  echo "  $0 --check" >&2
+  exit 1
 }
 
-check_swift() {
-  contents="$(find ./swift -name '*.swift' -exec cat \{\} \;)"
-  formatted="$(find ./swift -name '*.swift' -exec swift-format format --configuration .swift-format.json \{\} \;)"
+if ! command -v swift-format >/dev/null; then
+  echo "$0: swift-format is not installed; it ships with Xcode's toolchain" >&2
+  exit 1
+fi
 
-  if [[ "${contents}" == "${formatted}" ]]; then
-    exit 0
-  else
-    echo "Swift files have not been properly formatted" >&2
-    exit 1
-  fi
-}
-
-case $1 in
+case "${1:-}" in
   --all)
-    format_swift
+    swift-format format --configuration .swift-format.json --in-place --recursive swift
     ;;
 
   --check)
-    check_swift
+    sources=()
+    while IFS= read -r -d '' source; do
+      sources+=("$source")
+    done < <(find swift -name '*.swift' -print0 | sort -z)
+
+    unformatted=()
+    for source in "${sources[@]}"; do
+      formatted="$(swift-format format --configuration .swift-format.json "$source")"
+      if [[ "$formatted" != "$(cat "$source")" ]]; then
+        unformatted+=("$source")
+      fi
+    done
+
+    if ((${#unformatted[@]} > 0)); then
+      echo "These Swift files are not formatted; run $0 --all:" >&2
+      printf '  %s\n' "${unformatted[@]}" >&2
+      exit 1
+    fi
     ;;
 
   *)
-    echo "unknown flag or file type: '$1'"
-    echo ""
-    echo "USAGE"
-    echo "  $0 --all"
-    echo "  $0 --check"
-    exit 1
+    echo "$0: unknown argument '${1:-}'" >&2
+    usage
     ;;
-
 esac

@@ -56,88 +56,45 @@ impl network::NATInterface {
     accessors::present(&self.ipv6_address)
   }
 
-  pub(crate) fn has_ipv6_gateway(&self) -> bool {
-    self.ipv6_gateway.is_some()
-  }
-
-  /// Swift calls this only when [`Self::has_ipv6_gateway`] is true.
-  pub(crate) fn ipv6_gateway(&self) -> &address::IPv6Address {
-    accessors::present(&self.ipv6_gateway)
+  getters! {
+    present ipv6_gateway: address::IPv6Address => has_ipv6_gateway;
   }
 
   pub(crate) fn mac_address(&self) -> Option<u64> {
     self.mac_address.map(|address| address.value)
   }
 
-  pub(crate) fn mtu(&self) -> u32 {
-    self.mtu
+  getters! {
+    copy mtu: u32;
   }
 }
 
 impl network::DNS {
-  pub(crate) fn nameservers_len(&self) -> usize {
-    self.nameservers.len()
-  }
-
-  pub(crate) fn nameservers_at(&self, index: usize) -> &str {
-    &self.nameservers[index]
-  }
-
-  pub(crate) fn domain(&self) -> Option<&str> {
-    self.domain.as_deref()
-  }
-
-  pub(crate) fn search_domains_len(&self) -> usize {
-    self.search_domains.len()
-  }
-
-  pub(crate) fn search_domains_at(&self, index: usize) -> &str {
-    &self.search_domains[index]
-  }
-
-  pub(crate) fn options_len(&self) -> usize {
-    self.options.len()
-  }
-
-  pub(crate) fn options_at(&self, index: usize) -> &str {
-    &self.options[index]
+  getters! {
+    list nameservers: str => nameservers_len, nameservers_at;
+    optional_str domain;
+    list search_domains: str => search_domains_len, search_domains_at;
+    list options: str => options_len, options_at;
   }
 }
 
 impl hosts::Entry {
-  pub(crate) fn ip_address(&self) -> &str {
-    &self.ip_address
-  }
-
-  pub(crate) fn hostnames_len(&self) -> usize {
-    self.hostnames.len()
-  }
-
-  pub(crate) fn hostnames_at(&self, index: usize) -> &str {
-    &self.hostnames[index]
-  }
-
-  pub(crate) fn comment(&self) -> Option<&str> {
-    self.comment.as_deref()
+  getters! {
+    str ip_address;
+    list hostnames: str => hostnames_len, hostnames_at;
+    optional_str comment;
   }
 }
 
 impl network::Hosts {
-  pub(crate) fn entries_len(&self) -> usize {
-    self.entries.len()
-  }
-
-  pub(crate) fn entries_at(&self, index: usize) -> &hosts::Entry {
-    &self.entries[index]
-  }
-
-  pub(crate) fn comment(&self) -> Option<&str> {
-    self.comment.as_deref()
+  getters! {
+    list entries: hosts::Entry => entries_len, entries_at;
+    optional_str comment;
   }
 }
 
 // What the container, pod and VM configurations share, read and filled the
-// same way.
+// same way. The macros in `container/mod.rs` call these.
 
 pub(super) fn interface_kind(interface: &network::Interface) -> ffi::InterfaceKind {
   match interface {

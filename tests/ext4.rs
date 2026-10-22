@@ -31,20 +31,7 @@ fn unpacks_an_image_and_reports_its_progress() {
   );
 
   let events = events.lock().expect("the recording");
-  let total: isize = events
-    .iter()
-    .map(|event| match event {
-      cfw::containerization_extras::ProgressEvent::AddTotalItems(items) => *items,
-      _ => 0,
-    })
-    .sum();
-  let unpacked: isize = events
-    .iter()
-    .map(|event| match event {
-      cfw::containerization_extras::ProgressEvent::AddItems(items) => *items,
-      _ => 0,
-    })
-    .sum();
+  let (unpacked, total) = support::item_totals(&events);
 
   assert!(total > 0, "{events:?}");
   assert_eq!(unpacked, total, "every item counted is unpacked");
@@ -115,8 +102,7 @@ fn finishes_unpacking_then_resumes_a_panic_in_its_progress_handler() {
       Some(handler),
     )
   }))
-  .err()
-  .expect("the handler's panic should reach the caller");
+  .expect_err("the handler's panic should reach the caller");
 
   assert_eq!(panicked.downcast_ref::<&str>(), Some(&"the handler gave up"));
   assert_eq!(
@@ -178,8 +164,7 @@ fn exports_an_unpacked_filesystem_as_a_tar() {
 #[test]
 fn says_which_block_device_it_could_not_read() {
   let error = cfw::containerization_ext4::ext4::EXT4Reader::new("/nowhere/rootfs.ext4".as_ref())
-    .err()
-    .expect("a filesystem that doesn't exist");
+    .expect_err("a filesystem that doesn't exist");
 
   assert!(error.to_string().contains("/nowhere/rootfs.ext4"), "{error}");
 }
@@ -404,8 +389,7 @@ fn refuses_a_count_swifts_int_cannot_hold() {
         ..Default::default()
       },
     )
-    .err()
-    .expect("a count above Int.max");
+    .expect_err("a count above Int.max");
 
   assert!(error.to_string().contains("count"), "{error}");
 }
@@ -419,8 +403,7 @@ fn says_which_path_it_could_not_read() {
 
   let error = reader
     .read_file("/nowhere.txt".as_ref(), Default::default())
-    .err()
-    .expect("a file that doesn't exist");
+    .expect_err("a file that doesn't exist");
 
   assert!(error.to_string().contains("/nowhere.txt"), "{error}");
 }
@@ -463,8 +446,7 @@ fn rejects_a_block_size_it_cannot_format() {
   };
 
   let error = cfw::containerization_ext4::ext4::Formatter::new(&directory.path().join("bad.ext4"), options)
-    .err()
-    .expect("a block size that isn't a power of two");
+    .expect_err("a block size that isn't a power of two");
 
   assert!(error.to_string().contains("3000"), "{error}");
 }
@@ -585,8 +567,7 @@ fn compresses_extended_attribute_names() {
 #[test]
 fn rejects_extended_attributes_without_a_header() {
   let error = cfw::containerization_ext4::ext4::EXT4Reader::read_block_extended_attributes(&[0; 32])
-    .err()
-    .expect("a buffer with no header");
+    .expect_err("a buffer with no header");
 
   assert!(error.to_string().contains("header"), "{error}");
 }

@@ -1,11 +1,9 @@
 //! The OCI runtime spec's Linux section: its namespaces, ID mappings, devices
 //! and personality.
 
-use crate::bridge::accessors::entry_at;
 use crate::bridge::accessors::present;
 use crate::bridge::ffi;
 use crate::containerization_oci::runtime;
-use std::collections::BTreeMap;
 
 impl ffi::CzOutcome {
   pub(super) fn linux(&self) -> runtime::Linux {
@@ -58,62 +56,20 @@ impl ffi::CzOutcome {
 }
 
 impl runtime::LinuxIDMapping {
-  pub(crate) fn container_id(&self) -> u32 {
-    self.container_id
-  }
-
-  pub(crate) fn host_id(&self) -> u32 {
-    self.host_id
-  }
-
-  pub(crate) fn size(&self) -> u32 {
-    self.size
+  getters! {
+    copy container_id: u32;
+    copy host_id: u32;
+    copy size: u32;
   }
 }
 
 impl runtime::Linux {
-  pub(crate) fn uid_mappings_len(&self) -> usize {
-    self.uid_mappings.len()
-  }
-
-  pub(crate) fn uid_mappings_at(&self, index: usize) -> &runtime::LinuxIDMapping {
-    &self.uid_mappings[index]
-  }
-
-  pub(crate) fn gid_mappings_len(&self) -> usize {
-    self.gid_mappings.len()
-  }
-
-  pub(crate) fn gid_mappings_at(&self, index: usize) -> &runtime::LinuxIDMapping {
-    &self.gid_mappings[index]
-  }
-
-  pub(crate) fn has_sysctl(&self) -> bool {
-    self.sysctl.is_some()
-  }
-
-  pub(crate) fn sysctl_len(&self) -> usize {
-    self.sysctl.as_ref().map_or(0, BTreeMap::len)
-  }
-
-  pub(crate) fn sysctl_key_at(&self, index: usize) -> &str {
-    entry_at(present(&self.sysctl), index).0
-  }
-
-  pub(crate) fn sysctl_value_at(&self, index: usize) -> &str {
-    entry_at(present(&self.sysctl), index).1
-  }
-
-  pub(crate) fn has_resources(&self) -> bool {
-    self.resources.is_some()
-  }
-
-  pub(crate) fn resources(&self) -> &runtime::LinuxResources {
-    present(&self.resources)
-  }
-
-  pub(crate) fn cgroups_path(&self) -> &str {
-    &self.cgroups_path
+  getters! {
+    list uid_mappings: runtime::LinuxIDMapping => uid_mappings_len, uid_mappings_at;
+    list gid_mappings: runtime::LinuxIDMapping => gid_mappings_len, gid_mappings_at;
+    optional_map sysctl => has_sysctl, sysctl_len, sysctl_key_at, sysctl_value_at;
+    present resources: runtime::LinuxResources => has_resources;
+    str cgroups_path;
   }
 
   pub(crate) fn namespaces_len(&self) -> usize {
@@ -128,44 +84,13 @@ impl runtime::Linux {
     &self.namespaces[index].path
   }
 
-  pub(crate) fn devices_len(&self) -> usize {
-    self.devices.len()
-  }
-
-  pub(crate) fn devices_at(&self, index: usize) -> &runtime::LinuxDevice {
-    &self.devices[index]
-  }
-
-  pub(crate) fn has_seccomp(&self) -> bool {
-    self.seccomp.is_some()
-  }
-
-  pub(crate) fn seccomp(&self) -> &runtime::LinuxSeccomp {
-    present(&self.seccomp)
-  }
-
-  pub(crate) fn rootfs_propagation(&self) -> &str {
-    &self.rootfs_propagation
-  }
-
-  pub(crate) fn masked_paths_len(&self) -> usize {
-    self.masked_paths.len()
-  }
-
-  pub(crate) fn masked_paths_at(&self, index: usize) -> &str {
-    &self.masked_paths[index]
-  }
-
-  pub(crate) fn readonly_paths_len(&self) -> usize {
-    self.readonly_paths.len()
-  }
-
-  pub(crate) fn readonly_paths_at(&self, index: usize) -> &str {
-    &self.readonly_paths[index]
-  }
-
-  pub(crate) fn mount_label(&self) -> &str {
-    &self.mount_label
+  getters! {
+    list devices: runtime::LinuxDevice => devices_len, devices_at;
+    present seccomp: runtime::LinuxSeccomp => has_seccomp;
+    str rootfs_propagation;
+    list masked_paths: str => masked_paths_len, masked_paths_at;
+    list readonly_paths: str => readonly_paths_len, readonly_paths_at;
+    str mount_label;
   }
 
   pub(crate) fn has_personality(&self) -> bool {
@@ -186,31 +111,13 @@ impl runtime::Linux {
 }
 
 impl runtime::LinuxDevice {
-  pub(crate) fn path(&self) -> &str {
-    &self.path
-  }
-
-  pub(crate) fn device_type(&self) -> &str {
-    &self.r#type
-  }
-
-  pub(crate) fn major(&self) -> i64 {
-    self.major
-  }
-
-  pub(crate) fn minor(&self) -> i64 {
-    self.minor
-  }
-
-  pub(crate) fn file_mode(&self) -> Option<u32> {
-    self.file_mode
-  }
-
-  pub(crate) fn uid(&self) -> Option<u32> {
-    self.uid
-  }
-
-  pub(crate) fn gid(&self) -> Option<u32> {
-    self.gid
+  getters! {
+    str path;
+    str r#type => device_type;
+    copy major: i64;
+    copy minor: i64;
+    copy file_mode: Option<u32>;
+    copy uid: Option<u32>;
+    copy gid: Option<u32>;
   }
 }

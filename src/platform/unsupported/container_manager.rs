@@ -20,77 +20,38 @@ failing!(
   cz_container_manager_with_vmm(CzVirtualMachineManager, CzNetwork),
 );
 
-/// `ContainerManager`'s inits that take an image store.
-impl CzImageStore {
-  pub(crate) fn container_manager(
-    &self,
-    _kernel: vm::Kernel,
-    _initfs: container::Mount,
-    _network: CzNetwork,
-    _rosetta: bool,
-    _nested_virtualization: bool,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
+// `ContainerManager`'s inits that take an image store.
+uninhabited!(CzImageStore {
+  fn container_manager(vm::Kernel, container::Mount, CzNetwork, bool, bool) -> CzOutcome;
+  fn container_manager_with_initfs_reference(vm::Kernel, &str, CzNetwork, bool, bool) -> CzOutcome;
+});
 
-  pub(crate) fn container_manager_with_initfs_reference(
-    &self,
-    _kernel: vm::Kernel,
-    _initfs_reference: &str,
-    _network: CzNetwork,
-    _rosetta: bool,
-    _nested_virtualization: bool,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-}
-
-impl CzContainerManager {
-  pub(crate) fn image_store(&self) -> CzImageStore {
-    match self.0 {}
-  }
-
-  pub(crate) fn create_from_reference(
-    &self,
-    _id: &str,
-    _reference: &str,
-    _options: container::container_manager::CreateOptions,
-    _progress: platform::Progress,
-    _seed: container::linux_container::Configuration,
-    _configuration: platform::ConfigureContainer,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create(
-    &self,
-    _id: &str,
-    _image: CzImage,
-    _options: container::container_manager::CreateOptions,
-    _progress: platform::Progress,
-    _seed: container::linux_container::Configuration,
-    _configuration: platform::ConfigureContainer,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create_with_rootfs(
-    &self,
-    _id: &str,
-    _image: CzImage,
-    _rootfs: container::Mount,
-    _options: container::container_manager::CreateWithRootfsOptions,
-    _seed: container::linux_container::Configuration,
-    _configuration: platform::ConfigureContainer,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn release_network(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn delete(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzContainerManager {
+  fn image_store() -> CzImageStore;
+  fn create_from_reference(
+    &str,
+    &str,
+    container::container_manager::CreateOptions,
+    platform::Progress,
+    container::linux_container::Configuration,
+    platform::ConfigureContainer,
+  ) -> CzOutcome;
+  fn create(
+    &str,
+    CzImage,
+    container::container_manager::CreateOptions,
+    platform::Progress,
+    container::linux_container::Configuration,
+    platform::ConfigureContainer,
+  ) -> CzOutcome;
+  fn create_with_rootfs(
+    &str,
+    CzImage,
+    container::Mount,
+    container::container_manager::CreateWithRootfsOptions,
+    container::linux_container::Configuration,
+    platform::ConfigureContainer,
+  ) -> CzOutcome;
+  fn release_network(&str) -> CzOutcome;
+  fn delete(&str) -> CzOutcome;
+});

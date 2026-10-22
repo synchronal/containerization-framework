@@ -3,7 +3,6 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::fmt;
 use std::marker::PhantomData;
 use std::time::SystemTime;
 
@@ -43,11 +42,7 @@ pub struct WriteEntry<'a> {
   pub(crate) archive: PhantomData<&'a ArchiveWriter>,
 }
 
-impl fmt::Debug for WriteEntry<'_> {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("WriteEntry").finish_non_exhaustive()
-  }
-}
+opaque_debug!(WriteEntry<'_>);
 
 impl WriteEntry<'static> {
   /// `WriteEntry()`.

@@ -11,7 +11,7 @@ of related types, such as `containerization::container` and
 `LinuxContainer.Configuration`, is in a module named after its parent, so its
 path is `containerization::container::linux_container::Configuration`.
 
-```rust
+```rust,no_run
 use containerization_framework as cfw;
 use cfw::containerization as cz;
 use cfw::containerization_extras as cz_extras;
@@ -45,6 +45,8 @@ process.delete()?;
 
 container.stop()?;
 manager.delete("example")?;
+println!("{status:?}");
+Ok::<(), cfw::Error>(())
 ```
 
 Swift's `async` methods block until they finish, and errors they throw are
@@ -190,6 +192,25 @@ init image Apple publishes for the pinned release. `KERNEL_ARCHIVE_URL` is the
 Kata Containers archive whose kernel Containerization's Makefile uses, and
 `KERNEL_IN_ARCHIVE` is the kernel's path inside it.
 
+## Development
+
+Besides Xcode 26, working on this crate needs a few tools. The `Brewfile`
+installs [medic](https://github.com/synchronal/medic-rs), and `medic doctor`
+then checks for the rest: the Rust toolchain that `rust-toolchain.toml` pins,
+`cargo-nextest`, `cargo-audit`, `cargo-outdated`, and the
+`aarch64-unknown-linux-gnu` target, which checks that the crate still compiles
+off macOS. `bin/dev/test-integration` also needs `python3`, and the Swift
+scripts need the `swift-format` that ships with Xcode.
+
+`medic audit` runs the checks, lints and formatters, and `medic test` runs the
+unit tests and the doctests. Nextest doesn't run doctests, so
+`cargo test --doc` runs them separately.
+
+Setting `DEVELOPMENT_TEAM` to an Apple developer team ID makes
+`bin/dev/sign` sign test binaries with that team's identity instead of ad hoc.
+An ad hoc signature changes with every build, and the keychain asks again for
+each new one.
+
 ## Testing
 
 `cargo nextest run` runs the unit tests. They also check Rust's copies of Swift
@@ -213,6 +234,9 @@ time.
 
 Two tests open Containerization's default image store, and in doing so create
 `~/Library/Application Support/com.apple.containerization` if it is missing.
+The keychain and registry tests add items to the login keychain and remove
+them afterward, so macOS may ask to allow the test binary access to it. Signing
+with `DEVELOPMENT_TEAM` set lets an allowed binary stay allowed across builds.
 The tests that need a vmnet network pass without checking anything on a host
 whose process lacks the vmnet entitlement, and say so in their output.
 

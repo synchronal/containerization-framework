@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 
 /// An `Authentication`: a `BasicAuthentication`, or what
 /// [`super::KeychainHelper::lookup`] returned. Swift's is a protocol, and its
@@ -41,14 +40,10 @@ impl Clone for Authentication {
   }
 }
 
-/// Without the credentials, which Rust can't read.
-impl fmt::Debug for Authentication {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("Authentication")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(
+  /// Without the credentials, which Rust can't read.
+  Authentication
+);
 
 impl Authentication {
   /// An `Authentication?`, as it crosses to Swift.

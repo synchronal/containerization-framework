@@ -3,7 +3,6 @@ use super::WriteEntry;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::marker::PhantomData;
 
 /// `ArchiveWriterTransaction`. It writes through its writer's archive, so it
@@ -28,13 +27,7 @@ pub struct ArchiveWriterTransaction<'a> {
   pub(super) writer: PhantomData<&'a ArchiveWriter>,
 }
 
-impl fmt::Debug for ArchiveWriterTransaction<'_> {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("ArchiveWriterTransaction")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(ArchiveWriterTransaction<'_>);
 
 impl ArchiveWriterTransaction<'_> {
   /// `ArchiveWriterTransaction.writeHeader(entry:)`.

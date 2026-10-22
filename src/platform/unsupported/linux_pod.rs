@@ -21,101 +21,30 @@ failing!(cz_linux_pod_new(
   container::linux_pod::Configuration
 ));
 
-impl CzLinuxPod {
-  pub(crate) fn id(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn config(&self, _seed: container::linux_pod::Configuration, _receive: platform::ConfigurePod) {
-    match self.0 {}
-  }
-
-  pub(crate) fn vm_cpus(&self) -> u32 {
-    match self.0 {}
-  }
-
-  pub(crate) fn vm_memory_in_bytes(&self) -> u64 {
-    match self.0 {}
-  }
-
-  pub(crate) fn add_container(
-    &self,
-    _id: &str,
-    _rootfs: container::Mount,
-    _seed: container::linux_pod::ContainerConfiguration,
-    _configuration: platform::ConfigurePodContainer,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn start_container(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn stop_container(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn stop(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn kill_container(&self, _id: &str, _signal: i32) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn wait_container(&self, _id: &str, _timeout_in_seconds: Option<i64>) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn resize_container(&self, _id: &str, _width: u16, _height: u16) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn exec_in_container(
-    &self,
-    _id: &str,
-    _process_id: &str,
-    _seed: process::LinuxProcessConfiguration,
-    _configuration: platform::ConfigureProcess,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn list_containers(&self) -> Vec<String> {
-    match self.0 {}
-  }
-
-  pub(crate) fn statistics(
-    &self,
-    _has_container_ids: bool,
-    _container_ids: Vec<String>,
-    _categories: i64,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn dial_vsock(&self, _port: u32) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn virtual_machine_instance(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn filesystem_operation(&self, _id: &str, _operation: FilesystemOperationKind, _path: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn close_container_stdin(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn relay_unix_socket(&self, _id: &str, _socket: CzUnixSocketConfiguration) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzLinuxPod {
+  fn id() -> String;
+  fn config(container::linux_pod::Configuration, platform::ConfigurePod);
+  fn vm_cpus() -> u32;
+  fn vm_memory_in_bytes() -> u64;
+  fn add_container(
+    &str,
+    container::Mount,
+    container::linux_pod::ContainerConfiguration,
+    platform::ConfigurePodContainer,
+  ) -> CzOutcome;
+  fn create() -> CzOutcome;
+  fn start_container(&str) -> CzOutcome;
+  fn stop_container(&str) -> CzOutcome;
+  fn stop() -> CzOutcome;
+  fn kill_container(&str, i32) -> CzOutcome;
+  fn wait_container(&str, Option<i64>) -> CzOutcome;
+  fn resize_container(&str, u16, u16) -> CzOutcome;
+  fn exec_in_container(&str, &str, process::LinuxProcessConfiguration, platform::ConfigureProcess) -> CzOutcome;
+  fn list_containers() -> Vec<String>;
+  fn statistics(bool, Vec<String>, i64) -> CzOutcome;
+  fn dial_vsock(u32) -> CzOutcome;
+  fn virtual_machine_instance() -> CzOutcome;
+  fn filesystem_operation(&str, FilesystemOperationKind, &str) -> CzOutcome;
+  fn close_container_stdin(&str) -> CzOutcome;
+  fn relay_unix_socket(&str, CzUnixSocketConfiguration) -> CzOutcome;
+});

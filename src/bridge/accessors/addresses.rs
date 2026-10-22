@@ -20,8 +20,8 @@ impl address::IPv6Address {
     self.value as u64
   }
 
-  pub(crate) fn zone(&self) -> Option<&str> {
-    self.zone.as_deref()
+  getters! {
+    optional_str zone;
   }
 }
 
@@ -80,20 +80,9 @@ impl containerization_extras::LinkRoute {
     self.ipv4_source.map(|address| address.value)
   }
 
-  pub(crate) fn has_ipv6_destination(&self) -> bool {
-    self.ipv6_destination.is_some()
-  }
-
-  pub(crate) fn ipv6_destination(&self) -> &address::IPv6Address {
-    present(&self.ipv6_destination)
-  }
-
-  pub(crate) fn has_ipv6_source(&self) -> bool {
-    self.ipv6_source.is_some()
-  }
-
-  pub(crate) fn ipv6_source(&self) -> &address::IPv6Address {
-    present(&self.ipv6_source)
+  getters! {
+    present ipv6_destination: address::IPv6Address => has_ipv6_destination;
+    present ipv6_source: address::IPv6Address => has_ipv6_source;
   }
 }
 
@@ -102,12 +91,8 @@ impl containerization_extras::DefaultRoute {
     self.ipv4_gateway.map(|address| address.value)
   }
 
-  pub(crate) fn has_ipv6_gateway(&self) -> bool {
-    self.ipv6_gateway.is_some()
-  }
-
-  pub(crate) fn ipv6_gateway(&self) -> &address::IPv6Address {
-    present(&self.ipv6_gateway)
+  getters! {
+    present ipv6_gateway: address::IPv6Address => has_ipv6_gateway;
   }
 }
 

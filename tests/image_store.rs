@@ -83,17 +83,7 @@ fn pulls_one_platform_and_reports_its_progress() {
     .expect("the image should pull");
 
   let events = events.lock().expect("the recording");
-  let sum = |pick: fn(&cfw::containerization_extras::ProgressEvent) -> Option<isize>| {
-    events.iter().filter_map(pick).sum::<isize>()
-  };
-  let items = sum(|event| match event {
-    cfw::containerization_extras::ProgressEvent::AddItems(items) => Some(*items),
-    _ => None,
-  });
-  let total = sum(|event| match event {
-    cfw::containerization_extras::ProgressEvent::AddTotalItems(total) => Some(*total),
-    _ => None,
-  });
+  let (items, total) = support::item_totals(&events);
   assert!(total > 0, "{events:?}");
   assert_eq!(items, total, "every blob counted should be fetched: {events:?}");
   assert!(
@@ -147,8 +137,7 @@ fn says_which_image_it_could_not_push() {
         ..Default::default()
       },
     )
-    .err()
-    .expect("an image the store doesn't hold");
+    .expect_err("an image the store doesn't hold");
 
   assert!(error.to_string().contains(reference), "{error}");
   assert!(error.is_code(cfw::containerization_error::Code::NotFound), "{error}");
@@ -161,8 +150,7 @@ fn pushes_to_one_registry_at_a_time() {
       &["a.example.test/image:latest", "b.example.test/image:latest"],
       Default::default(),
     )
-    .err()
-    .expect("references to two registries");
+    .expect_err("references to two registries");
 
   assert!(
     error.is_code(cfw::containerization_error::Code::InvalidArgument),
@@ -342,7 +330,7 @@ fn loads_the_platforms_a_layout_holds_when_its_index_lists_more() {
     2,
     "the index should be kept as it was"
   );
-  let arm64 = cfw::containerization_oci::image::Platform::parse("linux/arm64").expect("a platform");
+  let arm64 = support::platform("linux/arm64");
   assert!(
     loaded[0].manifest(&arm64).is_ok(),
     "the platform that was present should be usable"
@@ -382,7 +370,7 @@ fn new_stores(
 fn creates_an_init_image_from_a_rootfs() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let (store, content_store) = new_stores(directory.path());
-  let platform = cfw::containerization_oci::image::Platform::parse("linux/arm64").expect("a platform");
+  let platform = support::platform("linux/arm64");
   let reference = "containerization-framework/test-init:latest";
   let labels = [("purpose".to_string(), "test".to_string())].into();
 
@@ -429,7 +417,7 @@ fn creates_a_kernel_image_and_finds_its_kernel() {
 
   let kernel_image = cfw::containerization::image::KernelImage::create(
     reference,
-    &[kernel.clone()],
+    std::slice::from_ref(&kernel),
     &Default::default(),
     &store,
     &content_store,
@@ -464,8 +452,7 @@ fn creates_a_kernel_image_and_finds_its_kernel() {
 fn says_which_image_it_could_not_get() {
   let error = support::store::image_store()
     .get("containerization-framework/never-pulled:latest", false)
-    .err()
-    .expect("an image the store doesn't hold");
+    .expect_err("an image the store doesn't hold");
 
   assert!(
     error
@@ -502,7 +489,7 @@ fn gets_an_image_or_none() {
 fn reads_an_images_platforms_from_the_store_or_the_registry() {
   let store = support::store::image_store();
   support::store::image(&store);
-  let arm64 = platform("linux/arm64");
+  let arm64 = support::platform("linux/arm64");
 
   let stored = store
     .platforms(support::store::IMAGE, Default::default())
@@ -539,15 +526,11 @@ fn unpacks_an_init_image() {
   assert_eq!(mount.destination, "/");
 }
 
-fn platform(string: &str) -> cfw::containerization_oci::image::Platform {
-  cfw::containerization_oci::image::Platform::parse(string).expect("a valid platform")
-}
-
 #[test]
 fn reads_a_pulled_images_index_manifest_and_config() {
   let store = support::store::image_store();
   let image = support::store::image(&store);
-  let platform = platform("linux/arm64");
+  let platform = support::platform("linux/arm64");
 
   let descriptor = image.descriptor();
   assert_eq!(descriptor.digest, image.digest());
@@ -602,7 +585,7 @@ fn fails_for_a_platform_the_image_lacks() {
   let image = support::store::image(&store);
 
   let error = image
-    .descriptor_for(&platform("windows/amd64"))
+    .descriptor_for(&support::platform("windows/amd64"))
     .expect_err("no Windows manifest");
   assert!(error.is_code(cfw::containerization_error::Code::InvalidArgument));
 }

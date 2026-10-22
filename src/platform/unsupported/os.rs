@@ -36,114 +36,35 @@ failing!(
   cz_file_info(&str),
 );
 
-impl CzTerminal {
-  pub(crate) fn duplicate(&self) -> CzTerminal {
-    match self.0 {}
-  }
+uninhabited!(CzTerminal {
+  fn duplicate() -> CzTerminal;
+  fn handle() -> i32;
+  fn write(Vec<u8>) -> CzOutcome;
+  fn size() -> CzOutcome;
+  fn resize_from(CzTerminal) -> CzOutcome;
+  fn resize_size(u16, u16) -> CzOutcome;
+  fn resize(u16, u16) -> CzOutcome;
+  fn setraw() -> CzOutcome;
+  fn enable_echo() -> CzOutcome;
+  fn disable_echo() -> CzOutcome;
+  fn close() -> CzOutcome;
+  fn reset() -> CzOutcome;
+  fn try_reset();
+});
 
-  pub(crate) fn handle(&self) -> i32 {
-    match self.0 {}
-  }
-
-  pub(crate) fn write(&self, _data: Vec<u8>) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn size(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn resize_from(&self, _pty: CzTerminal) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn resize_size(&self, _width: u16, _height: u16) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn resize(&self, _width: u16, _height: u16) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn setraw(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn enable_echo(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn disable_echo(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn close(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn reset(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn try_reset(&self) {
-    match self.0 {}
-  }
-}
-
-impl CzFileInfo {
-  pub(crate) fn mode(&self) -> u16 {
-    match self.0 {}
-  }
-
-  pub(crate) fn uid(&self) -> i64 {
-    match self.0 {}
-  }
-
-  pub(crate) fn gid(&self) -> i64 {
-    match self.0 {}
-  }
-
-  pub(crate) fn dev(&self) -> i64 {
-    match self.0 {}
-  }
-
-  pub(crate) fn ino(&self) -> i64 {
-    match self.0 {}
-  }
-
-  pub(crate) fn size(&self) -> i64 {
-    match self.0 {}
-  }
-
-  pub(crate) fn path(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_directory(&self) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_pipe(&self) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_socket(&self) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_link(&self) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_regular_file(&self) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_block(&self) -> bool {
-    match self.0 {}
-  }
-
-  pub(crate) fn is_char(&self) -> bool {
-    match self.0 {}
-  }
-}
+uninhabited!(CzFileInfo {
+  fn mode() -> u16;
+  fn uid() -> i64;
+  fn gid() -> i64;
+  fn dev() -> i64;
+  fn ino() -> i64;
+  fn size() -> i64;
+  fn path() -> String;
+  fn is_directory() -> bool;
+  fn is_pipe() -> bool;
+  fn is_socket() -> bool;
+  fn is_link() -> bool;
+  fn is_regular_file() -> bool;
+  fn is_block() -> bool;
+  fn is_char() -> bool;
+});

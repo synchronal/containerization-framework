@@ -1,19 +1,6 @@
 //! Getters and setters for a container's configuration: its mounts, sockets,
 //! boot log and seccomp profile.
 
-use super::network::dns;
-use super::network::hosts;
-use super::network::interface_kind;
-use super::network::nat;
-use super::network::nat_interface;
-use super::network::push_hosts_entry;
-use super::network::set_ipv6_address;
-use super::network::set_ipv6_gateway;
-use super::network::vmnet;
-use super::network::vmnet_interface;
-use super::vm::boot_log_file;
-use crate::bridge::accessors;
-use crate::bridge::accessors::entry_at;
 use crate::bridge::ffi;
 use crate::containerization::container;
 use crate::containerization::container::linux_container;
@@ -51,24 +38,11 @@ impl ffi::CzOutcome {
 }
 
 impl container::Mount {
-  pub(crate) fn mount_type(&self) -> &str {
-    &self.r#type
-  }
-
-  pub(crate) fn source(&self) -> &str {
-    &self.source
-  }
-
-  pub(crate) fn destination(&self) -> &str {
-    &self.destination
-  }
-
-  pub(crate) fn options_len(&self) -> usize {
-    self.options.len()
-  }
-
-  pub(crate) fn options_at(&self, index: usize) -> &str {
-    &self.options[index]
+  getters! {
+    str r#type => mount_type;
+    str source;
+    str destination;
+    list options: str => options_len, options_at;
   }
 
   pub(crate) fn runtime_kind(&self) -> ffi::RuntimeKind {
@@ -144,9 +118,10 @@ impl linux_container::Configuration {
     self.unified.clear();
   }
 
-  pub(crate) fn clear_interfaces(&mut self) {
-    self.interfaces.clear();
-  }
+  network_setters!();
+  boot_log_setters!();
+  seccomp_accessors!();
+  interface_getters!();
 
   pub(crate) fn clear_sockets(&mut self) {
     self.sockets.clear();
@@ -156,53 +131,12 @@ impl linux_container::Configuration {
     self.mounts.clear();
   }
 
-  pub(crate) fn clear_dns(&mut self) {
-    self.dns = None;
-  }
-
-  pub(crate) fn clear_hosts(&mut self) {
-    self.hosts = None;
-  }
-
-  pub(crate) fn clear_boot_log(&mut self) {
-    self.boot_log = None;
-  }
-
   pub(crate) fn insert_sysctl(&mut self, key: String, value: String) {
     self.sysctl.insert(key, value);
   }
 
   pub(crate) fn insert_unified(&mut self, key: String, value: String) {
     self.unified.insert(key, value);
-  }
-
-  pub(crate) fn push_interface(
-    &mut self,
-    ipv4_address: u32,
-    ipv4_prefix: u8,
-    ipv4_gateway: Option<u32>,
-    mac_address: Option<u64>,
-    mtu: u32,
-  ) {
-    self
-      .interfaces
-      .push(nat(ipv4_address, ipv4_prefix, ipv4_gateway, mac_address, mtu));
-  }
-
-  pub(crate) fn push_vmnet_interface(&mut self, interface: ffi::CzVmnetInterface) {
-    self.interfaces.push(vmnet(interface));
-  }
-
-  /// Swift calls this only after [`Self::push_interface`], and it sets the
-  /// interface that call pushed.
-  pub(crate) fn set_interface_ipv6_address(&mut self, high: u64, low: u64, zone: Option<String>, prefix: u8) {
-    set_ipv6_address(&mut self.interfaces, high, low, zone, prefix);
-  }
-
-  /// Swift calls this only after [`Self::push_interface`], and it sets the
-  /// interface that call pushed.
-  pub(crate) fn set_interface_ipv6_gateway(&mut self, high: u64, low: u64, zone: Option<String>) {
-    set_ipv6_gateway(&mut self.interfaces, high, low, zone);
   }
 
   pub(crate) fn push_socket(&mut self, socket: ffi::CzUnixSocketConfiguration) {
@@ -229,82 +163,22 @@ impl linux_container::Configuration {
     });
   }
 
-  pub(crate) fn set_dns(
-    &mut self,
-    nameservers: Vec<String>,
-    domain: Option<String>,
-    search_domains: Vec<String>,
-    options: Vec<String>,
-  ) {
-    self.dns = Some(dns(nameservers, domain, search_domains, options));
-  }
-
-  pub(crate) fn set_hosts(&mut self, comment: Option<String>) {
-    self.hosts = Some(hosts(comment));
-  }
-
-  /// Swift calls this only after [`Self::set_hosts`].
-  pub(crate) fn push_hosts_entry(&mut self, ip_address: String, hostnames: Vec<String>, comment: Option<String>) {
-    push_hosts_entry(&mut self.hosts, ip_address, hostnames, comment);
-  }
-
-  pub(crate) fn set_boot_log_file(&mut self, path: String, append: bool) {
-    self.boot_log = Some(boot_log_file(path, append));
-  }
-
-  pub(crate) fn set_boot_log_file_handle(&mut self, descriptor: i32) {
-    self.boot_log = Some(vm::BootLog::FileHandle(descriptor));
-  }
-
-  /// `profile` holds the `LinuxSeccomp` of a `Profile`, or `Absent`.
-  pub(crate) fn set_seccomp_profile(&mut self, mode: ffi::SeccompMode, profile: ffi::CzOutcome) {
-    self.seccomp_profile = seccomp_profile(mode, profile);
-  }
-
-  pub(crate) fn process(&self) -> &process::LinuxProcessConfiguration {
-    &self.process
-  }
-
-  pub(crate) fn cpus(&self) -> u32 {
-    self.cpus
-  }
-
-  pub(crate) fn memory_in_bytes(&self) -> u64 {
-    self.memory_in_bytes
-  }
-
-  pub(crate) fn hostname(&self) -> Option<&str> {
-    self.hostname.as_deref()
-  }
-
-  pub(crate) fn sysctl_len(&self) -> usize {
-    self.sysctl.len()
-  }
-
-  pub(crate) fn sysctl_key_at(&self, index: usize) -> &str {
-    entry_at(&self.sysctl, index).0
-  }
-
-  pub(crate) fn sysctl_value_at(&self, index: usize) -> &str {
-    entry_at(&self.sysctl, index).1
-  }
-
-  pub(crate) fn interfaces_len(&self) -> usize {
-    self.interfaces.len()
-  }
-
-  pub(crate) fn interface_kind_at(&self, index: usize) -> ffi::InterfaceKind {
-    interface_kind(&self.interfaces[index])
-  }
-
-  /// Swift calls this only when [`Self::interface_kind_at`] is `Nat`.
-  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NATInterface {
-    nat_interface(&self.interfaces[index])
-  }
-
-  /// Swift calls this only when [`Self::interface_kind_at`] is `Vmnet`.
-  pub(crate) fn vmnet_interface_at(&self, index: usize) -> ffi::CzVmnetInterface {
-    vmnet_interface(&self.interfaces[index])
+  getters! {
+    borrow process: process::LinuxProcessConfiguration;
+    copy cpus: u32;
+    copy memory_in_bytes: u64;
+    optional_str hostname;
+    map sysctl => sysctl_len, sysctl_key_at, sysctl_value_at;
+    list mounts: container::Mount => mounts_len, mounts_at;
+    list masked_paths: str => masked_paths_len, masked_paths_at;
+    list readonly_paths: str => readonly_paths_len, readonly_paths_at;
+    present dns: network::DNS => has_dns;
+    present hosts: network::Hosts => has_hosts;
+    copy virtualization: bool;
+    present boot_log: vm::BootLog => has_boot_log;
+    optional_str oci_runtime_path;
+    copy use_init: bool;
+    map unified => unified_len, unified_key_at, unified_value_at;
   }
 
   pub(crate) fn sockets_len(&self) -> usize {
@@ -313,90 +187,6 @@ impl linux_container::Configuration {
 
   pub(crate) fn sockets_at(&self, index: usize) -> ffi::CzUnixSocketConfiguration {
     self.sockets[index].handle.duplicate()
-  }
-
-  pub(crate) fn mounts_len(&self) -> usize {
-    self.mounts.len()
-  }
-
-  pub(crate) fn mounts_at(&self, index: usize) -> &container::Mount {
-    &self.mounts[index]
-  }
-
-  pub(crate) fn masked_paths_len(&self) -> usize {
-    self.masked_paths.len()
-  }
-
-  pub(crate) fn masked_paths_at(&self, index: usize) -> &str {
-    &self.masked_paths[index]
-  }
-
-  pub(crate) fn readonly_paths_len(&self) -> usize {
-    self.readonly_paths.len()
-  }
-
-  pub(crate) fn readonly_paths_at(&self, index: usize) -> &str {
-    &self.readonly_paths[index]
-  }
-
-  pub(crate) fn has_dns(&self) -> bool {
-    self.dns.is_some()
-  }
-
-  /// Swift calls this only when [`Self::has_dns`] is true.
-  pub(crate) fn dns(&self) -> &network::DNS {
-    accessors::present(&self.dns)
-  }
-
-  pub(crate) fn has_hosts(&self) -> bool {
-    self.hosts.is_some()
-  }
-
-  /// Swift calls this only when [`Self::has_hosts`] is true.
-  pub(crate) fn hosts(&self) -> &network::Hosts {
-    accessors::present(&self.hosts)
-  }
-
-  pub(crate) fn virtualization(&self) -> bool {
-    self.virtualization
-  }
-
-  pub(crate) fn has_boot_log(&self) -> bool {
-    self.boot_log.is_some()
-  }
-
-  /// Swift calls this only when [`Self::has_boot_log`] is true.
-  pub(crate) fn boot_log(&self) -> &vm::BootLog {
-    accessors::present(&self.boot_log)
-  }
-
-  pub(crate) fn oci_runtime_path(&self) -> Option<&str> {
-    self.oci_runtime_path.as_deref()
-  }
-
-  pub(crate) fn seccomp_mode(&self) -> ffi::SeccompMode {
-    seccomp_mode(&self.seccomp_profile)
-  }
-
-  /// Swift calls this only when [`Self::seccomp_mode`] is `Profile`.
-  pub(crate) fn seccomp_profile(&self) -> &runtime::LinuxSeccomp {
-    custom_seccomp(&self.seccomp_profile)
-  }
-
-  pub(crate) fn use_init(&self) -> bool {
-    self.use_init
-  }
-
-  pub(crate) fn unified_len(&self) -> usize {
-    self.unified.len()
-  }
-
-  pub(crate) fn unified_key_at(&self, index: usize) -> &str {
-    entry_at(&self.unified, index).0
-  }
-
-  pub(crate) fn unified_value_at(&self, index: usize) -> &str {
-    entry_at(&self.unified, index).1
   }
 }
 

@@ -457,8 +457,7 @@ fn describes_an_extended_attribute_format() {
 #[test]
 fn says_which_archive_it_could_not_open() {
   let error = cfw::containerization_archive::ArchiveReader::new("/nowhere/archive.tar".as_ref())
-    .err()
-    .expect("an archive that doesn't exist");
+    .expect_err("an archive that doesn't exist");
 
   assert!(error.to_string().contains("/nowhere/archive.tar"), "{error}");
 }
@@ -478,8 +477,7 @@ fn refuses_a_path_that_isnt_utf8_without_asking_swift() {
     Default::default(),
     &archive,
   )
-  .err()
-  .expect("a path that isn't UTF-8");
+  .expect_err("a path that isn't UTF-8");
 
   assert!(matches!(error, cfw::Error::Failed { .. }), "{error:?}");
   assert!(error.to_string().contains("UTF-8"), "{error}");
@@ -511,8 +509,7 @@ fn says_which_file_is_not_in_an_archive() {
   let error = cfw::containerization_archive::ArchiveReader::new(&archive)
     .expect("the archive should open")
     .extract_file("two.txt")
-    .err()
-    .expect("a file the archive lacks");
+    .expect_err("a file the archive lacks");
 
   assert!(error.to_string().contains("two.txt"), "{error}");
 }

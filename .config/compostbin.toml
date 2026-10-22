@@ -13,15 +13,17 @@ clipboard = true
 argv = ["cargo", "audit"]
 
 [host.commands.check]
-argv = ["cargo", "check", "--all-targets"]
+argv = ["cargo", "check", "--all-targets", "--features", "integration"]
 
 # Off macOS the bridge is compiled out, so code only Swift calls is dead there.
 # This only type-checks, so the target needs no linker.
 [host.commands.check-linux]
-argv = ["cargo", "check", "--all-targets", "--features", "strict", "--target", "aarch64-unknown-linux-gnu"]
+argv = ["cargo", "check", "--all-targets", "--features", "integration,strict", "--target", "aarch64-unknown-linux-gnu"]
 
+# The integration feature compiles the integration tests, so they are linted
+# without booting a VM.
 [host.commands.clippy]
-argv = ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"]
+argv = ["cargo", "clippy", "--all-targets", "--features", "integration", "--", "-D", "warnings"]
 
 [host.commands.doctest]
 argv = ["cargo", "test", "--workspace", "--doc"]

@@ -81,34 +81,24 @@ final class CzVirtualMachineInstance: Sendable {
   }
 
   func start() -> CzOutcome {
-    let instance = instance
-
-    return CzOutcome { try blocking { try await instance.start() } }
+    .awaiting { try await self.instance.start() }
   }
 
   func stop() -> CzOutcome {
-    let instance = instance
-
-    return CzOutcome { try blocking { try await instance.stop() } }
+    .awaiting { try await self.instance.stop() }
   }
 
   func pause() -> CzOutcome {
-    let instance = instance
-
-    return CzOutcome { try blocking { try await instance.pause() } }
+    .awaiting { try await self.instance.pause() }
   }
 
   func resume() -> CzOutcome {
-    let instance = instance
-
-    return CzOutcome { try blocking { try await instance.resume() } }
+    .awaiting { try await self.instance.resume() }
   }
 
   /// The dialed handle doesn't close its descriptor, so Rust takes it.
   func dial(port: UInt32) -> CzOutcome {
-    let instance = instance
-
-    return CzOutcome { try blocking { try await instance.dial(port) }.fileDescriptor }
+    .awaiting { try await self.instance.dial(port).fileDescriptor }
   }
 
   func listen(port: UInt32) -> CzOutcome {
@@ -116,11 +106,10 @@ final class CzVirtualMachineInstance: Sendable {
   }
 
   func hotplug(block: RustMount, id: RustStr) -> CzOutcome {
-    let instance = instance
     let block = Containerization.Mount(block)
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await instance.hotplug(block, id: id) } }
+    return .awaiting { try await self.instance.hotplug(block, id: id) }
   }
 
   func registerMounts(id: RustStr, rootfs: RustAttachedFilesystem, additionalMounts: RustVec<RustMount>) -> CzOutcome {
@@ -132,30 +121,27 @@ final class CzVirtualMachineInstance: Sendable {
   }
 
   func releaseHotplug(id: RustStr) -> CzOutcome {
-    let instance = instance
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await instance.releaseHotplug(id: id) } }
+    return .awaiting { try await self.instance.releaseHotplug(id: id) }
   }
 
   func hotplugVirtioFS(mounts: RustVec<RustMount>, id: RustStr) -> CzOutcome {
-    let instance = instance
     let mounts = mounts.map { Containerization.Mount($0) }
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await instance.hotplugVirtioFS(mounts, id: id) } }
+    return .awaiting { try await self.instance.hotplugVirtioFS(mounts, id: id) }
   }
 
   func releaseVirtioFS(id: RustStr) -> CzOutcome {
-    let instance = instance
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await instance.releaseVirtioFS(id: id) } }
+    return .awaiting { try await self.instance.releaseVirtioFS(id: id) }
   }
 }
 
 func installRosetta() -> CzOutcome {
-  CzOutcome { try blocking { try await VZVirtualMachineInstance.Configuration.installRosetta() } }
+  .awaiting { try await VZVirtualMachineInstance.Configuration.installRosetta() }
 }
 
 /// Unchecked: `next` advances `iterator` only while it holds `advancing`.

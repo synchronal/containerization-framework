@@ -8,7 +8,6 @@ use crate::containerization::container;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 
 /// The defaulted arguments of `VZVirtualMachineManager`'s initializer, after
 /// the initial filesystem. [`Default`] uses Swift's defaults. `group` and
@@ -71,11 +70,7 @@ impl Clone for VZVirtualMachineManager {
   }
 }
 
-/// Leaves out the fields, which Swift keeps private.
-impl fmt::Debug for VZVirtualMachineManager {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("VZVirtualMachineManager")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(
+  /// Leaves out the fields, which Swift keeps private.
+  VZVirtualMachineManager
+);

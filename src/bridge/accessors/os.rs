@@ -12,28 +12,13 @@ use crate::error::Error;
 use crate::platform;
 
 impl binfmt::Entry {
-  pub(crate) fn name(&self) -> &str {
-    &self.name
-  }
-
-  pub(crate) fn entry_type(&self) -> &str {
-    &self.r#type
-  }
-
-  pub(crate) fn offset(&self) -> &str {
-    &self.offset
-  }
-
-  pub(crate) fn magic(&self) -> &str {
-    &self.magic
-  }
-
-  pub(crate) fn mask(&self) -> &str {
-    &self.mask
-  }
-
-  pub(crate) fn flags(&self) -> &str {
-    &self.flags
+  getters! {
+    str name;
+    str r#type => entry_type;
+    str offset;
+    str magic;
+    str mask;
+    str flags;
   }
 }
 

@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::path::Path;
 
 /// `ContentWriter`.
@@ -9,13 +8,7 @@ pub struct ContentWriter {
   handle: ffi::CzContentWriter,
 }
 
-impl fmt::Debug for ContentWriter {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("ContentWriter")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(ContentWriter);
 
 // Swift's `ContentWriter` holds only its directory and an encoder. Rust's isn't
 // `Sync`, so one call runs at a time.

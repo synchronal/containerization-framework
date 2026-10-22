@@ -44,12 +44,8 @@ impl containerization_archive::ArchiveWriterConfiguration {
     }
   }
 
-  pub(crate) fn locales_len(&self) -> usize {
-    self.locales.len()
-  }
-
-  pub(crate) fn locales_at(&self, index: usize) -> &str {
-    &self.locales[index]
+  getters! {
+    list locales: str => locales_len, locales_at;
   }
 }
 

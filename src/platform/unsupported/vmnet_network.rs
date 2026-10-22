@@ -23,70 +23,24 @@ handles!(CzVmnetNetwork, CzVmnetInterface);
 
 failing!(cz_vmnet_network_new(VmnetMode, Option<u32>, u8, bool, containerization_extras::address::IPv6Address, u8));
 
-impl CzVmnetNetwork {
-  pub(crate) fn as_network(&self) -> CzNetwork {
-    match self.0 {}
-  }
+uninhabited!(CzVmnetNetwork {
+  fn as_network() -> CzNetwork;
+  fn subnet() -> CzOutcome;
+  fn prefix_v6() -> CzOutcome;
+  fn ipv4_gateway() -> CzOutcome;
+  fn ipv6_gateway() -> CzOutcome;
+  fn create_interface(&str) -> CzOutcome;
+  fn create_interface_with_mtu(&str, u32) -> CzOutcome;
+  fn create_interface_without_gateway(&str) -> CzOutcome;
+  fn release_interface(&str) -> CzOutcome;
+});
 
-  pub(crate) fn subnet(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn prefix_v6(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn ipv4_gateway(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn ipv6_gateway(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create_interface(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create_interface_with_mtu(&self, _id: &str, _mtu: u32) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn create_interface_without_gateway(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn release_interface(&self, _id: &str) -> CzOutcome {
-    match self.0 {}
-  }
-}
-
-impl CzVmnetInterface {
-  pub(crate) fn duplicate(&self) -> CzVmnetInterface {
-    match self.0 {}
-  }
-
-  pub(crate) fn ipv4_address(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn ipv4_gateway(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn ipv6_address(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn ipv6_gateway(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn mac_address(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn mtu(&self) -> u32 {
-    match self.0 {}
-  }
-}
+uninhabited!(CzVmnetInterface {
+  fn duplicate() -> CzVmnetInterface;
+  fn ipv4_address() -> CzOutcome;
+  fn ipv4_gateway() -> CzOutcome;
+  fn ipv6_address() -> CzOutcome;
+  fn ipv6_gateway() -> CzOutcome;
+  fn mac_address() -> CzOutcome;
+  fn mtu() -> u32;
+});

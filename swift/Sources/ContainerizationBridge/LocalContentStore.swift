@@ -25,53 +25,44 @@ final class CzLocalContentStore: Sendable {
 
   func get(digest: RustStr) -> CzOutcome {
     let digest = digest.toString()
-    let store = store
 
-    return CzOutcome { CzContent(try blocking { try await store.get(digest: digest) }) }
+    return .awaiting { CzContent(try await self.store.get(digest: digest)) }
   }
 
   func deleteDigests(digests: RustVec<RustString>) -> CzOutcome {
     let digests = strings(digests)
-    let store = store
 
-    return CzOutcome { try blocking { try await store.delete(digests: digests) } }
+    return .awaiting { try await self.store.delete(digests: digests) }
   }
 
   func deleteKeeping(keeping: RustVec<RustString>) -> CzOutcome {
     let keeping = strings(keeping)
-    let store = store
 
-    return CzOutcome { try blocking { try await store.delete(keeping: keeping) } }
+    return .awaiting { try await self.store.delete(keeping: keeping) }
   }
 
   func newIngestSession() -> CzOutcome {
-    let store = store
-
-    return CzOutcome { try blocking { try await store.newIngestSession() } }
+    .awaiting { try await self.store.newIngestSession() }
   }
 
   func completeIngestSession(id: RustStr) -> CzOutcome {
     let id = id.toString()
-    let store = store
 
-    return CzOutcome { try blocking { try await store.completeIngestSession(id) } }
+    return .awaiting { try await self.store.completeIngestSession(id) }
   }
 
   func cancelIngestSession(id: RustStr) -> CzOutcome {
     let id = id.toString()
-    let store = store
 
-    return CzOutcome { try blocking { try await store.cancelIngestSession(id) } }
+    return .awaiting { try await self.store.cancelIngestSession(id) }
   }
 
   func totalAllocatedSize() -> CzOutcome {
-    let store = store
-
-    return CzOutcome { try blocking { try await store.totalAllocatedSize() } }
+    .awaiting { try await self.store.totalAllocatedSize() }
   }
 
   /// `body` is Rust's: it gets the ingest directory, and returns whether it
-  /// succeeded. Rust keeps its own error, and returns that in place of the one
+  /// threw. Rust keeps its own error, and returns that in place of the one
   /// thrown here. Swift's closure is `async`, so `body` runs off the
   /// cooperative pool and may call back into Swift.
   func ingest(body: (RustString) -> Bool) -> CzOutcome {
@@ -84,10 +75,10 @@ final class CzLocalContentStore: Sendable {
 
         return try blocking {
           try await store.ingest { directory in
-            let succeeded = await offPool {
+            let threw = await offPool {
               body(directory.path(percentEncoded: false).intoRustString())
             }
-            guard succeeded else {
+            if threw {
               throw BridgeError.bodyFailed
             }
           }

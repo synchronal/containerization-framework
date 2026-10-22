@@ -80,52 +80,41 @@ final class CzLinuxPod: Sendable {
   }
 
   func create() -> CzOutcome {
-    let pod = pod
-
-    return CzOutcome { try blocking { try await pod.create() } }
+    .awaiting { try await self.pod.create() }
   }
 
   func startContainer(id: RustStr) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await pod.startContainer(id) } }
+    return .awaiting { try await self.pod.startContainer(id) }
   }
 
   func stopContainer(id: RustStr) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await pod.stopContainer(id) } }
+    return .awaiting { try await self.pod.stopContainer(id) }
   }
 
   func stop() -> CzOutcome {
-    let pod = pod
-
-    return CzOutcome { try blocking { try await pod.stop() } }
+    .awaiting { try await self.pod.stop() }
   }
 
   func killContainer(id: RustStr, signal: Int32) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await pod.killContainer(id, signal: Signal(rawValue: signal)) } }
+    return .awaiting { try await self.pod.killContainer(id, signal: Signal(rawValue: signal)) }
   }
 
   func waitContainer(id: RustStr, timeoutInSeconds: Int64?) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await pod.waitContainer(id, timeoutInSeconds: timeoutInSeconds) } }
+    return .awaiting { try await self.pod.waitContainer(id, timeoutInSeconds: timeoutInSeconds) }
   }
 
   func resizeContainer(id: RustStr, width: UInt16, height: UInt16) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
 
-    return CzOutcome {
-      try blocking { try await pod.resizeContainer(id, to: Terminal.Size(width: width, height: height)) }
-    }
+    return .awaiting { try await self.pod.resizeContainer(id, to: Terminal.Size(width: width, height: height)) }
   }
 
   /// `seed` and `configuration` as in a container's `execWith`.
@@ -135,15 +124,14 @@ final class CzLinuxPod: Sendable {
     seed: RustLinuxProcessConfiguration,
     configuration: RustConfigureProcess
   ) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
     let processID = processID.toString()
     let output = Output()
     let configure = configured(seed, by: configuration, keeping: output)
 
-    return CzOutcome {
+    return .awaiting {
       CzLinuxProcess(
-        try blocking { try await pod.execInContainer(id, processID: processID, configuration: configure) },
+        try await self.pod.execInContainer(id, processID: processID, configuration: configure),
         output: output
       )
     }
@@ -157,59 +145,42 @@ final class CzLinuxPod: Sendable {
   }
 
   func statistics(hasContainerIDs: Bool, containerIDs: RustVec<RustString>, categories: Int64) -> CzOutcome {
-    let pod = pod
     let containerIDs = hasContainerIDs ? strings(containerIDs) : nil
     let categories = StatCategory(rawValue: Int(categories))
 
-    return CzOutcome {
-      try blocking { try await pod.statistics(containerIDs: containerIDs, categories: categories) }
-    }
+    return .awaiting { try await self.pod.statistics(containerIDs: containerIDs, categories: categories) }
   }
 
   /// The dialed handle doesn't close its descriptor, so Rust takes it.
   func dialVsock(port: UInt32) -> CzOutcome {
-    let pod = pod
-
-    return CzOutcome { try blocking { try await pod.dialVsock(port: port) }.fileDescriptor }
+    .awaiting { try await self.pod.dialVsock(port: port).fileDescriptor }
   }
 
   /// What `withVirtualMachineInstance` hands its closure, for Rust's closure
   /// to use.
   func virtualMachineInstance() -> CzOutcome {
-    let pod = pod
-
-    return CzOutcome {
-      CzVirtualMachineInstance(try blocking { try await pod.withVirtualMachineInstance { $0 } })
-    }
+    .awaiting { CzVirtualMachineInstance(try await self.pod.withVirtualMachineInstance { $0 }) }
   }
 
   func filesystemOperation(id: RustStr, operation: FilesystemOperationKind, path: RustStr) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
     let path = path.toString()
-    let operation: FilesystemOperation =
-      switch operation {
-      case .Freeze: .freeze
-      case .Thaw: .thaw
-      case .Trim: .trim
-      }
+    let operation = FilesystemOperation(operation)
 
-    return CzOutcome { try blocking { try await pod.filesystemOperation(id, operation: operation, path: path) } }
+    return .awaiting { try await self.pod.filesystemOperation(id, operation: operation, path: path) }
   }
 
   func closeContainerStdin(id: RustStr) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
 
-    return CzOutcome { try blocking { try await pod.closeContainerStdin(id) } }
+    return .awaiting { try await self.pod.closeContainerStdin(id) }
   }
 
   func relayUnixSocket(id: RustStr, socket: CzUnixSocketConfiguration) -> CzOutcome {
-    let pod = pod
     let id = id.toString()
     let socket = socket.configuration
 
-    return CzOutcome { try blocking { try await pod.relayUnixSocket(id, socket: socket) } }
+    return .awaiting { try await self.pod.relayUnixSocket(id, socket: socket) }
   }
 }
 

@@ -3,6 +3,8 @@
 //! `ContainerizationExtras`' `ProgressEvent` and `ProxyUtils`, each asked of
 //! Swift.
 
+mod support;
+
 use cfw::containerization_extras as extras;
 use containerization_framework as cfw;
 use std::collections::BTreeMap;
@@ -22,16 +24,9 @@ fn names_progress_events_as_swift_does() {
   }
 }
 
-fn env(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
-  entries
-    .iter()
-    .map(|(key, value)| (key.to_string(), value.to_string()))
-    .collect()
-}
-
 #[test]
 fn finds_the_proxy_for_a_scheme_in_the_environment_given() {
-  let env = env(&[
+  let env = support::map(&[
     ("HTTP_PROXY", "http://proxy.test:3128"),
     ("HTTPS_PROXY", "http://secure.test:3129"),
     ("NO_PROXY", ".internal.test,localhost"),

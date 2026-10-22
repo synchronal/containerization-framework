@@ -81,11 +81,7 @@ pub struct Formatter {
   handle: ffi::CzExt4Formatter,
 }
 
-impl fmt::Debug for Formatter {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("Formatter").finish_non_exhaustive()
-  }
-}
+opaque_debug!(Formatter);
 
 // Swift's `Formatter` is a class that isn't `Sendable`; Rust's isn't `Sync`,
 // so one call runs at a time.

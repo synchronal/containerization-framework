@@ -5,14 +5,13 @@
 //! exit statuses, resource limits, capabilities, process configurations and
 //! signals.
 
+mod support;
+
 use containerization_framework as cfw;
 use std::collections::BTreeMap;
 use std::time::Duration;
 use std::time::SystemTime;
-
-fn strings(values: &[&str]) -> Vec<String> {
-  values.iter().map(|value| value.to_string()).collect()
-}
+use support::strings;
 
 #[test]
 fn edits_a_kernel_command_line() {
@@ -67,8 +66,7 @@ fn says_which_mount_it_could_not_copy() {
 
   let error = mount
     .clone_to("/nowhere/copy.img")
-    .err()
-    .expect("a missing source");
+    .expect_err("a missing source");
 
   assert!(error.to_string().contains("/nowhere/disk.img"), "{error}");
 }
@@ -158,10 +156,7 @@ fn renders_and_validates_dns() {
     nameservers: strings(&["dns.example.com"]),
     ..Default::default()
   };
-  let error = invalid
-    .validate()
-    .err()
-    .expect("a hostname as a nameserver");
+  let error = invalid.validate().expect_err("a hostname as a nameserver");
   assert!(error.to_string().contains("dns.example.com"), "{error}");
 }
 
@@ -222,9 +217,8 @@ fn parses_rlimit_kinds_by_their_oci_names() {
   assert_eq!(kind, cfw::containerization::process::linux_rlimit::Kind::OpenFiles);
   assert_eq!(kind.to_string(), "RLIMIT_NOFILE");
 
-  let error = cfw::containerization::process::linux_rlimit::Kind::parse("nofile")
-    .err()
-    .expect("a name without its prefix");
+  let error =
+    cfw::containerization::process::linux_rlimit::Kind::parse("nofile").expect_err("a name without its prefix");
   assert!(error.to_string().contains("nofile"), "{error}");
 }
 
@@ -343,7 +337,7 @@ fn parses_signals_as_swift_does() {
     cfw::containerization::process::signal::linux::rtmin(1)
   );
 
-  let error = parse("SIGNOPE").err().expect("an unknown signal");
+  let error = parse("SIGNOPE").expect_err("an unknown signal");
   assert!(error.to_string().contains("SIGNOPE"), "{error}");
   assert!(parse("65").is_err(), "a number Linux lacks");
 }
@@ -409,6 +403,6 @@ fn renders_system_platforms_as_swift_does() {
   assert_eq!(platform.architecture.raw_value(), "amd64");
   assert_eq!(
     platform.oci_platform().expect("a platform"),
-    cfw::containerization_oci::image::Platform::parse("linux/amd64").expect("a platform")
+    support::platform("linux/amd64")
   );
 }

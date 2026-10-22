@@ -1,13 +1,9 @@
 //! Getters for a virtual machine's configuration, boot log, kernel and
 //! platform.
 
-use super::network::interface_kind;
-use super::network::nat_interface;
-use super::network::vmnet_interface;
 use crate::bridge::accessors;
 use crate::bridge::ffi;
 use crate::containerization::container;
-use crate::containerization::network;
 use crate::containerization::vm;
 use crate::containerization::vm::system_platform;
 use std::collections::BTreeMap;
@@ -77,31 +73,12 @@ pub(super) fn boot_log_file(path: String, append: bool) -> vm::BootLog {
 }
 
 impl vm::VMConfiguration {
-  pub(crate) fn cpus(&self) -> u32 {
-    self.cpus
+  getters! {
+    copy cpus: u32;
+    copy memory_in_bytes: u64;
   }
 
-  pub(crate) fn memory_in_bytes(&self) -> u64 {
-    self.memory_in_bytes
-  }
-
-  pub(crate) fn interfaces_len(&self) -> usize {
-    self.interfaces.len()
-  }
-
-  pub(crate) fn interface_kind_at(&self, index: usize) -> ffi::InterfaceKind {
-    interface_kind(&self.interfaces[index])
-  }
-
-  /// Swift calls this only when [`Self::interface_kind_at`] is `Nat`.
-  pub(crate) fn nat_interface_at(&self, index: usize) -> &network::NATInterface {
-    nat_interface(&self.interfaces[index])
-  }
-
-  /// Swift calls this only when [`Self::interface_kind_at`] is `Vmnet`.
-  pub(crate) fn vmnet_interface_at(&self, index: usize) -> ffi::CzVmnetInterface {
-    vmnet_interface(&self.interfaces[index])
-  }
+  interface_getters!();
 
   pub(crate) fn mounts_by_id_len(&self) -> usize {
     self.mounts_by_id.len()
@@ -123,39 +100,18 @@ impl vm::VMConfiguration {
     accessors::entry_at(&self.mounts_by_id, index)
   }
 
-  pub(crate) fn has_boot_log(&self) -> bool {
-    self.boot_log.is_some()
-  }
-
-  /// Swift calls this only when [`Self::has_boot_log`] is true.
-  pub(crate) fn boot_log(&self) -> &vm::BootLog {
-    accessors::present(&self.boot_log)
-  }
-
-  pub(crate) fn nested_virtualization(&self) -> bool {
-    self.nested_virtualization
+  getters! {
+    present boot_log: vm::BootLog => has_boot_log;
+    copy nested_virtualization: bool;
   }
 }
 
 impl vm::AttachedFilesystem {
-  pub(crate) fn filesystem_type(&self) -> &str {
-    &self.r#type
-  }
-
-  pub(crate) fn source(&self) -> &str {
-    &self.source
-  }
-
-  pub(crate) fn destination(&self) -> &str {
-    &self.destination
-  }
-
-  pub(crate) fn options_len(&self) -> usize {
-    self.options.len()
-  }
-
-  pub(crate) fn options_at(&self, index: usize) -> &str {
-    &self.options[index]
+  getters! {
+    str r#type => filesystem_type;
+    str source;
+    str destination;
+    list options: str => options_len, options_at;
   }
 }
 
@@ -217,8 +173,8 @@ impl vm::Kernel {
     accessors::lossy_path(&self.path)
   }
 
-  pub(crate) fn platform(&self) -> &vm::SystemPlatform {
-    &self.platform
+  getters! {
+    borrow platform: vm::SystemPlatform;
   }
 
   pub(crate) fn kernel_args_len(&self) -> usize {

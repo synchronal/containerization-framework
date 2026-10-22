@@ -8,15 +8,17 @@
 # static build, since no one publishes a kernel as an image. In the archive,
 # `vmlinux.container` is a symlink to the versioned kernel, so it is resolved
 # before it moves out of the staging directory.
+#
+# The URL and the path in the archive are copies of KERNEL_ARCHIVE_URL and
+# KERNEL_IN_ARCHIVE in `src/versions.rs`, whose tests fail if they differ.
 
 set -euo pipefail
 
-kernel_version="3.17.0"
+url="https://github.com/kata-containers/kata-containers/releases/download/3.17.0/kata-static-3.17.0-arm64.tar.xz"
 kernel_in_archive="opt/kata/share/kata-containers/vmlinux.container"
-url="https://github.com/kata-containers/kata-containers/releases/download/${kernel_version}/kata-static-${kernel_version}-arm64.tar.xz"
 
 kernels="${HOME:?}/.cache/containerization-framework-tests/kernels"
-kernel="${kernels}/vmlinux-${kernel_version}"
+kernel="${kernels}/vmlinux-$(basename "$url" .tar.xz)"
 
 if [ ! -f "$kernel" ]; then
   echo "bin/dev/prepare-integration: downloading the kernel from ${url}" >&2

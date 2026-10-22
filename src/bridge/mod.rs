@@ -2362,7 +2362,7 @@ pub(crate) mod ffi {
     #[swift_bridge(swift_name = "totalAllocatedSize")]
     fn total_allocated_size(self: &CzLocalContentStore) -> CzOutcome;
     fn duplicate(self: &CzLocalContentStore) -> CzLocalContentStore;
-    // `body` gets the ingest directory, and returns whether it succeeded.
+    // `body` gets the ingest directory, and returns whether it threw.
     fn ingest(self: &CzLocalContentStore, body: Box<dyn FnOnce(String) -> bool>) -> CzOutcome;
     #[swift_bridge(swift_name = "newIngestSession")]
     fn new_ingest_session(self: &CzLocalContentStore) -> CzOutcome;

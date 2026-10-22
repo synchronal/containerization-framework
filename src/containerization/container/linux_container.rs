@@ -15,7 +15,6 @@ use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
 use std::collections::BTreeMap;
-use std::fmt;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 use std::path::Path;
@@ -134,13 +133,7 @@ pub struct LinuxContainer {
   pub(crate) handle: ffi::CzLinuxContainer,
 }
 
-impl fmt::Debug for LinuxContainer {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("LinuxContainer")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(LinuxContainer);
 
 // Swift's `LinuxContainer` is `Sendable`.
 unsafe impl Send for LinuxContainer {}

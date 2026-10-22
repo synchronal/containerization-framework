@@ -39,39 +39,27 @@ final class CzLinuxContainer: Sendable {
   }
 
   func create() -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.create() } }
+    .awaiting { try await self.container.create() }
   }
 
   func start() -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.start() } }
+    .awaiting { try await self.container.start() }
   }
 
   func stop() -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.stop() } }
+    .awaiting { try await self.container.stop() }
   }
 
   func kill(signal: Int32) -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.kill(Signal(rawValue: signal)) } }
+    .awaiting { try await self.container.kill(Signal(rawValue: signal)) }
   }
 
   func wait(timeoutInSeconds: Int64?) -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.wait(timeoutInSeconds: timeoutInSeconds) } }
+    .awaiting { try await self.container.wait(timeoutInSeconds: timeoutInSeconds) }
   }
 
   func resize(width: UInt16, height: UInt16) -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.resize(to: Terminal.Size(width: width, height: height)) } }
+    .awaiting { try await self.container.resize(to: Terminal.Size(width: width, height: height)) }
   }
 
   func exec(id: RustStr, configuration: RustLinuxProcessConfiguration) -> CzOutcome {
@@ -92,46 +80,32 @@ final class CzLinuxContainer: Sendable {
   /// manager's `create`.
   func execWith(id: RustStr, seed: RustLinuxProcessConfiguration, configuration: RustConfigureProcess) -> CzOutcome {
     let id = id.toString()
-    let container = container
     let output = Output()
     let configure = configured(seed, by: configuration, keeping: output)
 
-    return CzOutcome {
-      CzLinuxProcess(try blocking { try await container.exec(id, configuration: configure) }, output: output)
-    }
+    return .awaiting { CzLinuxProcess(try await self.container.exec(id, configuration: configure), output: output) }
   }
 
   /// The dialed handle doesn't close its descriptor, so Rust takes it.
   func dialVsock(port: UInt32) -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.dialVsock(port: port) }.fileDescriptor }
+    .awaiting { try await self.container.dialVsock(port: port).fileDescriptor }
   }
 
   func closeStdin() -> CzOutcome {
-    let container = container
-
-    return CzOutcome { try blocking { try await container.closeStdin() } }
+    .awaiting { try await self.container.closeStdin() }
   }
 
   func statistics(categories: Int64) -> CzOutcome {
-    let container = container
     let categories = StatCategory(rawValue: Int(categories))
 
-    return CzOutcome { try blocking { try await container.statistics(categories: categories) } }
+    return .awaiting { try await self.container.statistics(categories: categories) }
   }
 
   func filesystemOperation(operation: FilesystemOperationKind, path: RustStr) -> CzOutcome {
-    let container = container
     let path = path.toString()
-    let operation: FilesystemOperation =
-      switch operation {
-      case .Freeze: .freeze
-      case .Thaw: .thaw
-      case .Trim: .trim
-      }
+    let operation = FilesystemOperation(operation)
 
-    return CzOutcome { try blocking { try await container.filesystemOperation(operation: operation, path: path) } }
+    return .awaiting { try await self.container.filesystemOperation(operation: operation, path: path) }
   }
 
   func copyIn(source: RustStr, destination: RustStr, mode: UInt32, createParents: Bool, chunkSize: UInt) -> CzOutcome {
@@ -174,11 +148,7 @@ final class CzLinuxContainer: Sendable {
   /// What `withVirtualMachineInstance` hands its closure, for Rust's closure
   /// to use.
   func virtualMachineInstance() -> CzOutcome {
-    let container = container
-
-    return CzOutcome {
-      CzVirtualMachineInstance(try blocking { try await container.withVirtualMachineInstance { $0 } })
-    }
+    .awaiting { CzVirtualMachineInstance(try await self.container.withVirtualMachineInstance { $0 }) }
   }
 }
 
@@ -350,33 +320,23 @@ final class CzLinuxProcess: Sendable {
   }
 
   func start() -> CzOutcome {
-    let process = process
-
-    return CzOutcome { try blocking { try await process.start() } }
+    .awaiting { try await self.process.start() }
   }
 
   func kill(signal: Int32) -> CzOutcome {
-    let process = process
-
-    return CzOutcome { try blocking { try await process.kill(Signal(rawValue: signal)) } }
+    .awaiting { try await self.process.kill(Signal(rawValue: signal)) }
   }
 
   func resize(width: UInt16, height: UInt16) -> CzOutcome {
-    let process = process
-
-    return CzOutcome { try blocking { try await process.resize(to: Terminal.Size(width: width, height: height)) } }
+    .awaiting { try await self.process.resize(to: Terminal.Size(width: width, height: height)) }
   }
 
   func closeStdin() -> CzOutcome {
-    let process = process
-
-    return CzOutcome { try blocking { try await process.closeStdin() } }
+    .awaiting { try await self.process.closeStdin() }
   }
 
   func wait(timeoutInSeconds: Int64?) -> CzOutcome {
-    let process = process
-
-    return CzOutcome { try blocking { try await process.wait(timeoutInSeconds: timeoutInSeconds) } }
+    .awaiting { try await self.process.wait(timeoutInSeconds: timeoutInSeconds) }
   }
 
   func delete() -> CzOutcome {

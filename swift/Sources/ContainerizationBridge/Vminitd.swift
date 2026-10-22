@@ -17,79 +17,60 @@ final class CzVminitd: Sendable {
   }
 
   func standardSetup() -> CzOutcome {
-    let agent = agent
-
-    return CzOutcome { try blocking { try await agent.standardSetup() } }
+    .awaiting { try await self.agent.standardSetup() }
   }
 
   func close() -> CzOutcome {
-    let agent = agent
-
-    return CzOutcome { try blocking { try await agent.close() } }
+    .awaiting { try await self.agent.close() }
   }
 
   func filesystemOperation(operation: FilesystemOperationKind, path: RustStr, containerID: RustString?) -> CzOutcome {
-    let agent = agent
     let path = path.toString()
     let containerID = containerID?.toString()
-    let operation: FilesystemOperation =
-      switch operation {
-      case .Freeze: .freeze
-      case .Thaw: .thaw
-      case .Trim: .trim
-      }
+    let operation = FilesystemOperation(operation)
 
-    return CzOutcome {
-      try blocking { try await agent.filesystemOperation(operation: operation, path: path, containerID: containerID) }
+    return .awaiting {
+      try await self.agent.filesystemOperation(operation: operation, path: path, containerID: containerID)
     }
   }
 
   func getenv(key: RustStr) -> CzOutcome {
-    let agent = agent
     let key = key.toString()
 
-    return CzOutcome { try blocking { try await agent.getenv(key: key) } }
+    return .awaiting { try await self.agent.getenv(key: key) }
   }
 
   func setenv(key: RustStr, value: RustStr) -> CzOutcome {
-    let agent = agent
     let key = key.toString()
     let value = value.toString()
 
-    return CzOutcome { try blocking { try await agent.setenv(key: key, value: value) } }
+    return .awaiting { try await self.agent.setenv(key: key, value: value) }
   }
 
   func mount(mount: RustOciMount) -> CzOutcome {
-    let agent = agent
     let mount = ContainerizationOCI.Mount(mount)
 
-    return CzOutcome { try blocking { try await agent.mount(mount) } }
+    return .awaiting { try await self.agent.mount(mount) }
   }
 
   func umount(path: RustStr, flags: Int32) -> CzOutcome {
-    let agent = agent
     let path = path.toString()
 
-    return CzOutcome { try blocking { try await agent.umount(path: path, flags: flags) } }
+    return .awaiting { try await self.agent.umount(path: path, flags: flags) }
   }
 
   func mkdir(path: RustStr, all: Bool, perms: UInt32) -> CzOutcome {
-    let agent = agent
     let path = path.toString()
 
-    return CzOutcome { try blocking { try await agent.mkdir(path: path, all: all, perms: perms) } }
+    return .awaiting { try await self.agent.mkdir(path: path, all: all, perms: perms) }
   }
 
   func kill(pid: Int32, signal: Int32) -> CzOutcome {
-    let agent = agent
-
-    return CzOutcome { try blocking { try await agent.kill(pid: pid, signal: signal) } }
+    .awaiting { try await self.agent.kill(pid: pid, signal: signal) }
   }
 
   func sync() -> CzOutcome {
-    let agent = agent
-
-    return CzOutcome { try blocking { try await agent.sync() } }
+    .awaiting { try await self.agent.sync() }
   }
 
   /// `options` stands for `nil` when `hasOptions` is false.
@@ -104,95 +85,82 @@ final class CzVminitd: Sendable {
     hasOptions: Bool,
     options: RustVec<UInt8>
   ) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
     let ociRuntimePath = ociRuntimePath?.toString()
     let configuration = ContainerizationOCI.Spec(configuration)
     let options = hasOptions ? Data(options) : nil
 
-    return CzOutcome {
-      try blocking {
-        try await agent.createProcess(
-          id: id,
-          containerID: containerID,
-          stdinPort: stdinPort,
-          stdoutPort: stdoutPort,
-          stderrPort: stderrPort,
-          ociRuntimePath: ociRuntimePath,
-          configuration: configuration,
-          options: options
-        )
-      }
+    return .awaiting {
+      try await self.agent.createProcess(
+        id: id,
+        containerID: containerID,
+        stdinPort: stdinPort,
+        stdoutPort: stdoutPort,
+        stderrPort: stderrPort,
+        ociRuntimePath: ociRuntimePath,
+        configuration: configuration,
+        options: options
+      )
     }
   }
 
   func startProcess(id: RustStr, containerID: RustString?) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
 
-    return CzOutcome { try blocking { try await agent.startProcess(id: id, containerID: containerID) } }
+    return .awaiting { try await self.agent.startProcess(id: id, containerID: containerID) }
   }
 
   func signalProcess(id: RustStr, containerID: RustString?, signal: Int32) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
 
-    return CzOutcome {
-      try blocking { try await agent.signalProcess(id: id, containerID: containerID, signal: signal) }
-    }
+    return .awaiting { try await self.agent.signalProcess(id: id, containerID: containerID, signal: signal) }
   }
 
   func resizeProcess(id: RustStr, containerID: RustString?, columns: UInt32, rows: UInt32) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
 
-    return CzOutcome {
-      try blocking { try await agent.resizeProcess(id: id, containerID: containerID, columns: columns, rows: rows) }
+    return .awaiting {
+      try await self.agent.resizeProcess(id: id, containerID: containerID, columns: columns, rows: rows)
     }
   }
 
   func waitProcess(id: RustStr, containerID: RustString?, timeoutInSeconds: Int64?) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
 
-    return CzOutcome {
-      try blocking { try await agent.waitProcess(id: id, containerID: containerID, timeoutInSeconds: timeoutInSeconds) }
+    return .awaiting {
+      try await self.agent.waitProcess(id: id, containerID: containerID, timeoutInSeconds: timeoutInSeconds)
     }
   }
 
   func deleteProcess(id: RustStr, containerID: RustString?) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
 
-    return CzOutcome { try blocking { try await agent.deleteProcess(id: id, containerID: containerID) } }
+    return .awaiting { try await self.agent.deleteProcess(id: id, containerID: containerID) }
   }
 
   func closeProcessStdin(id: RustStr, containerID: RustString?) -> CzOutcome {
-    let agent = agent
     let id = id.toString()
     let containerID = containerID?.toString()
 
-    return CzOutcome { try blocking { try await agent.closeProcessStdin(id: id, containerID: containerID) } }
+    return .awaiting { try await self.agent.closeProcessStdin(id: id, containerID: containerID) }
   }
 
   func up(name: RustStr, mtu: UInt32?) -> CzOutcome {
-    let agent = agent
     let name = name.toString()
 
-    return CzOutcome { try blocking { try await agent.up(name: name, mtu: mtu) } }
+    return .awaiting { try await self.agent.up(name: name, mtu: mtu) }
   }
 
   func down(name: RustStr) -> CzOutcome {
-    let agent = agent
     let name = name.toString()
 
-    return CzOutcome { try blocking { try await agent.down(name: name) } }
+    return .awaiting { try await self.agent.down(name: name) }
   }
 
   func addressAdd(name: RustStr, address: RustInterfaceAddress) -> CzOutcome {
@@ -207,105 +175,85 @@ final class CzVminitd: Sendable {
   }
 
   func routeAddLink(name: RustStr, route: RustLinkRoute) -> CzOutcome {
-    let agent = agent
     let name = name.toString()
     let route = LinkRoute(route)
 
-    return CzOutcome { try blocking { try await agent.routeAddLink(name: name, route: route) } }
+    return .awaiting { try await self.agent.routeAddLink(name: name, route: route) }
   }
 
   func routeAddDefault(name: RustStr, route: RustDefaultRoute) -> CzOutcome {
-    let agent = agent
     let name = name.toString()
     let route = DefaultRoute(route)
 
-    return CzOutcome { try blocking { try await agent.routeAddDefault(name: name, route: route) } }
+    return .awaiting { try await self.agent.routeAddDefault(name: name, route: route) }
   }
 
   func configureDNS(config: RustDns, location: RustStr) -> CzOutcome {
-    let agent = agent
     let config = DNS(config)
     let location = location.toString()
 
-    return CzOutcome { try blocking { try await agent.configureDNS(config: config, location: location) } }
+    return .awaiting { try await self.agent.configureDNS(config: config, location: location) }
   }
 
   func configureHosts(config: RustHosts, location: RustStr) -> CzOutcome {
-    let agent = agent
     let config = Hosts(config)
     let location = location.toString()
 
-    return CzOutcome { try blocking { try await agent.configureHosts(config: config, location: location) } }
+    return .awaiting { try await self.agent.configureHosts(config: config, location: location) }
   }
 
   func containerStatistics(containerIDs: RustVec<RustString>, categories: Int64) -> CzOutcome {
-    let agent = agent
     let containerIDs = strings(containerIDs)
     let categories = StatCategory(rawValue: Int(categories))
 
-    return CzOutcome {
-      try blocking { try await agent.containerStatistics(containerIDs: containerIDs, categories: categories) }
-    }
+    return .awaiting { try await self.agent.containerStatistics(containerIDs: containerIDs, categories: categories) }
   }
 
   func setupEmulator(binaryPath: RustStr, configuration: RustBinfmtEntry) -> CzOutcome {
-    let agent = agent
     let binaryPath = binaryPath.toString()
     // `Binfmt.Entry` isn't `Sendable`, though it holds only `String`s.
     nonisolated(unsafe) let configuration = Binfmt.Entry(configuration)
 
-    return CzOutcome {
-      try blocking { try await agent.setupEmulator(binaryPath: binaryPath, configuration: configuration) }
-    }
+    return .awaiting { try await self.agent.setupEmulator(binaryPath: binaryPath, configuration: configuration) }
   }
 
   func setTime(sec: Int64, usec: Int32) -> CzOutcome {
-    let agent = agent
-
-    return CzOutcome { try blocking { try await agent.setTime(sec: sec, usec: usec) } }
+    .awaiting { try await self.agent.setTime(sec: sec, usec: usec) }
   }
 
   func sysctl(keys: RustVec<RustString>, values: RustVec<RustString>) -> CzOutcome {
-    let agent = agent
     let settings = dictionary(keys, values)
 
-    return CzOutcome { try blocking { try await agent.sysctl(settings: settings) } }
+    return .awaiting { try await self.agent.sysctl(settings: settings) }
   }
 
   func stat(root: RustStr, path: RustStr) -> CzOutcome {
-    let agent = agent
     let root = root.toString()
     let path = path.toString()
 
-    return CzOutcome { try blocking { try await agent.stat(root: root, path: path) } }
+    return .awaiting { try await self.agent.stat(root: root, path: path) }
   }
 
   func enableRosetta() -> CzOutcome {
-    let agent = agent
-
-    return CzOutcome { try blocking { try await agent.enableRosetta() } }
+    .awaiting { try await self.agent.enableRosetta() }
   }
 
   func relaySocket(port: UInt32, configuration: CzUnixSocketConfiguration) -> CzOutcome {
-    let agent = agent
     let configuration = configuration.configuration
 
-    return CzOutcome { try blocking { try await agent.relaySocket(port: port, configuration: configuration) } }
+    return .awaiting { try await self.agent.relaySocket(port: port, configuration: configuration) }
   }
 
   func stopSocketRelay(configuration: CzUnixSocketConfiguration) -> CzOutcome {
-    let agent = agent
     let configuration = configuration.configuration
 
-    return CzOutcome { try blocking { try await agent.stopSocketRelay(configuration: configuration) } }
+    return .awaiting { try await self.agent.stopSocketRelay(configuration: configuration) }
   }
 }
 
 extension CzVirtualMachineInstance {
   func dialAgent() -> CzOutcome {
-    let instance = instance
-
-    return CzOutcome { CzVminitd(try blocking { try await instance.dialAgent() }) }
+    .awaiting { CzVminitd(try await self.instance.dialAgent()) }
   }
 }
 

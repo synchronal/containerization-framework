@@ -7,7 +7,6 @@ use super::WriteEntry;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 use std::marker::PhantomData;
 use std::os::fd::IntoRawFd;
 use std::os::fd::OwnedFd;
@@ -19,13 +18,7 @@ pub struct ArchiveReader {
   pub(crate) handle: ffi::CzArchiveReader,
 }
 
-impl fmt::Debug for ArchiveReader {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("ArchiveReader")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(ArchiveReader);
 
 // Swift's `ArchiveReader` is a class that isn't `Sendable`; Rust's isn't
 // `Sync`, so one call runs at a time.
@@ -141,11 +134,7 @@ pub struct Iterator<'a> {
   reader: PhantomData<&'a ArchiveReader>,
 }
 
-impl fmt::Debug for Iterator<'_> {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("Iterator").finish_non_exhaustive()
-  }
-}
+opaque_debug!(Iterator<'_>);
 
 impl std::iter::Iterator for Iterator<'_> {
   type Item = (WriteEntry<'static>, Vec<u8>);
@@ -165,13 +154,7 @@ pub struct StreamingIterator<'a> {
   reader: PhantomData<&'a ArchiveReader>,
 }
 
-impl fmt::Debug for StreamingIterator<'_> {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter
-      .debug_struct("StreamingIterator")
-      .finish_non_exhaustive()
-  }
-}
+opaque_debug!(StreamingIterator<'_>);
 
 impl<'a> std::iter::Iterator for StreamingIterator<'a> {
   type Item = (WriteEntry<'static>, ArchiveEntryReader<'a>);

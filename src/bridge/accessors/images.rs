@@ -2,43 +2,20 @@
 //! OCI `Platform`, `Descriptor`, `Index` and `ImageConfig`,
 //! `Image.Description` and `EXT4Unpacker`.
 
-use super::entry_at;
 use super::ext4;
-use super::present;
 use crate::bridge::ffi;
 use crate::containerization;
 use crate::containerization::image;
 use crate::containerization::vm::kernel;
 use crate::containerization_oci;
-use std::collections::BTreeMap;
 
 impl containerization_oci::image::Platform {
-  pub(crate) fn architecture(&self) -> &str {
-    &self.architecture
-  }
-
-  pub(crate) fn os(&self) -> &str {
-    &self.os
-  }
-
-  pub(crate) fn os_version(&self) -> Option<&str> {
-    self.os_version.as_deref()
-  }
-
-  pub(crate) fn has_os_features(&self) -> bool {
-    self.os_features.is_some()
-  }
-
-  pub(crate) fn os_features_len(&self) -> usize {
-    self.os_features.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn os_features_at(&self, index: usize) -> &str {
-    &present(&self.os_features)[index]
-  }
-
-  pub(crate) fn variant(&self) -> Option<&str> {
-    self.variant.as_deref()
+  getters! {
+    str architecture;
+    str os;
+    optional_str os_version;
+    optional_list os_features: str => has_os_features, os_features_len, os_features_at;
+    optional_str variant;
   }
 }
 
@@ -161,184 +138,50 @@ impl ffi::CzOutcome {
 }
 
 impl containerization_oci::image::Descriptor {
-  pub(crate) fn media_type(&self) -> &str {
-    &self.media_type
-  }
-
-  pub(crate) fn digest(&self) -> &str {
-    &self.digest
-  }
-
-  pub(crate) fn size(&self) -> i64 {
-    self.size
-  }
-
-  pub(crate) fn has_urls(&self) -> bool {
-    self.urls.is_some()
-  }
-
-  pub(crate) fn urls_len(&self) -> usize {
-    self.urls.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn urls_at(&self, index: usize) -> &str {
-    &present(&self.urls)[index]
-  }
-
-  pub(crate) fn has_annotations(&self) -> bool {
-    self.annotations.is_some()
-  }
-
-  pub(crate) fn annotations_len(&self) -> usize {
-    self.annotations.as_ref().map_or(0, BTreeMap::len)
-  }
-
-  pub(crate) fn annotation_key_at(&self, index: usize) -> &str {
-    entry_at(present(&self.annotations), index).0
-  }
-
-  pub(crate) fn annotation_value_at(&self, index: usize) -> &str {
-    entry_at(present(&self.annotations), index).1
-  }
-
-  pub(crate) fn has_platform(&self) -> bool {
-    self.platform.is_some()
-  }
-
-  pub(crate) fn platform(&self) -> &containerization_oci::image::Platform {
-    present(&self.platform)
-  }
-
-  pub(crate) fn artifact_type(&self) -> Option<&str> {
-    self.artifact_type.as_deref()
+  getters! {
+    str media_type;
+    str digest;
+    copy size: i64;
+    optional_list urls: str => has_urls, urls_len, urls_at;
+    optional_map annotations => has_annotations, annotations_len, annotation_key_at, annotation_value_at;
+    present platform: containerization_oci::image::Platform => has_platform;
+    optional_str artifact_type;
   }
 }
 
 impl containerization_oci::image::Index {
-  pub(crate) fn schema_version(&self) -> isize {
-    self.schema_version
-  }
-
-  pub(crate) fn media_type(&self) -> &str {
-    &self.media_type
-  }
-
-  pub(crate) fn manifests_len(&self) -> usize {
-    self.manifests.len()
-  }
-
-  pub(crate) fn manifests_at(&self, index: usize) -> &containerization_oci::image::Descriptor {
-    &self.manifests[index]
-  }
-
-  pub(crate) fn has_annotations(&self) -> bool {
-    self.annotations.is_some()
-  }
-
-  pub(crate) fn annotations_len(&self) -> usize {
-    self.annotations.as_ref().map_or(0, BTreeMap::len)
-  }
-
-  pub(crate) fn annotation_key_at(&self, index: usize) -> &str {
-    entry_at(present(&self.annotations), index).0
-  }
-
-  pub(crate) fn annotation_value_at(&self, index: usize) -> &str {
-    entry_at(present(&self.annotations), index).1
-  }
-
-  pub(crate) fn has_subject(&self) -> bool {
-    self.subject.is_some()
-  }
-
-  pub(crate) fn subject(&self) -> &containerization_oci::image::Descriptor {
-    present(&self.subject)
-  }
-
-  pub(crate) fn artifact_type(&self) -> Option<&str> {
-    self.artifact_type.as_deref()
+  getters! {
+    copy schema_version: isize;
+    str media_type;
+    list manifests: containerization_oci::image::Descriptor => manifests_len, manifests_at;
+    optional_map annotations => has_annotations, annotations_len, annotation_key_at, annotation_value_at;
+    present subject: containerization_oci::image::Descriptor => has_subject;
+    optional_str artifact_type;
   }
 }
 
 impl containerization_oci::image::ImageConfig {
-  pub(crate) fn user(&self) -> Option<&str> {
-    self.user.as_deref()
-  }
-
-  pub(crate) fn has_env(&self) -> bool {
-    self.env.is_some()
-  }
-
-  pub(crate) fn env_len(&self) -> usize {
-    self.env.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn env_at(&self, index: usize) -> &str {
-    &present(&self.env)[index]
-  }
-
-  pub(crate) fn has_entrypoint(&self) -> bool {
-    self.entrypoint.is_some()
-  }
-
-  pub(crate) fn entrypoint_len(&self) -> usize {
-    self.entrypoint.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn entrypoint_at(&self, index: usize) -> &str {
-    &present(&self.entrypoint)[index]
-  }
-
-  pub(crate) fn has_cmd(&self) -> bool {
-    self.cmd.is_some()
-  }
-
-  pub(crate) fn cmd_len(&self) -> usize {
-    self.cmd.as_ref().map_or(0, Vec::len)
-  }
-
-  pub(crate) fn cmd_at(&self, index: usize) -> &str {
-    &present(&self.cmd)[index]
-  }
-
-  pub(crate) fn working_dir(&self) -> Option<&str> {
-    self.working_dir.as_deref()
-  }
-
-  pub(crate) fn has_labels(&self) -> bool {
-    self.labels.is_some()
-  }
-
-  pub(crate) fn labels_len(&self) -> usize {
-    self.labels.as_ref().map_or(0, BTreeMap::len)
-  }
-
-  pub(crate) fn label_key_at(&self, index: usize) -> &str {
-    entry_at(present(&self.labels), index).0
-  }
-
-  pub(crate) fn label_value_at(&self, index: usize) -> &str {
-    entry_at(present(&self.labels), index).1
-  }
-
-  pub(crate) fn stop_signal(&self) -> Option<&str> {
-    self.stop_signal.as_deref()
+  getters! {
+    optional_str user;
+    optional_list env: str => has_env, env_len, env_at;
+    optional_list entrypoint: str => has_entrypoint, entrypoint_len, entrypoint_at;
+    optional_list cmd: str => has_cmd, cmd_len, cmd_at;
+    optional_str working_dir;
+    optional_map labels => has_labels, labels_len, label_key_at, label_value_at;
+    optional_str stop_signal;
   }
 }
 
 impl image::Description {
-  pub(crate) fn reference(&self) -> &str {
-    &self.reference
-  }
-
-  pub(crate) fn descriptor(&self) -> &containerization_oci::image::Descriptor {
-    &self.descriptor
+  getters! {
+    str reference;
+    borrow descriptor: containerization_oci::image::Descriptor;
   }
 }
 
 impl image::EXT4Unpacker {
-  pub(crate) fn capacity_in_bytes(&self) -> u64 {
-    self.capacity_in_bytes
+  getters! {
+    copy capacity_in_bytes: u64;
   }
 
   pub(crate) fn has_journal(&self) -> bool {

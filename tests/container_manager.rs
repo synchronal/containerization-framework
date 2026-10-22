@@ -37,7 +37,11 @@ fn hands_out_interfaces_from_its_subnet() {
     .expect("an interface should be created")
     .expect("a vmnet network always makes an interface");
 
-  assert!(subnet.contains(interface.ipv4_address().address()).unwrap());
+  assert!(
+    subnet
+      .contains(interface.ipv4_address().address())
+      .expect("Swift checks the subnet")
+  );
   assert_eq!(interface.ipv4_address().prefix(), subnet.prefix());
   assert_eq!(interface.ipv4_gateway(), Some(gateway));
   assert_eq!(interface.ipv6_gateway(), network.ipv6_gateway());
@@ -85,6 +89,7 @@ fn routes_a_container_through_its_network() {
     return;
   };
   let gateway = network.ipv4_gateway();
+  let gateway_address = gateway.description().expect("Swift describes the gateway");
   let booted = Container::boot_on("cfw-test-manager-vmnet", network);
   let interfaces = booted.container().interfaces();
 
@@ -94,14 +99,14 @@ fn routes_a_container_through_its_network() {
   assert_eq!(interface.ipv4_gateway(), Some(gateway));
   assert_eq!(
     booted.container().config().dns.map(|dns| dns.nameservers),
-    Some(vec![gateway.description().unwrap()]),
+    Some(vec![gateway_address.clone()]),
     "the manager resolves through the gateway"
   );
 
   let routes = booted.sh("routes", "ip route");
 
   assert!(
-    routes.contains(&format!("default via {}", gateway.description().unwrap())),
+    routes.contains(&format!("default via {gateway_address}")),
     "the guest should route through the gateway: {routes}"
   );
 }
@@ -118,14 +123,11 @@ fn reaches_its_store_and_creates_from_a_reference() {
   // A run that died before deleting its container may have left it behind.
   let _ = manager.delete(name);
 
-  let events = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-  let counted = std::sync::Arc::clone(&events);
+  let (events, handler) = support::recorded();
   let options = cfw::containerization::container::container_manager::CreateOptions {
     rootfs_size_in_bytes: support::TEST_ROOTFS_SIZE_IN_BYTES,
     networking: false,
-    progress: Some(Box::new(move |batch| {
-      counted.fetch_add(batch.len(), std::sync::atomic::Ordering::Relaxed);
-    })),
+    progress: Some(handler),
     ..Default::default()
   };
 
@@ -135,7 +137,7 @@ fn reaches_its_store_and_creates_from_a_reference() {
 
   assert_eq!(container.id(), name);
   assert!(
-    events.load(std::sync::atomic::Ordering::Relaxed) > 0,
+    !events.lock().expect("the recording").is_empty(),
     "unpacking the rootfs reports progress"
   );
   manager

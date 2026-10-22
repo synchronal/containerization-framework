@@ -28,28 +28,11 @@ impl ffi::CzOutcome {
 }
 
 impl runtime::Hook {
-  pub(crate) fn path(&self) -> &str {
-    &self.path
-  }
-
-  pub(crate) fn args_len(&self) -> usize {
-    self.args.len()
-  }
-
-  pub(crate) fn args_at(&self, index: usize) -> &str {
-    &self.args[index]
-  }
-
-  pub(crate) fn env_len(&self) -> usize {
-    self.env.len()
-  }
-
-  pub(crate) fn env_at(&self, index: usize) -> &str {
-    &self.env[index]
-  }
-
-  pub(crate) fn timeout(&self) -> Option<isize> {
-    self.timeout
+  getters! {
+    str path;
+    list args: str => args_len, args_at;
+    list env: str => env_len, env_at;
+    copy timeout: Option<isize>;
   }
 }
 

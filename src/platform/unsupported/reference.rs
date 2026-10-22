@@ -22,44 +22,15 @@ failing!(
   cz_parsed_digest_path(&str, &str),
 );
 
-impl CzReference {
-  pub(crate) fn domain(&self) -> Option<String> {
-    match self.0 {}
-  }
-
-  pub(crate) fn resolved_domain(&self) -> Option<String> {
-    match self.0 {}
-  }
-
-  pub(crate) fn path(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn tag(&self) -> Option<String> {
-    match self.0 {}
-  }
-
-  pub(crate) fn digest(&self) -> Option<String> {
-    match self.0 {}
-  }
-
-  pub(crate) fn name(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn description(&self) -> String {
-    match self.0 {}
-  }
-
-  pub(crate) fn with_tag(&self, _tag: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn with_digest(&self, _digest: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn normalize(&self) {
-    match self.0 {}
-  }
-}
+uninhabited!(CzReference {
+  fn domain() -> Option<String>;
+  fn resolved_domain() -> Option<String>;
+  fn path() -> String;
+  fn tag() -> Option<String>;
+  fn digest() -> Option<String>;
+  fn name() -> String;
+  fn description() -> String;
+  fn with_tag(&str) -> CzOutcome;
+  fn with_digest(&str) -> CzOutcome;
+  fn normalize();
+});

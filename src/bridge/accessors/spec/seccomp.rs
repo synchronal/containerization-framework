@@ -45,8 +45,8 @@ impl runtime::LinuxSeccomp {
     self.default_action.raw_value()
   }
 
-  pub(crate) fn default_errno_ret(&self) -> Option<usize> {
-    self.default_errno_ret
+  getters! {
+    copy default_errno_ret: Option<usize>;
   }
 
   pub(crate) fn architectures_len(&self) -> usize {
@@ -65,38 +65,24 @@ impl runtime::LinuxSeccomp {
     self.flags[index].raw_value()
   }
 
-  pub(crate) fn listener_path(&self) -> &str {
-    &self.listener_path
-  }
-
-  pub(crate) fn listener_metadata(&self) -> &str {
-    &self.listener_metadata
-  }
-
-  pub(crate) fn syscalls_len(&self) -> usize {
-    self.syscalls.len()
-  }
-
-  pub(crate) fn syscalls_at(&self, index: usize) -> &runtime::LinuxSyscall {
-    &self.syscalls[index]
+  getters! {
+    str listener_path;
+    str listener_metadata;
+    list syscalls: runtime::LinuxSyscall => syscalls_len, syscalls_at;
   }
 }
 
 impl runtime::LinuxSyscall {
-  pub(crate) fn names_len(&self) -> usize {
-    self.names.len()
-  }
-
-  pub(crate) fn names_at(&self, index: usize) -> &str {
-    &self.names[index]
+  getters! {
+    list names: str => names_len, names_at;
   }
 
   pub(crate) fn action(&self) -> &str {
     self.action.raw_value()
   }
 
-  pub(crate) fn errno_ret(&self) -> Option<usize> {
-    self.errno_ret
+  getters! {
+    copy errno_ret: Option<usize>;
   }
 
   pub(crate) fn args_len(&self) -> usize {

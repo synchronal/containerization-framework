@@ -61,16 +61,9 @@ impl ffi::CzOutcome {
 }
 
 impl runtime::Process {
-  pub(crate) fn cwd(&self) -> &str {
-    &self.cwd
-  }
-
-  pub(crate) fn env_len(&self) -> usize {
-    self.env.len()
-  }
-
-  pub(crate) fn env_at(&self, index: usize) -> &str {
-    &self.env[index]
+  getters! {
+    str cwd;
+    list env: str => env_len, env_at;
   }
 
   pub(crate) fn has_console_size(&self) -> bool {
@@ -85,36 +78,14 @@ impl runtime::Process {
     present(&self.console_size).width
   }
 
-  pub(crate) fn selinux_label(&self) -> &str {
-    &self.selinux_label
-  }
-
-  pub(crate) fn no_new_privileges(&self) -> bool {
-    self.no_new_privileges
-  }
-
-  pub(crate) fn command_line(&self) -> &str {
-    &self.command_line
-  }
-
-  pub(crate) fn oom_score_adj(&self) -> Option<isize> {
-    self.oom_score_adj
-  }
-
-  pub(crate) fn has_capabilities(&self) -> bool {
-    self.capabilities.is_some()
-  }
-
-  pub(crate) fn capabilities(&self) -> &runtime::LinuxCapabilities {
-    present(&self.capabilities)
-  }
-
-  pub(crate) fn apparmor_profile(&self) -> &str {
-    &self.apparmor_profile
-  }
-
-  pub(crate) fn user(&self) -> &runtime::User {
-    &self.user
+  getters! {
+    str selinux_label;
+    copy no_new_privileges: bool;
+    str command_line;
+    copy oom_score_adj: Option<isize>;
+    present capabilities: runtime::LinuxCapabilities => has_capabilities;
+    str apparmor_profile;
+    borrow user: runtime::User;
   }
 
   pub(crate) fn rlimits_len(&self) -> usize {
@@ -133,16 +104,9 @@ impl runtime::Process {
     self.rlimits[index].soft
   }
 
-  pub(crate) fn args_len(&self) -> usize {
-    self.args.len()
-  }
-
-  pub(crate) fn args_at(&self, index: usize) -> &str {
-    &self.args[index]
-  }
-
-  pub(crate) fn terminal(&self) -> bool {
-    self.terminal
+  getters! {
+    list args: str => args_len, args_at;
+    copy terminal: bool;
   }
 }
 

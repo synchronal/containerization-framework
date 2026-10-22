@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
+#
+# Lints the bridge's Swift sources with swift-format. Any finding fails.
 
-check_swift() {
-  output="$(find ./swift -name '*.swift' -exec swift-format lint --configuration .swift-format.json -s {} 2>&1 \;)"
+set -euo pipefail
 
-  if [[ -z "${output}" ]]; then
-    exit 0
-  else
-    echo -e "Swift-format lint produced errors!" >&2
-    echo >&2
-    echo "${output}" >&2
-    exit 1
-  fi
-}
+cd "$(dirname "$0")/../.."
 
-check_swift
+if ! command -v swift-format >/dev/null; then
+  echo "$0: swift-format is not installed; it ships with Xcode's toolchain" >&2
+  exit 1
+fi
+
+swift-format lint --configuration .swift-format.json --strict --recursive swift

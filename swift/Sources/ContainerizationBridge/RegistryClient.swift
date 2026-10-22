@@ -51,25 +51,21 @@ final class CzRegistryClient: Sendable {
   }
 
   func ping() -> CzOutcome {
-    let client = client
-
-    return CzOutcome { try blocking { try await client.ping() } }
+    .awaiting { try await self.client.ping() }
   }
 
   func resolve(name: RustStr, tag: RustStr) -> CzOutcome {
     let name = name.toString()
     let tag = tag.toString()
-    let client = client
 
-    return CzOutcome { try blocking { try await client.resolve(name: name, tag: tag) } }
+    return .awaiting { try await self.client.resolve(name: name, tag: tag) }
   }
 
   func fetchData(name: RustStr, descriptor: RustDescriptor) -> CzOutcome {
     let name = name.toString()
     let descriptor = Descriptor(descriptor)
-    let client = client
 
-    return CzOutcome { try blocking { try await client.fetchData(name: name, descriptor: descriptor) } }
+    return .awaiting { try await self.client.fetchData(name: name, descriptor: descriptor) }
   }
 
   func fetchBlob(name: RustStr, descriptor: RustDescriptor, into: RustStr, progress: RustProgressHandler) -> CzOutcome {
@@ -89,20 +85,16 @@ final class CzRegistryClient: Sendable {
 
   func catalog(prefix: RustString?) -> CzOutcome {
     let prefix = prefix?.toString()
-    let client = client
 
-    return CzOutcome { try blocking { try await client.catalog(prefix: prefix) } }
+    return .awaiting { try await self.client.catalog(prefix: prefix) }
   }
 
   func referrers(name: RustStr, digest: RustStr, artifactType: RustString?) -> CzOutcome {
     let name = name.toString()
     let digest = digest.toString()
     let artifactType = artifactType?.toString()
-    let client = client
 
-    return CzOutcome {
-      try blocking { try await client.referrers(name: name, digest: digest, artifactType: artifactType) }
-    }
+    return .awaiting { try await self.client.referrers(name: name, digest: digest, artifactType: artifactType) }
   }
 }
 

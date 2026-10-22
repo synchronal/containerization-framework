@@ -41,20 +41,13 @@ impl Container {
     name: &str,
     configure: impl FnOnce(&mut cfw::containerization::container::linux_container::Configuration) + Send + 'static,
   ) -> Result<Self, cfw::Error> {
-    let image_store = store::image_store();
-    let image = store::image(&image_store);
-    let mut manager = store::manager(&image_store);
-
-    // A run that died before dropping its container may have left it behind.
-    let _ = manager.delete(name);
-
-    let options = cfw::containerization::container::container_manager::CreateOptions {
-      rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
-      networking: false,
-      vm: super::vm(),
-      ..Default::default()
-    };
-    let container = manager.create(name, &image, options, suite_configuration(name, configure))?;
+    let (image, mut manager) = prepare(name, store::manager);
+    let container = manager.create(
+      name,
+      &image,
+      create_options(false),
+      suite_configuration(name, configure),
+    )?;
 
     Self::start(manager, container)
   }
@@ -62,27 +55,18 @@ impl Container {
   /// Creates and starts [`store::IMAGE`] on `network`, which gives the
   /// container its interface and resolver in place of the suite's.
   pub fn boot_on(name: &str, network: cfw::containerization::network::VmnetNetwork) -> Self {
-    let image_store = store::image_store();
-    let image = store::image(&image_store);
-    let mut manager = store::manager_with(
-      &image_store,
-      cfw::containerization::container::container_manager::ContainerManagerOptions {
-        network: Some(network),
-        ..Default::default()
-      },
-    );
-
-    // A run that died before dropping its container may have left it behind.
-    let _ = manager.delete(name);
-
-    let options = cfw::containerization::container::container_manager::CreateOptions {
-      rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
-      vm: super::vm(),
-      ..Default::default()
-    };
+    let (image, mut manager) = prepare(name, |image_store| {
+      store::manager_with(
+        image_store,
+        cfw::containerization::container::container_manager::ContainerManagerOptions {
+          network: Some(network),
+          ..Default::default()
+        },
+      )
+    });
 
     manager
-      .create(name, &image, options, keep_alive)
+      .create(name, &image, create_options(true), keep_alive)
       .and_then(|container| Self::start(manager, container))
       .unwrap_or_else(|error| panic!("{name} should boot: {error}"))
   }
@@ -94,13 +78,7 @@ impl Container {
   /// directory that only the image `create` makes.
   pub fn boot_from_rootfs(name: &str, rootfs: cfw::containerization::container::Mount) -> Self {
     let boot_log = std::path::Path::new(&rootfs.source).with_extension("log");
-    let image_store = store::image_store();
-    let image = store::image(&image_store);
-    let mut manager = store::manager(&image_store);
-
-    // A run that died before dropping its container may have left it behind.
-    let _ = manager.delete(name);
-
+    let (image, mut manager) = prepare(name, store::manager);
     let options = cfw::containerization::container::container_manager::CreateWithRootfsOptions {
       networking: false,
       vm: super::vm(),
@@ -203,6 +181,36 @@ impl Container {
   }
 }
 
+/// The suite's image, and a manager on its store that `manager` makes. A run
+/// that died before dropping its container may have left one named `name`
+/// behind, so that one is deleted first.
+fn prepare(
+  name: &str,
+  manager: impl FnOnce(&cfw::containerization::image::ImageStore) -> cfw::containerization::container::ContainerManager,
+) -> (
+  cfw::containerization::image::Image,
+  cfw::containerization::container::ContainerManager,
+) {
+  let image_store = store::image_store();
+  let image = store::image(&image_store);
+  let mut manager = manager(&image_store);
+
+  let _ = manager.delete(name);
+
+  (image, manager)
+}
+
+/// Options that create a container in the suite's limits, with the manager's
+/// network or without it.
+fn create_options(networking: bool) -> cfw::containerization::container::container_manager::CreateOptions {
+  cfw::containerization::container::container_manager::CreateOptions {
+    rootfs_size_in_bytes: super::TEST_ROOTFS_SIZE_IN_BYTES,
+    networking,
+    vm: super::vm(),
+    ..Default::default()
+  }
+}
+
 /// The suite's changes to a seeded configuration, then `configure`'s.
 fn suite_configuration(
   name: &str,
@@ -256,6 +264,16 @@ pub fn finish(process: &cfw::containerization::process::LinuxProcess, what: &str
 /// A process that holds the container open, in the suite's limits.
 pub fn keep_alive(
   configuration: &mut cfw::containerization::container::linux_container::Configuration,
+) -> Result<(), cfw::Error> {
+  configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
+  configuration.cpus = super::TEST_CPUS;
+  configuration.memory_in_bytes = super::TEST_MEMORY_IN_BYTES;
+  Ok(())
+}
+
+/// The same, for a container in a pod.
+pub fn keep_alive_in_pod(
+  configuration: &mut cfw::containerization::container::linux_pod::ContainerConfiguration,
 ) -> Result<(), cfw::Error> {
   configuration.process.arguments = KEEPALIVE.map(String::from).to_vec();
   configuration.cpus = super::TEST_CPUS;

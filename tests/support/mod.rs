@@ -14,6 +14,7 @@ pub mod network;
 pub mod store;
 
 use containerization_framework as cfw;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -40,6 +41,35 @@ pub fn vm_configuration() -> cfw::containerization::vm::VMConfiguration {
     memory_in_bytes: vm().memory_in_bytes,
     ..Default::default()
   }
+}
+
+/// Each value as an owned string.
+pub fn strings(values: &[&str]) -> Vec<String> {
+  values.iter().map(|value| value.to_string()).collect()
+}
+
+/// Each entry as an owned key and value.
+pub fn map(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
+  entries
+    .iter()
+    .map(|(key, value)| (key.to_string(), value.to_string()))
+    .collect()
+}
+
+/// The platform that `string` names, which must be valid.
+pub fn platform(string: &str) -> cfw::containerization_oci::image::Platform {
+  cfw::containerization_oci::image::Platform::parse(string).expect("a valid platform")
+}
+
+/// The items that `events` report done, and the total items they announce.
+pub fn item_totals(events: &[cfw::containerization_extras::ProgressEvent]) -> (isize, isize) {
+  events
+    .iter()
+    .fold((0, 0), |(items, total), event| match event {
+      cfw::containerization_extras::ProgressEvent::AddItems(added) => (items + added, total),
+      cfw::containerization_extras::ProgressEvent::AddTotalItems(added) => (items, total + added),
+      _ => (items, total),
+    })
 }
 
 /// A progress handler, and every event it is called with, in order.

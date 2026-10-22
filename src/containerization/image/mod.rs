@@ -15,7 +15,6 @@ use crate::containerization_oci;
 use crate::error::Error;
 use crate::platform;
 use crate::platform::ffi;
-use std::fmt;
 
 /// `Image.Description`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,11 +54,7 @@ pub struct Image {
   pub(crate) handle: ffi::CzImage,
 }
 
-impl fmt::Debug for Image {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("Image").finish_non_exhaustive()
-  }
-}
+opaque_debug!(Image);
 
 // Swift's `Image` is `Sendable`.
 unsafe impl Send for Image {}

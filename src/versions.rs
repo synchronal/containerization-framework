@@ -47,4 +47,20 @@ mod tests {
 
     assert_eq!(pinned.trim(), super::KERNEL_ARCHIVE_URL);
   }
+
+  /// The integration suites' setup script downloads the kernel itself, so it
+  /// keeps its own copy of the pin.
+  #[test]
+  fn integration_setup_downloads_the_same_kernel() {
+    let script = include_str!("../bin/dev/prepare-integration");
+
+    assert!(
+      script.contains(&format!("url=\"{}\"", super::KERNEL_ARCHIVE_URL)),
+      "bin/dev/prepare-integration should download KERNEL_ARCHIVE_URL"
+    );
+    assert!(
+      script.contains(&format!("kernel_in_archive=\"{}\"", super::KERNEL_IN_ARCHIVE)),
+      "bin/dev/prepare-integration should take KERNEL_IN_ARCHIVE from the archive"
+    );
+  }
 }

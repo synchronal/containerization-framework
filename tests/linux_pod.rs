@@ -55,8 +55,7 @@ fn resumes_a_panic_in_a_containers_configuration_on_the_callers_thread() {
   let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     pod.add_container("panics", rootfs, |_| panic!("the configuration gave up"))
   }))
-  .err()
-  .expect("the closure's panic should reach the caller");
+  .expect_err("the closure's panic should reach the caller");
 
   assert_eq!(panicked.downcast_ref::<&str>(), Some(&"the configuration gave up"));
   assert!(pod.list_containers().is_empty());
@@ -91,9 +90,7 @@ fn shares_a_volume_between_its_containers() {
 
     pod
       .add_container(name, rootfs, |configuration| {
-        configuration.process.arguments = support::container::KEEPALIVE.map(String::from).to_vec();
-        configuration.cpus = support::TEST_CPUS;
-        configuration.memory_in_bytes = support::TEST_MEMORY_IN_BYTES;
+        support::container::keep_alive_in_pod(configuration)?;
         configuration
           .mounts
           .push(cfw::containerization::container::Mount::shared_mount(
@@ -168,9 +165,7 @@ fn writes_a_containers_unified_cgroup_files() {
 
   pod
     .add_container("unified", rootfs, |configuration| {
-      configuration.process.arguments = support::container::KEEPALIVE.map(String::from).to_vec();
-      configuration.cpus = support::TEST_CPUS;
-      configuration.memory_in_bytes = support::TEST_MEMORY_IN_BYTES;
+      support::container::keep_alive_in_pod(configuration)?;
       configuration.unified = [("memory.oom.group".to_string(), "1".to_string())].into();
       Ok(())
     })

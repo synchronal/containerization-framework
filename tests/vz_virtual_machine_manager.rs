@@ -67,8 +67,11 @@ fn boots_a_virtual_machine_of_its_own() {
   std::thread::scope(|scope| {
     let waiting = scope.spawn(|| (&listener).next());
 
-    // Give the other thread time to start waiting, so finishing ends a wait
-    // already in progress.
+    // The pause gives the other thread time to start waiting, so finishing
+    // most likely ends a wait already in progress. Nothing guarantees that the
+    // thread is waiting yet, though. If it starts late it finds the listener
+    // already finished, and it gets `None` all the same, so what this proves
+    // is that a wait does not outlast `finish`.
     std::thread::sleep(std::time::Duration::from_millis(100));
     listener.finish().expect("the listener should finish");
 

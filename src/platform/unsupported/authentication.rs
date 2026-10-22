@@ -21,12 +21,7 @@ failing!(
   cz_keychain_helper_save(&str, Option<String>, &str, &str, &str),
 );
 
-impl CzAuthentication {
-  pub(crate) fn duplicate(&self) -> CzAuthentication {
-    match self.0 {}
-  }
-
-  pub(crate) fn token(&self) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzAuthentication {
+  fn duplicate() -> CzAuthentication;
+  fn token() -> CzOutcome;
+});

@@ -25,34 +25,11 @@ failing!(
   ),
 );
 
-impl CzRegistryClient {
-  pub(crate) fn ping(&self) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn resolve(&self, _name: &str, _tag: &str) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn fetch_data(&self, _name: &str, _descriptor: containerization_oci::image::Descriptor) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn fetch_blob(
-    &self,
-    _name: &str,
-    _descriptor: containerization_oci::image::Descriptor,
-    _into: &str,
-    _progress: platform::Progress,
-  ) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn catalog(&self, _prefix: Option<String>) -> CzOutcome {
-    match self.0 {}
-  }
-
-  pub(crate) fn referrers(&self, _name: &str, _digest: &str, _artifact_type: Option<String>) -> CzOutcome {
-    match self.0 {}
-  }
-}
+uninhabited!(CzRegistryClient {
+  fn ping() -> CzOutcome;
+  fn resolve(&str, &str) -> CzOutcome;
+  fn fetch_data(&str, containerization_oci::image::Descriptor) -> CzOutcome;
+  fn fetch_blob(&str, containerization_oci::image::Descriptor, &str, platform::Progress) -> CzOutcome;
+  fn catalog(Option<String>) -> CzOutcome;
+  fn referrers(&str, &str, Option<String>) -> CzOutcome;
+});

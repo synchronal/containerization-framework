@@ -23,6 +23,154 @@
 //! and pushing what it holds, so that it can hand back a configuration it
 //! seeded. A Rust function that returned a new one to Swift would get a
 //! redundant cast in swift-bridge's glue.
+//!
+//! A getter that only lends a field is written as an entry in `getters!`,
+//! and the rest are written out. `container/mod.rs` has the macros for what
+//! the container, pod and VM configurations share.
+
+/// Getters that lend a field as it is, written as one entry for each field.
+/// An entry names the kind of field, then the field, then the getters' names
+/// where they differ from the field's. Each getter keeps the name Swift calls
+/// it by.
+///
+/// - `copy x: T;` returns a field that is `Copy`.
+/// - `str x;` lends a `String` as `&str`, and `str x => name;` names the
+///   getter.
+/// - `optional_str x;` lends an `Option<String>` as `Option<&str>`.
+/// - `borrow x: T;` lends a `T`.
+/// - `present x: T => has_x;` lends an `Option<T>` through `has_x` and `x`,
+///   which Swift calls only when `has_x` is true.
+/// - `list x: T => x_len, x_at;` lends a `Vec<T>` as its length and the
+///   element at an index. `T` is `str` for a `Vec<String>`.
+/// - `optional_list x: T => has_x, x_len, x_at;` lends an `Option<Vec<T>>`
+///   the same way, with a length of zero when it is `None`.
+/// - `map x => x_len, x_key_at, x_value_at;` lends a `BTreeMap<String, String>`
+///   as its length and the key and value at an index.
+/// - `optional_map x => has_x, x_len, x_key_at, x_value_at;` lends an
+///   `Option<BTreeMap<String, String>>` the same way.
+///
+/// An entry can carry doc comments, which go on the getter it is named for.
+macro_rules! getters {
+  () => {};
+  ($(#[$attr:meta])* copy $field:ident: $type:ty; $($rest:tt)*) => {
+    $(#[$attr])*
+    pub(crate) fn $field(&self) -> $type {
+      self.$field
+    }
+
+    getters! { $($rest)* }
+  };
+  ($(#[$attr:meta])* str $field:ident; $($rest:tt)*) => {
+    getters! { $(#[$attr])* str $field => $field; $($rest)* }
+  };
+  ($(#[$attr:meta])* str $field:ident => $name:ident; $($rest:tt)*) => {
+    $(#[$attr])*
+    pub(crate) fn $name(&self) -> &str {
+      &self.$field
+    }
+
+    getters! { $($rest)* }
+  };
+  ($(#[$attr:meta])* optional_str $field:ident; $($rest:tt)*) => {
+    $(#[$attr])*
+    pub(crate) fn $field(&self) -> Option<&str> {
+      self.$field.as_deref()
+    }
+
+    getters! { $($rest)* }
+  };
+  ($(#[$attr:meta])* borrow $field:ident: $type:ty; $($rest:tt)*) => {
+    $(#[$attr])*
+    pub(crate) fn $field(&self) -> &$type {
+      &self.$field
+    }
+
+    getters! { $($rest)* }
+  };
+  ($(#[$attr:meta])* present $field:ident: $type:ty => $has:ident; $($rest:tt)*) => {
+    pub(crate) fn $has(&self) -> bool {
+      self.$field.is_some()
+    }
+
+    #[doc = concat!("Swift calls this only when [`Self::", stringify!($has), "`] is true.")]
+    $(#[$attr])*
+    pub(crate) fn $field(&self) -> &$type {
+      $crate::bridge::accessors::present(&self.$field)
+    }
+
+    getters! { $($rest)* }
+  };
+  ($(#[$attr:meta])* list $field:ident: $type:ty => $len:ident, $at:ident; $($rest:tt)*) => {
+    pub(crate) fn $len(&self) -> usize {
+      self.$field.len()
+    }
+
+    $(#[$attr])*
+    pub(crate) fn $at(&self, index: usize) -> &$type {
+      &self.$field[index]
+    }
+
+    getters! { $($rest)* }
+  };
+  (
+    $(#[$attr:meta])* optional_list $field:ident: $type:ty => $has:ident, $len:ident, $at:ident;
+    $($rest:tt)*
+  ) => {
+    pub(crate) fn $has(&self) -> bool {
+      self.$field.is_some()
+    }
+
+    pub(crate) fn $len(&self) -> usize {
+      self.$field.as_ref().map_or(0, Vec::len)
+    }
+
+    $(#[$attr])*
+    pub(crate) fn $at(&self, index: usize) -> &$type {
+      &$crate::bridge::accessors::present(&self.$field)[index]
+    }
+
+    getters! { $($rest)* }
+  };
+  ($(#[$attr:meta])* map $field:ident => $len:ident, $key_at:ident, $value_at:ident; $($rest:tt)*) => {
+    pub(crate) fn $len(&self) -> usize {
+      self.$field.len()
+    }
+
+    $(#[$attr])*
+    pub(crate) fn $key_at(&self, index: usize) -> &str {
+      $crate::bridge::accessors::entry_at(&self.$field, index).0
+    }
+
+    pub(crate) fn $value_at(&self, index: usize) -> &str {
+      $crate::bridge::accessors::entry_at(&self.$field, index).1
+    }
+
+    getters! { $($rest)* }
+  };
+  (
+    $(#[$attr:meta])* optional_map $field:ident => $has:ident, $len:ident, $key_at:ident, $value_at:ident;
+    $($rest:tt)*
+  ) => {
+    pub(crate) fn $has(&self) -> bool {
+      self.$field.is_some()
+    }
+
+    pub(crate) fn $len(&self) -> usize {
+      self.$field.as_ref().map_or(0, ::std::collections::BTreeMap::len)
+    }
+
+    $(#[$attr])*
+    pub(crate) fn $key_at(&self, index: usize) -> &str {
+      $crate::bridge::accessors::entry_at($crate::bridge::accessors::present(&self.$field), index).0
+    }
+
+    pub(crate) fn $value_at(&self, index: usize) -> &str {
+      $crate::bridge::accessors::entry_at($crate::bridge::accessors::present(&self.$field), index).1
+    }
+
+    getters! { $($rest)* }
+  };
+}
 
 mod addresses;
 mod archive;

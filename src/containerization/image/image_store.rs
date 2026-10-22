@@ -120,11 +120,7 @@ pub struct ImageStore {
   pub(crate) handle: ffi::CzImageStore,
 }
 
-impl fmt::Debug for ImageStore {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    formatter.debug_struct("ImageStore").finish_non_exhaustive()
-  }
-}
+opaque_debug!(ImageStore);
 
 // Swift's `ImageStore` is an actor.
 unsafe impl Send for ImageStore {}

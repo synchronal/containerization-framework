@@ -16,9 +16,9 @@ checks = [
 [audit]
 checks = [
   {name = "rust: audit", shell = "cargo audit", verbose = true},
-  {name = "rust: check", shell = "cargo check --all-targets --features strict --color always", remedy = "cargo fix --allow-dirty"},
-  {name = "rust: check off macOS", shell = "cargo check --all-targets --features strict --target aarch64-unknown-linux-gnu --color always"},
-  {name = "rust: clippy", shell = "cargo clippy --all-targets -- -D warnings", remedy = "cargo clippy --all-targets --fix --allow-dirty"},
+  {name = "rust: check", shell = "cargo check --all-targets --features integration,strict --color always", remedy = "cargo fix --allow-dirty"},
+  {name = "rust: check off macOS", shell = "cargo check --all-targets --features integration,strict --target aarch64-unknown-linux-gnu --color always"},
+  {name = "rust: clippy", shell = "cargo clippy --all-targets --features integration -- -D warnings", remedy = "cargo clippy --all-targets --features integration --fix --allow-dirty"},
   {check = "rust", command = "format-check"},
   {name = "swift: format", shell = "bin/dev/format-swift --check", remedy = "bin/dev/format-swift --all"},
   {name = "swift: lint", shell = "bin/dev/lint-swift"},

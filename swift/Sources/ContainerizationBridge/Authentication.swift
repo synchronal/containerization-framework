@@ -20,9 +20,7 @@ final class CzAuthentication: Sendable {
   }
 
   func token() -> CzOutcome {
-    let authentication = authentication
-
-    return CzOutcome { try blocking { try await authentication?.token() ?? "" } }
+    .awaiting { try await self.authentication?.token() ?? "" }
   }
 }
 
