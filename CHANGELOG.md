@@ -7,11 +7,28 @@
   closing either closes both. `ContainerManager` still doesn't implement
   `Clone`, because a Swift copy keeps its own record of the network's
   allocations while sharing the allocators.
-- The docs of every binding with a defaulted Swift argument give Swift's
-  default; every options struct's docs describe its `Default`.
+- Document every `Default` option of every struct; use and document every
+  defaulted Swift argument.
+- Update Containerization to 0.54.0. Use the matching init image,
+  `ghcr.io/apple/containerization/vminit:0.54.0`, which `versions::INIT_IMAGE`
+  now pins.
+  - A pod container can mount a path within a shared pod volume rather than
+    the whole volume. `SharedMountOptions::subpath` names the path, and the
+    guest resolves it without leaving the volume.
+  - `containerization_os::volume_subpath` binds `VolumeSubpath`, which
+    carries that path to the guest as a mount option. `to_mount_option`
+    makes the option, `is_subpath_mount` says whether a mount's options
+    carry one, and `extract` takes it out of them. A failure in Swift
+    becomes `Error::VolumeSubpath`, which holds what Swift threw.
+  - The connection to the guest agent sends an `:authority`, which newer
+    gRPC-Go servers require.
 
 ### Breaking changes
 
+- `mount::RuntimeOptions::Shared` is now `Shared(Option<String>)`, holding
+  the volume's subpath, since Swift's `shared` case now carries one.
+- `Mount::shared_mount` takes a `SharedMountOptions` in place of its
+  `options` argument, as Swift added a second defaulted argument, `subpath`.
 - A Swift function with two or more defaulted arguments is bound with an
   options struct whose `Default` matches Swift's defaults.
   - `ImageStore::get_init_image` takes a `GetInitImageOptions` in place of

@@ -96,7 +96,7 @@ fn shares_a_volume_between_its_containers() {
           .push(cfw::containerization::container::Mount::shared_mount(
             "shared",
             "/shared",
-            &[],
+            Default::default(),
           ));
         Ok(())
       })

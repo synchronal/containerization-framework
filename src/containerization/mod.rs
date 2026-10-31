@@ -16,6 +16,6 @@ pub mod vm;
 const MIB: u64 = 1024 * 1024;
 const GIB: u64 = 1024 * MIB;
 
-fn strings(values: &[&str]) -> Vec<String> {
+pub(crate) fn strings(values: &[&str]) -> Vec<String> {
   values.iter().map(|value| value.to_string()).collect()
 }

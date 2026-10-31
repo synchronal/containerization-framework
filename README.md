@@ -186,7 +186,7 @@ fails to start unless you build an init image with one.
 ## Versioning
 
 The init image's `vminitd` must match the Containerization release this crate
-builds against (0.53.0, in `swift/Package.swift`): they share a protocol, and a
+builds against (0.54.0, in `swift/Package.swift`): they share a protocol, and a
 mismatch fails at runtime rather than at build time. As in Containerization,
 the caller chooses the kernel and the init image.
 

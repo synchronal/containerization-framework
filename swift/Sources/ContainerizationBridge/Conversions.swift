@@ -109,12 +109,13 @@ func rustStrings(_ values: some Sequence<String>) -> RustVec<RustString> {
   return vec
 }
 
-/// A mount's `RuntimeOptions`, as the bridge's kind and the options it carries.
+/// A mount's `RuntimeOptions`, as the bridge's kind and the options it
+/// carries. A `shared` mount's subpath is its only option.
 func runtimeKind(_ options: Containerization.Mount.RuntimeOptions) -> (RuntimeKind, [String]) {
   switch options {
   case .virtioblk(let options): (.Virtioblk, options)
   case .virtiofs(let options): (.Virtiofs, options)
-  case .shared: (.Shared, [])
+  case .shared(let subpath): (.Shared, subpath.map { [$0] } ?? [])
   case .any(let options): (.Generic, options)
   }
 }

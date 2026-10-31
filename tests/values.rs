@@ -61,6 +61,32 @@ fn copies_a_mounts_source() {
 }
 
 #[test]
+fn keeps_a_shared_mounts_subpath_through_swift() {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  let source = directory.path().join("volume");
+  std::fs::write(&source, b"volume").expect("a file");
+
+  for (index, subpath) in [None, Some("data/cache")].into_iter().enumerate() {
+    let mount = cfw::containerization::container::Mount::shared_mount(
+      source.to_str().unwrap(),
+      "/cache",
+      cfw::containerization::container::mount::SharedMountOptions {
+        subpath,
+        ..Default::default()
+      },
+    );
+    let copy = directory.path().join(format!("copy-{index}"));
+
+    let cloned = mount.clone_to(copy.to_str().unwrap()).expect("a copy");
+
+    assert_eq!(
+      cloned.runtime_options,
+      cfw::containerization::container::mount::RuntimeOptions::Shared(subpath.map(str::to_string))
+    );
+  }
+}
+
+#[test]
 fn says_which_mount_it_could_not_copy() {
   let mount = cfw::containerization::container::Mount::block("ext4", "/nowhere/disk.img", "/data", &[], &[]);
 
@@ -91,13 +117,20 @@ fn hashes_a_mounts_source_through_symlinks() {
 
 #[test]
 fn tells_block_mounts_from_others() {
-  let shared = cfw::containerization::container::Mount::shared_mount("cache", "/cache", &["ro"]);
+  let shared = cfw::containerization::container::Mount::shared_mount(
+    "cache",
+    "/cache",
+    cfw::containerization::container::mount::SharedMountOptions {
+      options: &["ro"],
+      ..Default::default()
+    },
+  );
 
   assert_eq!(shared.r#type, "none");
   assert_eq!(shared.source, "cache");
   assert_eq!(
     shared.runtime_options,
-    cfw::containerization::container::mount::RuntimeOptions::Shared
+    cfw::containerization::container::mount::RuntimeOptions::Shared(None)
   );
   assert!(!shared.is_block());
   assert!(cfw::containerization::container::Mount::block("ext4", "/disk.img", "/data", &[], &[]).is_block());

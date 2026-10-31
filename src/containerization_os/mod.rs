@@ -1,8 +1,8 @@
-//! Containerization's `ContainerizationOS` module: files, terminals, sysctls
-//! and the keychain, and a few Linux interfaces. The keychain types are in
-//! [`keychain`], and binfmt_misc, capabilities and network protocol counters
-//! are in [`linux`], as they are in Swift's `Keychain` and `Linux`
-//! directories. Reading the Linux counters fails on macOS.
+//! Containerization's `ContainerizationOS` module: files, terminals, sysctls,
+//! volume subpaths and the keychain, and a few Linux interfaces. The keychain
+//! types are in [`keychain`], and binfmt_misc, capabilities and network
+//! protocol counters are in [`linux`], as they are in Swift's `Keychain` and
+//! `Linux` directories. Reading the Linux counters fails on macOS.
 
 pub mod file;
 pub mod file_descriptor_ops;
@@ -12,6 +12,7 @@ pub mod linux;
 mod stat;
 pub mod sysctl;
 pub mod terminal;
+pub mod volume_subpath;
 
 pub use self::file_info::FileInfo;
 pub use self::stat::Stat;

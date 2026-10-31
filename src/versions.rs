@@ -29,7 +29,7 @@ pub const KERNEL_IN_ARCHIVE: &str = "opt/kata/share/kata-containers/vmlinux.cont
 mod tests {
   #[test]
   fn names_the_init_image_for_the_pinned_release() {
-    assert_eq!(super::INIT_IMAGE, "ghcr.io/apple/containerization/vminit:0.53.0");
+    assert_eq!(super::INIT_IMAGE, "ghcr.io/apple/containerization/vminit:0.54.0");
   }
 
   /// Containerization's Makefile is the kernel's only pin, so a Containerization

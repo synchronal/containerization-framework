@@ -370,6 +370,12 @@ fn error(outcome: &ffi::CzOutcome, action: impl Into<String>, message: String) -
       error,
     };
   }
+  if let Some(error) = outcome.thrown_volume_subpath_error() {
+    return Error::VolumeSubpath {
+      action: action.into(),
+      error,
+    };
+  }
 
   let code = outcome
     .error_code()

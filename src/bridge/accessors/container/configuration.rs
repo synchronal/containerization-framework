@@ -15,20 +15,20 @@ impl From<&mount::RuntimeOptions> for ffi::RuntimeKind {
     match options {
       mount::RuntimeOptions::Virtioblk(_) => Self::Virtioblk,
       mount::RuntimeOptions::Virtiofs(_) => Self::Virtiofs,
-      mount::RuntimeOptions::Shared => Self::Shared,
+      mount::RuntimeOptions::Shared(_) => Self::Shared,
       mount::RuntimeOptions::Any(_) => Self::Generic,
     }
   }
 }
 
-/// The `RuntimeOptions` of a kind, carrying `options` unless the kind is
-/// `Shared`. Unlike the other direction this isn't a `From`, since the kind
-/// alone doesn't hold the options.
+/// The `RuntimeOptions` of a kind, carrying `options`. A `Shared` mount's
+/// subpath, if any, is its only option. Unlike the other direction this isn't
+/// a `From`, since the kind alone doesn't hold the options.
 fn runtime_options_of(kind: ffi::RuntimeKind, options: Vec<String>) -> mount::RuntimeOptions {
   match kind {
     ffi::RuntimeKind::Virtioblk => mount::RuntimeOptions::Virtioblk(options),
     ffi::RuntimeKind::Virtiofs => mount::RuntimeOptions::Virtiofs(options),
-    ffi::RuntimeKind::Shared => mount::RuntimeOptions::Shared,
+    ffi::RuntimeKind::Shared => mount::RuntimeOptions::Shared(options.into_iter().next()),
     ffi::RuntimeKind::Generic => mount::RuntimeOptions::Any(options),
   }
 }
@@ -71,13 +71,14 @@ impl container::Mount {
     &self.runtime_option_values()[index]
   }
 
-  /// What the runtime options carry, whatever their kind.
+  /// What the runtime options carry, whatever their kind. A `Shared` mount's
+  /// subpath is its only option.
   fn runtime_option_values(&self) -> &[String] {
     match &self.runtime_options {
       mount::RuntimeOptions::Virtioblk(options)
       | mount::RuntimeOptions::Virtiofs(options)
       | mount::RuntimeOptions::Any(options) => options,
-      mount::RuntimeOptions::Shared => &[],
+      mount::RuntimeOptions::Shared(subpath) => subpath.as_slice(),
     }
   }
 }

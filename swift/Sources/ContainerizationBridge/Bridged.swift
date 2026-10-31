@@ -24,24 +24,27 @@ public final class CzOutcome: @unchecked Sendable {
   private let failure: String?
   private let failureCode: String?
   private let fdOpsFailure: FileDescriptorOps.Error?
+  private let volumeSubpathFailure: VolumeSubpath.Error?
   /// Internal so that a getter that reads more than one shape can switch on
   /// it from its type's file.
   let value: Any?
 
   /// Runs `body`, keeping what it returns or the message of what it throws,
   /// the code of a thrown `ContainerizationError`, and a thrown
-  /// `FileDescriptorOps.Error`.
+  /// `FileDescriptorOps.Error` or `VolumeSubpath.Error`.
   init(_ body: () throws -> Any) {
     do {
       value = try body()
       failure = nil
       failureCode = nil
       fdOpsFailure = nil
+      volumeSubpathFailure = nil
     } catch {
       value = nil
       failure = "\(error)"
       failureCode = (error as? ContainerizationError)?.code.description
       fdOpsFailure = error as? FileDescriptorOps.Error
+      volumeSubpathFailure = error as? VolumeSubpath.Error
     }
   }
 
@@ -71,6 +74,11 @@ public final class CzOutcome: @unchecked Sendable {
   /// A thrown `FileDescriptorOps.Error`, or `Absent`.
   func thrownFdOpsError() -> CzOutcome {
     CzOutcome.holding(fdOpsFailure)
+  }
+
+  /// A thrown `VolumeSubpath.Error`, or `Absent`.
+  func thrownVolumeSubpathError() -> CzOutcome {
+    CzOutcome.holding(volumeSubpathFailure)
   }
 
   func taken<T>() -> T {

@@ -161,6 +161,7 @@ mod virtual_machine;
 mod vm_model;
 mod vminitd;
 mod vmnet_network;
+mod volume_subpath;
 
 pub(crate) use self::addresses::*;
 pub(crate) use self::archive::*;
@@ -186,3 +187,4 @@ pub(crate) use self::values::*;
 pub(crate) use self::virtual_machine::*;
 pub(crate) use self::vminitd::*;
 pub(crate) use self::vmnet_network::*;
+pub(crate) use self::volume_subpath::*;

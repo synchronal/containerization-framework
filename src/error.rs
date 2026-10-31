@@ -2,6 +2,7 @@
 
 use crate::containerization_error;
 use crate::containerization_os::file_descriptor_ops;
+use crate::containerization_os::volume_subpath;
 use std::fmt;
 
 /// An error thrown by Swift or by a Rust closure, a value that could not cross
@@ -26,6 +27,13 @@ pub enum Error {
     action: String,
     /// What Swift threw.
     error: file_descriptor_ops::Error,
+  },
+  /// The call threw a `VolumeSubpath.Error`.
+  VolumeSubpath {
+    /// What was attempted, such as `take the subpath from the mount options`.
+    action: String,
+    /// What Swift threw.
+    error: volume_subpath::Error,
   },
   /// The call was not attempted, because Containerization runs only on
   /// macOS.
@@ -76,7 +84,10 @@ impl Error {
   /// What was attempted, for a caller rewording the failure.
   pub fn action(&self) -> &str {
     match self {
-      Self::Failed { action, .. } | Self::FileDescriptorOps { action, .. } | Self::Unavailable { action, .. } => action,
+      Self::Failed { action, .. }
+      | Self::FileDescriptorOps { action, .. }
+      | Self::VolumeSubpath { action, .. }
+      | Self::Unavailable { action, .. } => action,
     }
   }
 
@@ -92,6 +103,7 @@ impl fmt::Display for Error {
     match self {
       Self::Failed { action, message, .. } => write!(formatter, "could not {action}: {message}"),
       Self::FileDescriptorOps { action, error } => write!(formatter, "could not {action}: {error}"),
+      Self::VolumeSubpath { action, error } => write!(formatter, "could not {action}: {error}"),
       Self::Unavailable { action, message } => write!(formatter, "cannot {action}: {message}"),
     }
   }

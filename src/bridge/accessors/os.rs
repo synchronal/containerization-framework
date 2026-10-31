@@ -9,6 +9,7 @@ use crate::containerization_os::file_descriptor_ops;
 use crate::containerization_os::keychain;
 use crate::containerization_os::linux::binfmt;
 use crate::containerization_os::linux::proc_net_snmp;
+use crate::containerization_os::volume_subpath;
 use crate::error::Error;
 use crate::platform;
 
@@ -180,6 +181,34 @@ impl ffi::CzOutcome {
         }
       })
   }
+
+  /// The `(subpath:options:)` that `VolumeSubpath.extract(from:)` returned.
+  pub(crate) fn volume_subpath_extracted(&self) -> (String, Vec<String>) {
+    (
+      self.volume_subpath_extracted_subpath(),
+      self.volume_subpath_extracted_options(),
+    )
+  }
+
+  /// The `VolumeSubpath.Error` a failed outcome threw, if it threw one.
+  pub(crate) fn thrown_volume_subpath_error(&self) -> Option<volume_subpath::Error> {
+    self
+      .thrown_volume_subpath_error_outcome()
+      .optional(|error| match error.held_volume_subpath_error_kind() {
+        ffi::VolumeSubpathErrorKind::Invalid => volume_subpath::Error::Invalid {
+          subpath: error.held_volume_subpath_error_subpath(),
+          reason: error.held_volume_subpath_error_reason(),
+        },
+        ffi::VolumeSubpathErrorKind::Missing => volume_subpath::Error::Missing {
+          options: error.held_volume_subpath_error_options(),
+        },
+        ffi::VolumeSubpathErrorKind::NotBind => volume_subpath::Error::NotBind,
+        ffi::VolumeSubpathErrorKind::Resolve => volume_subpath::Error::Resolve {
+          subpath: error.held_volume_subpath_error_subpath(),
+          errno: error.held_volume_subpath_error_number(),
+        },
+      })
+  }
 }
 
 #[cfg(test)]
@@ -231,6 +260,33 @@ mod tests {
       ffi::cz_fd_ops_maximum_symlinks_followed(),
       containerization_os::file_descriptor_ops::MAXIMUM_SYMLINKS_FOLLOWED
     );
+  }
+
+  #[test]
+  fn copies_swifts_subpath_mount_option() {
+    assert_eq!(
+      ffi::cz_volume_subpath_to_mount_option("data/cache"),
+      containerization_os::volume_subpath::to_mount_option("data/cache")
+    );
+  }
+
+  #[test]
+  fn describes_a_volume_subpath_error_as_swift_does() {
+    let option = containerization_os::volume_subpath::to_mount_option("data");
+    let thrown = [
+      ffi::cz_volume_subpath_extract(vec!["bind".into()]),
+      ffi::cz_volume_subpath_extract(vec![option.clone(), option.clone()]),
+      ffi::cz_volume_subpath_is_subpath_mount(vec!["rbind".into(), option]),
+    ];
+
+    for outcome in thrown {
+      let message = outcome.error().expect("a thrown error");
+      let error = outcome
+        .thrown_volume_subpath_error()
+        .expect("a VolumeSubpath.Error");
+
+      assert_eq!(error.to_string(), message);
+    }
   }
 
   #[test]

@@ -28,7 +28,7 @@ extension Containerization.Mount {
       switch mount.runtimeKind() {
       case .Virtioblk: .virtioblk(options)
       case .Virtiofs: .virtiofs(options)
-      case .Shared: .shared
+      case .Shared: .shared(options.first)
       case .Generic: .any(options)
       }
 

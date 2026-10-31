@@ -1,4 +1,5 @@
-//! `Mount`, and its nested `Mount.RuntimeOptions`.
+//! `Mount`, its nested `Mount.RuntimeOptions`, and the
+//! [`SharedMountOptions`] `Mount::shared_mount` takes.
 
 use crate::cloud_hypervisor;
 use crate::containerization::strings;
@@ -11,8 +12,21 @@ use crate::platform::ffi;
 pub enum RuntimeOptions {
   Virtioblk(Vec<String>),
   Virtiofs(Vec<String>),
-  Shared,
+  /// A shared pod volume, and the path within it to bind instead of the
+  /// whole volume, if there is one.
+  Shared(Option<String>),
   Any(Vec<String>),
+}
+
+/// The defaulted arguments of
+/// `Mount.sharedMount(name:destination:options:subpath:)`. [`Default`] uses
+/// Swift's defaults: no options and no subpath.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SharedMountOptions<'a> {
+  pub options: &'a [&'a str],
+  /// A path within the volume to bind at the destination instead of the
+  /// whole volume. The guest resolves it, and it never leaves the volume.
+  pub subpath: Option<&'a str>,
 }
 
 /// `Mount`.
@@ -79,15 +93,19 @@ impl Mount {
     }
   }
 
-  /// `Mount.sharedMount(name:destination:options:)`. Swift's `options`
-  /// defaults to `[]`.
-  pub fn shared_mount(name: impl Into<String>, destination: impl Into<String>, options: &[&str]) -> Self {
+  /// `Mount.sharedMount(name:destination:options:subpath:)`, a mount of the
+  /// shared pod volume `name`.
+  pub fn shared_mount(
+    name: impl Into<String>,
+    destination: impl Into<String>,
+    options: SharedMountOptions<'_>,
+  ) -> Self {
     Self {
       r#type: "none".to_string(),
       source: name.into(),
       destination: destination.into(),
-      options: strings(options),
-      runtime_options: RuntimeOptions::Shared,
+      options: strings(options.options),
+      runtime_options: RuntimeOptions::Shared(options.subpath.map(str::to_string)),
     }
   }
 

@@ -15,7 +15,7 @@ let bridgingHeader =
 // Pinned exactly: the init image that `versions::INIT_IMAGE` names carries a
 // guest agent speaking this release's protocol. Any other library is a
 // runtime mismatch, not a compile error.
-let containerization: Version = "0.53.0"
+let containerization: Version = "0.54.0"
 
 let package = Package(
   name: "ContainerizationBridge",

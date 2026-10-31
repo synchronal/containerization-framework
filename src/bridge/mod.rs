@@ -89,8 +89,8 @@ use crate::platform::WithDescriptor as RustWithDescriptor;
 
 #[swift_bridge::bridge]
 pub(crate) mod ffi {
-  // `Mount.RuntimeOptions`, less its options. Its `any` case is `Generic`,
-  // because `Any` is a Swift keyword.
+  // `Mount.RuntimeOptions`, less its options or a `shared` mount's subpath.
+  // Its `any` case is `Generic`, because `Any` is a Swift keyword.
   enum RuntimeKind {
     Virtioblk,
     Virtiofs,
@@ -250,6 +250,14 @@ pub(crate) mod ffi {
     AlreadyExists,
     Conflict,
     SystemError,
+  }
+
+  // `VolumeSubpath.Error`, less what its cases carry.
+  enum VolumeSubpathErrorKind {
+    Invalid,
+    Missing,
+    NotBind,
+    Resolve,
   }
 
   // vmnet's `operating_modes_t`.
@@ -744,6 +752,9 @@ pub(crate) mod ffi {
     // A failed outcome's thrown `FileDescriptorOps.Error`, or `Absent`.
     #[swift_bridge(swift_name = "thrownFdOpsError")]
     fn thrown_fd_ops_error_outcome(self: &CzOutcome) -> CzOutcome;
+    // A failed outcome's thrown `VolumeSubpath.Error`, or `Absent`.
+    #[swift_bridge(swift_name = "thrownVolumeSubpathError")]
+    fn thrown_volume_subpath_error_outcome(self: &CzOutcome) -> CzOutcome;
     // Whether an optional result is there.
     #[swift_bridge(swift_name = "isSome")]
     fn is_some(self: &CzOutcome) -> bool;
@@ -2196,6 +2207,35 @@ pub(crate) mod ffi {
     fn held_fd_ops_error_operation(self: &CzOutcome) -> String;
     #[swift_bridge(swift_name = "heldFdOpsErrorNumber")]
     fn held_fd_ops_error_number(self: &CzOutcome) -> i32;
+  }
+
+  extern "Swift" {
+    // VolumeSubpath.swift
+    //
+    // `VolumeSubpath`. Rust reads the subpath and other options from the held
+    // `extract(from:)` result.
+    #[swift_bridge(swift_name = "volumeSubpathIsSubpathMount")]
+    fn cz_volume_subpath_is_subpath_mount(options: Vec<String>) -> CzOutcome;
+    #[swift_bridge(swift_name = "volumeSubpathExtract")]
+    fn cz_volume_subpath_extract(options: Vec<String>) -> CzOutcome;
+    // For a unit test: `VolumeSubpath.toMountOption(_:)`.
+    #[swift_bridge(swift_name = "volumeSubpathToMountOption")]
+    fn cz_volume_subpath_to_mount_option(subpath: &str) -> String;
+    #[swift_bridge(swift_name = "volumeSubpathExtractedSubpath")]
+    fn volume_subpath_extracted_subpath(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "volumeSubpathExtractedOptions")]
+    fn volume_subpath_extracted_options(self: &CzOutcome) -> Vec<String>;
+    // A held `VolumeSubpath.Error`'s kind, and what its case carries.
+    #[swift_bridge(swift_name = "heldVolumeSubpathErrorKind")]
+    fn held_volume_subpath_error_kind(self: &CzOutcome) -> VolumeSubpathErrorKind;
+    #[swift_bridge(swift_name = "heldVolumeSubpathErrorSubpath")]
+    fn held_volume_subpath_error_subpath(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "heldVolumeSubpathErrorReason")]
+    fn held_volume_subpath_error_reason(self: &CzOutcome) -> String;
+    #[swift_bridge(swift_name = "heldVolumeSubpathErrorOptions")]
+    fn held_volume_subpath_error_options(self: &CzOutcome) -> Vec<String>;
+    #[swift_bridge(swift_name = "heldVolumeSubpathErrorNumber")]
+    fn held_volume_subpath_error_number(self: &CzOutcome) -> i32;
   }
 
   extern "Swift" {
