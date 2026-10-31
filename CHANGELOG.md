@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.11.0
+
 - `Image`, `InitImage`, `KernelImage` and `Vminitd` implement `Clone`, as
   Swift's types are structs. A cloned `Vminitd` shares its connection, so
   closing either closes both. `ContainerManager` still doesn't implement
