@@ -45,6 +45,269 @@ fn reads_back_the_longest_nbd_timeout() {
 }
 
 #[test]
+fn shares_a_host_directory_as_a_read_only_volume() {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  let shared = directory.path().join("shared");
+  std::fs::create_dir(&shared).expect("the shared directory");
+  std::fs::write(shared.join("greeting"), "hello\n").expect("the shared file");
+  let vmm = support::store::vmm();
+  let volume = cfw::containerization::container::linux_pod::PodVolume {
+    name: "host".to_string(),
+    source: cfw::containerization::container::linux_pod::pod_volume::Source::Virtiofs {
+      path: shared.clone(),
+      read_only: true,
+    },
+    format: "virtiofs".to_string(),
+  };
+  let configured = volume.clone();
+
+  let pod = cfw::containerization::container::LinuxPod::new(
+    "cfw-test-virtiofs-pod",
+    &vmm,
+    support::vm(),
+    move |configuration| {
+      configuration.volumes = vec![configured];
+      Ok(())
+    },
+  )
+  .expect("a pod should be made");
+
+  assert_eq!(pod.config().volumes, [volume]);
+
+  let rootfs = support::store::unpack(&directory.path().join("reader.ext4"));
+  pod
+    .add_container("reader", rootfs, |configuration| {
+      support::container::keep_alive_in_pod(configuration)?;
+      configuration
+        .mounts
+        .push(cfw::containerization::container::Mount::shared_mount(
+          "host",
+          "/host",
+          Default::default(),
+        ));
+      Ok(())
+    })
+    .expect("the reader should be added");
+
+  pod.create().expect("the pod should create");
+  pod
+    .start_container("reader")
+    .expect("the reader should start");
+
+  assert_eq!(
+    sh(&pod, "reader", "read", "cat /host/greeting"),
+    (0, "hello\n".to_string()),
+    "the container sees the host's file"
+  );
+  assert_ne!(
+    sh(&pod, "reader", "write", "echo bye > /host/greeting").0,
+    0,
+    "a read-only volume refuses a write"
+  );
+
+  pod
+    .stop_container("reader")
+    .expect("the reader should stop");
+  pod.stop().expect("the pod should stop");
+  assert_eq!(
+    std::fs::read_to_string(shared.join("greeting")).expect("the shared file"),
+    "hello\n"
+  );
+}
+
+/// Runs busybox `sh` scripts in the pod's VM root rather than in a container,
+/// as upstream's `PodRootProcessTests` does. The VM root has no dynamic
+/// loader, so busybox runs through the loader in `container`'s rootfs, and
+/// `$B` runs a busybox applet.
+struct RootShell {
+  agent: cfw::containerization::vm::Vminitd,
+  loader: String,
+  busybox: String,
+}
+
+impl RootShell {
+  fn new(pod: &cfw::containerization::container::LinuxPod, container: &str) -> Self {
+    let rootfs = format!("/run/container/{container}/rootfs");
+    Self {
+      agent: pod
+        .with_virtual_machine_instance(|instance| instance.dial_agent())
+        .expect("the pod's guest agent should answer"),
+      loader: format!("{rootfs}/lib/ld-musl-aarch64.so.1"),
+      busybox: format!("{rootfs}/bin/busybox"),
+    }
+  }
+
+  /// Returns the script's exit code.
+  fn run(
+    &self,
+    id: &str,
+    script: &str,
+    capabilities: &[cfw::containerization_os::linux::CapabilityName],
+    resources: Option<cfw::containerization_oci::runtime::LinuxResources>,
+  ) -> i32 {
+    let process = cfw::containerization_oci::runtime::Process {
+      args: support::strings(&[&self.loader, &self.busybox, "sh", "-c", script]),
+      env: vec![format!("B={} {}", self.loader, self.busybox)],
+      capabilities: (!capabilities.is_empty()).then(|| {
+        cfw::containerization::process::LinuxCapabilities::with_capabilities(capabilities.to_vec())
+          .to_oci()
+          .expect("OCI capabilities")
+      }),
+      ..Default::default()
+    };
+    let spec = cfw::containerization_oci::runtime::Spec {
+      process: Some(process),
+      linux: resources.map(|resources| cfw::containerization_oci::runtime::Linux {
+        resources: Some(resources),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+
+    self
+      .agent
+      .create_process(id, None, None, None, None, None, &spec, None)
+      .unwrap_or_else(|error| panic!("{id} should be created: {error}"));
+    self
+      .agent
+      .start_process(id, None)
+      .unwrap_or_else(|error| panic!("{id} should start: {error}"));
+    let status = self
+      .agent
+      .wait_process(id, None, None)
+      .unwrap_or_else(|error| panic!("{id} should exit: {error}"));
+    self
+      .agent
+      .delete_process(id, None)
+      .unwrap_or_else(|error| panic!("{id} should be deleted: {error}"));
+    status.exit_code
+  }
+}
+
+#[test]
+fn runs_processes_in_its_vms_root() {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  let vmm = support::store::vmm();
+  let nameserver = "192.0.2.53";
+  let pod =
+    cfw::containerization::container::LinuxPod::new("cfw-test-root-pod", &vmm, support::vm(), |configuration| {
+      configuration.dns = Some(cfw::containerization::network::DNS {
+        nameservers: vec![nameserver.to_string()],
+        ..Default::default()
+      });
+      Ok(())
+    })
+    .expect("a pod should be made");
+  let rootfs = support::store::unpack(&directory.path().join("sleeper.ext4"));
+  pod
+    .add_container("sleeper", rootfs, support::container::keep_alive_in_pod)
+    .expect("the sleeper should be added");
+  pod.create().expect("the pod should create");
+  pod
+    .start_container("sleeper")
+    .expect("the sleeper should start");
+  let shell = RootShell::new(&pod, "sleeper");
+
+  assert_eq!(
+    shell.run(
+      "root-dns",
+      &format!("$B grep -qx 'nameserver {nameserver}' /etc/resolv.conf"),
+      &[],
+      None,
+    ),
+    0,
+    "the VM root's resolv.conf names the pod's nameserver"
+  );
+
+  assert_eq!(
+    shell.run(
+      "root-namespaces",
+      r#"
+      c=$($B pidof sleep) || exit 10
+      for n in cgroup ipc mnt pid uts net; do
+        [ "$($B readlink /proc/self/ns/$n)" = "$($B readlink /proc/1/ns/$n)" ] || exit 11
+      done
+      [ "$($B readlink /proc/$c/ns/mnt)" != "$($B readlink /proc/self/ns/mnt)" ] || exit 12
+      [ -f /proc/$c/root/etc/alpine-release ] || exit 13
+      "#,
+      &[cfw::containerization_os::linux::CapabilityName::SysPtrace],
+      None,
+    ),
+    0,
+    "10: no container process; 11: not in PID 1's namespaces; 12: shares the container's mount namespace; 13: can't read the container's root"
+  );
+
+  let mountpoint = "/run/root-process-probe";
+  let mount = format!("$B mount -t tmpfs tmpfs {mountpoint}");
+  shell
+    .agent
+    .mkdir(mountpoint, true, 0o755)
+    .expect("the agent should make the mountpoint");
+  let unmounted = shell
+    .agent
+    .stat("/", mountpoint)
+    .expect("the mountpoint's metadata")
+    .dev;
+  assert_ne!(
+    shell.run("root-unprivileged", &mount, &[], None),
+    0,
+    "a root process without CAP_SYS_ADMIN can't mount"
+  );
+  assert_eq!(
+    shell.run(
+      "root-privileged",
+      &mount,
+      &[cfw::containerization_os::linux::CapabilityName::SysAdmin],
+      None,
+    ),
+    0,
+    "a root process with CAP_SYS_ADMIN can mount"
+  );
+  assert_ne!(
+    shell
+      .agent
+      .stat("/", mountpoint)
+      .expect("the mountpoint's metadata")
+      .dev,
+    unmounted,
+    "the agent sees the root process's mount"
+  );
+  shell
+    .agent
+    .umount(mountpoint, 0)
+    .expect("the agent should unmount it");
+
+  let limit: i64 = 64 * 1024 * 1024;
+  assert_eq!(
+    shell.run(
+      "root-limited",
+      &format!(
+        r#"
+        [ "$($B cat /proc/self/cgroup)" = "0::/vminitd-root/root-limited" ] || exit 10
+        [ "$($B cat /sys/fs/cgroup/vminitd-root/root-limited/memory.max)" = "{limit}" ] || exit 11
+        "#
+      ),
+      &[],
+      Some(cfw::containerization_oci::runtime::LinuxResources {
+        memory: Some(cfw::containerization_oci::runtime::LinuxMemory {
+          limit: Some(limit),
+          ..Default::default()
+        }),
+        ..Default::default()
+      }),
+    ),
+    0,
+    "10: not in its own cgroup; 11: the wrong memory limit"
+  );
+
+  shell
+    .agent
+    .close()
+    .expect("the agent's connection should close");
+  pod.stop().expect("the pod should stop");
+}
+
+#[test]
 fn resumes_a_panic_in_a_containers_configuration_on_the_callers_thread() {
   let directory = tempfile::tempdir().expect("a temporary directory");
   let vmm = support::store::vmm();

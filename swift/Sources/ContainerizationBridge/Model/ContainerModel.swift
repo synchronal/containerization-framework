@@ -193,6 +193,8 @@ extension LinuxPod.PodVolume {
       case .DiskImage:
         .diskImage(path: try lentPath(location, "volume", volume.lossyLocation), readOnly: volume.readOnly())
       case .Tmpfs: .tmpfs(sizeBytes: volume.sizeBytes())
+      case .Virtiofs:
+        .virtiofs(path: try lentPath(location, "volume", volume.lossyLocation), readOnly: volume.readOnly())
       }
 
     self.init(name: volume.name().toString(), source: source, format: volume.format().toString())
@@ -374,6 +376,8 @@ func fill(_ built: RustPodConfigurationRefMut, from configuration: LinuxPod.Conf
       built.pushVolume(name, format, .DiskImage, rust(path.path(percentEncoded: false)), nil, readOnly, nil)
     case .tmpfs(let sizeBytes):
       built.pushVolume(name, format, .Tmpfs, rust(""), nil, false, sizeBytes)
+    case .virtiofs(let path, let readOnly):
+      built.pushVolume(name, format, .Virtiofs, rust(path.path(percentEncoded: false)), nil, readOnly, nil)
     }
   }
 }

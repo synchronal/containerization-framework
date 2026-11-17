@@ -1,6 +1,7 @@
 //! `RegistryClient`, and the options its inits take:
 //! [`RegistryClientReferenceOptions`] for the reference init and
-//! [`RegistryClientOptions`] for the host init.
+//! [`RegistryClientOptions`] for the host init. [`CatalogOptions`] holds
+//! `catalog`'s defaulted arguments.
 //!
 //! Neither init takes Swift's `tlsConfiguration` or `logger`, which are
 //! swift-nio and swift-log types.
@@ -48,6 +49,28 @@ impl Default for RegistryClientOptions {
   }
 }
 
+/// `RegistryClient.catalog(prefix:maxEntries:)`'s defaulted arguments.
+/// [`Default`] uses Swift's defaults: no prefix, and
+/// [`RegistryClient::DEFAULT_MAX_LIST_ENTRIES`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CatalogOptions<'a> {
+  /// Only repositories with this prefix are returned. `None` or an empty
+  /// prefix returns every repository.
+  pub prefix: Option<&'a str>,
+  /// The most entries to fetch from the registry, counted before the prefix
+  /// filter. The call fails if the registry returns more.
+  pub max_entries: isize,
+}
+
+impl Default for CatalogOptions<'_> {
+  fn default() -> Self {
+    Self {
+      prefix: None,
+      max_entries: RegistryClient::DEFAULT_MAX_LIST_ENTRIES,
+    }
+  }
+}
+
 /// `RegistryClient`. Every method talks to the registry.
 pub struct RegistryClient {
   handle: ffi::CzRegistryClient,
@@ -60,6 +83,10 @@ unsafe impl Send for RegistryClient {}
 unsafe impl Sync for RegistryClient {}
 
 impl RegistryClient {
+  /// `RegistryClient.defaultMaxListEntries`, the default limit on the entries
+  /// [`Self::tags`] and [`Self::catalog`] collect.
+  pub const DEFAULT_MAX_LIST_ENTRIES: isize = 10_000;
+
   /// `RegistryClient(reference:insecure:auth:)`, which retries a request that
   /// fails or that a server error answers.
   pub fn new(reference: &str, options: RegistryClientReferenceOptions) -> Result<Self, Error> {
@@ -145,13 +172,22 @@ impl RegistryClient {
     Ok((outcome.written_size(), outcome.written_digest()))
   }
 
-  /// `RegistryClient.catalog(prefix:)`. Swift's `prefix` defaults to `nil`.
-  pub fn catalog(&self, prefix: Option<&str>) -> Result<Vec<String>, Error> {
+  /// `RegistryClient.catalog(prefix:maxEntries:)`.
+  pub fn catalog(&self, options: CatalogOptions<'_>) -> Result<Vec<String>, Error> {
     platform::outcome(
-      self.handle.catalog(prefix.map(str::to_string)),
+      self
+        .handle
+        .catalog(options.prefix.map(str::to_string), options.max_entries),
       "list the registry's repositories",
     )
     .map(|outcome| outcome.strings())
+  }
+
+  /// `RegistryClient.tags(name:maxEntries:)`. Swift's `maxEntries` defaults
+  /// to [`Self::DEFAULT_MAX_LIST_ENTRIES`].
+  pub fn tags(&self, name: &str, max_entries: isize) -> Result<Vec<String>, Error> {
+    platform::outcome(self.handle.tags(name, max_entries), format!("list the tags of {name}"))
+      .map(|outcome| outcome.strings())
   }
 
   /// `RegistryClient.referrers(name:digest:artifactType:)`. Swift's

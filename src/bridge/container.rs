@@ -151,9 +151,9 @@ mod ffi {
     fn hard(self: &RustLinuxRLimit) -> u64;
     fn soft(self: &RustLinuxRLimit) -> u64;
 
-    // `location` is an `nbd` source's URL or a `diskImage`'s path. It is
-    // `None` if the path isn't UTF-8, and Swift throws, naming it by
-    // `lossyLocation`.
+    // `location` is an `nbd` source's URL, or a `diskImage`'s or `virtiofs`
+    // source's path. It is `None` if the path isn't UTF-8, and Swift throws,
+    // naming it by `lossyLocation`.
     type RustPodVolume;
     fn name(self: &RustPodVolume) -> &str;
     fn format(self: &RustPodVolume) -> &str;

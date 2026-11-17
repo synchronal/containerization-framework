@@ -63,6 +63,25 @@ fn makes_a_client_for_a_host() {
 }
 
 #[test]
+fn lists_a_repositorys_tags() {
+  let client = cfw::containerization_oci::client::RegistryClient::new(support::store::IMAGE, Default::default())
+    .expect("a client for the suite's registry");
+
+  let tags = client
+    .tags(
+      NAME,
+      cfw::containerization_oci::client::RegistryClient::DEFAULT_MAX_LIST_ENTRIES,
+    )
+    .expect("the tags should list");
+  assert!(tags.iter().any(|tag| tag == TAG), "{TAG} should be listed: {tags:?}");
+
+  let error = client
+    .tags(NAME, 1)
+    .expect_err("more tags than the limit should fail");
+  assert!(error.to_string().contains("exceeded 1 entries"), "{error}");
+}
+
+#[test]
 fn says_which_reference_it_could_not_make_a_client_for() {
   let error = cfw::containerization_oci::client::RegistryClient::new("Not A Reference", Default::default())
     .expect_err("a malformed reference");

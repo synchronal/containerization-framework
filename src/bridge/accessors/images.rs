@@ -211,6 +211,14 @@ mod tests {
   }
 
   #[test]
+  fn copies_swifts_default_max_list_entries() {
+    assert_eq!(
+      ffi::cz_registry_client_default_max_list_entries(),
+      containerization_oci::client::RegistryClient::DEFAULT_MAX_LIST_ENTRIES
+    );
+  }
+
+  #[test]
   fn copies_swifts_kernel_media_type() {
     assert_eq!(
       ffi::cz_kernel_image_media_type(),

@@ -63,6 +63,10 @@ impl linux_pod::Configuration {
         read_only,
       },
       ffi::PodVolumeKind::Tmpfs => pod_volume::Source::Tmpfs { size_bytes },
+      ffi::PodVolumeKind::Virtiofs => pod_volume::Source::Virtiofs {
+        path: PathBuf::from(location),
+        read_only,
+      },
     };
 
     self
@@ -93,15 +97,16 @@ impl linux_pod::PodVolume {
       pod_volume::Source::Nbd { .. } => ffi::PodVolumeKind::Nbd,
       pod_volume::Source::DiskImage { .. } => ffi::PodVolumeKind::DiskImage,
       pod_volume::Source::Tmpfs { .. } => ffi::PodVolumeKind::Tmpfs,
+      pod_volume::Source::Virtiofs { .. } => ffi::PodVolumeKind::Virtiofs,
     }
   }
 
-  /// An `nbd` source's URL or a `diskImage`'s path, and empty for a `tmpfs`.
-  /// It is `None` if a `diskImage`'s path isn't UTF-8.
+  /// An `nbd` source's URL, or a `diskImage`'s or `virtiofs` source's path,
+  /// and empty for a `tmpfs`. It is `None` if a path isn't UTF-8.
   pub(crate) fn location(&self) -> Option<String> {
     match &self.source {
       pod_volume::Source::Nbd { url, .. } => Some(url.clone()),
-      pod_volume::Source::DiskImage { path, .. } => accessors::path(path),
+      pod_volume::Source::DiskImage { path, .. } | pod_volume::Source::Virtiofs { path, .. } => accessors::path(path),
       pod_volume::Source::Tmpfs { .. } => Some(String::new()),
     }
   }
@@ -111,7 +116,9 @@ impl linux_pod::PodVolume {
   pub(crate) fn lossy_location(&self) -> String {
     match &self.source {
       pod_volume::Source::Nbd { url, .. } => url.clone(),
-      pod_volume::Source::DiskImage { path, .. } => accessors::lossy_path(path),
+      pod_volume::Source::DiskImage { path, .. } | pod_volume::Source::Virtiofs { path, .. } => {
+        accessors::lossy_path(path)
+      }
       pod_volume::Source::Tmpfs { .. } => String::new(),
     }
   }
@@ -126,7 +133,9 @@ impl linux_pod::PodVolume {
 
   pub(crate) fn read_only(&self) -> bool {
     match self.source {
-      pod_volume::Source::Nbd { read_only, .. } | pod_volume::Source::DiskImage { read_only, .. } => read_only,
+      pod_volume::Source::Nbd { read_only, .. }
+      | pod_volume::Source::DiskImage { read_only, .. }
+      | pod_volume::Source::Virtiofs { read_only, .. } => read_only,
       pod_volume::Source::Tmpfs { .. } => false,
     }
   }

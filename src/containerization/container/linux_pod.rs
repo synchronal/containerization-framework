@@ -128,6 +128,9 @@ pub mod pod_volume {
     DiskImage { path: PathBuf, read_only: bool },
     /// `.tmpfs(sizeBytes:)`, a volume in the guest's memory.
     Tmpfs { size_bytes: Option<u64> },
+    /// `.virtiofs(path:readOnly:)`, a host directory shared over virtio-fs.
+    /// Swift's `readOnly` defaults to `true`.
+    Virtiofs { path: PathBuf, read_only: bool },
   }
 }
 

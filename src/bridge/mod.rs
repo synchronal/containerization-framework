@@ -293,6 +293,7 @@ pub(crate) mod ffi {
     Nbd,
     DiskImage,
     Tmpfs,
+    Virtiofs,
   }
 
   extern "Rust" {
@@ -2537,7 +2538,16 @@ pub(crate) mod ffi {
       into: &str,
       progress: RustProgressHandler,
     ) -> CzOutcome;
-    fn catalog(self: &CzRegistryClient, prefix: Option<String>) -> CzOutcome;
+    fn catalog(
+      self: &CzRegistryClient,
+      prefix: Option<String>,
+      #[swift_bridge(label = "maxEntries")] max_entries: isize,
+    ) -> CzOutcome;
+    fn tags(self: &CzRegistryClient, name: &str, #[swift_bridge(label = "maxEntries")] max_entries: isize)
+    -> CzOutcome;
+    // For a test that compares Rust's copy with it.
+    #[swift_bridge(swift_name = "registryClientDefaultMaxListEntries")]
+    fn cz_registry_client_default_max_list_entries() -> isize;
     fn referrers(
       self: &CzRegistryClient,
       name: &str,

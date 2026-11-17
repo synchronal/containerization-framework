@@ -43,6 +43,10 @@ func registryClientWithHost(
   }
 }
 
+func registryClientDefaultMaxListEntries() -> Int {
+  RegistryClient.defaultMaxListEntries
+}
+
 final class CzRegistryClient: Sendable {
   let client: RegistryClient
 
@@ -82,10 +86,16 @@ final class CzRegistryClient: Sendable {
     }
   }
 
-  func catalog(prefix: RustString?) -> CzOutcome {
+  func catalog(prefix: RustString?, maxEntries: Int) -> CzOutcome {
     let prefix = prefix?.toString()
 
-    return .awaiting { try await self.client.catalog(prefix: prefix) }
+    return .awaiting { try await self.client.catalog(prefix: prefix, maxEntries: maxEntries) }
+  }
+
+  func tags(name: RustStr, maxEntries: Int) -> CzOutcome {
+    let name = name.toString()
+
+    return .awaiting { try await self.client.tags(name: name, maxEntries: maxEntries) }
   }
 
   func referrers(name: RustStr, digest: RustStr, artifactType: RustString?) -> CzOutcome {

@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- Update Containerization to 0.55.0. Use the matching init image,
+  `ghcr.io/apple/containerization/vminit:0.55.0`, which `versions::INIT_IMAGE`
+  now pins.
+  - A pod volume can share a host directory over virtio-fs.
+    `pod_volume::Source::Virtiofs` binds `.virtiofs(path:readOnly:)`, whose
+    `readOnly` defaults to `true` in Swift.
+  - `RegistryClient::tags` binds `RegistryClient.tags(name:maxEntries:)`,
+    which lists a repository's tags.
+  - `RegistryClient::catalog` takes Swift's new `maxEntries` argument, and
+    both calls fail when the registry returns more entries than that.
+    `RegistryClient::DEFAULT_MAX_LIST_ENTRIES` binds
+    `RegistryClient.defaultMaxListEntries`, the default limit.
+  - A pod's DNS configuration now also applies to processes that run in the
+    VM's root rather than in a container. Swift made this change, and it
+    needs no new binding.
+
+### Breaking changes
+
+- `RegistryClient::catalog` takes a `CatalogOptions` in place of its `prefix`
+  argument. `CatalogOptions` holds Swift's two defaulted arguments, `prefix`
+  and `max_entries`.
+- `pod_volume::Source` has a new `Virtiofs` variant, so an exhaustive match
+  on it needs a new arm.
+
 ## v0.11.0
 
 - `Image`, `InitImage`, `KernelImage` and `Vminitd` implement `Clone`, as

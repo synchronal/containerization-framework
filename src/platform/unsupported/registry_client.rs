@@ -30,6 +30,7 @@ uninhabited!(CzRegistryClient {
   fn resolve(&str, &str) -> CzOutcome;
   fn fetch_data(&str, containerization_oci::image::Descriptor) -> CzOutcome;
   fn fetch_blob(&str, containerization_oci::image::Descriptor, &str, platform::Progress) -> CzOutcome;
-  fn catalog(Option<String>) -> CzOutcome;
+  fn catalog(Option<String>, isize) -> CzOutcome;
+  fn tags(&str, isize) -> CzOutcome;
   fn referrers(&str, &str, Option<String>) -> CzOutcome;
 });
