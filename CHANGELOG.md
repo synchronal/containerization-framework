@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.13.0
+
 - Update Containerization to 0.57.0. Use the matching init image,
   `ghcr.io/apple/containerization/vminit:0.57.0`, which `versions::INIT_IMAGE`
   now pins.
