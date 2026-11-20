@@ -2714,6 +2714,69 @@ pub(crate) mod ffi {
     fn name(self: &CzInitImage) -> String;
     #[swift_bridge(swift_name = "initBlock")]
     fn init_block(self: &CzInitImage, at: &str, platform: RustSystemPlatform) -> CzOutcome;
+
+    // An `[Image]` that Rust fills, for `SnapshotManager.delete(keeping:)`:
+    // swift-bridge 0.1.59 can't pass a `Vec` of a Swift type.
+    type CzImageList;
+    #[swift_bridge(swift_name = "newImageList")]
+    fn cz_image_list_new() -> CzImageList;
+    fn push(self: &CzImageList, image: CzImage);
+  }
+
+  extern "Swift" {
+    // SnapshotManager.swift
+    //
+    // Each method takes the image as a `duplicate()`, and its platform as
+    // `ImageStore`'s do, with `Platform.current` for none. `unpack` and `get`
+    // return the snapshot's path, and `get` returns `Absent` for `nil`.
+    // `delete` returns the unlabeled `([String], UInt64)` that `strings` and
+    // `number` read.
+    type CzSnapshotManager;
+    #[swift_bridge(swift_name = "snapshotManager")]
+    fn snapshot_manager(self: &CzOutcome) -> CzSnapshotManager;
+    #[swift_bridge(swift_name = "snapshotManager")]
+    fn cz_snapshot_manager_new(
+      path: &str,
+      #[swift_bridge(label = "capacityInBytes")] capacity_in_bytes: u64,
+    ) -> CzOutcome;
+    fn duplicate(self: &CzSnapshotManager) -> CzSnapshotManager;
+    fn path(self: &CzSnapshotManager) -> String;
+    fn unpack(
+      self: &CzSnapshotManager,
+      image: CzImage,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+      progress: RustProgressHandler,
+    ) -> CzOutcome;
+    fn get(
+      self: &CzSnapshotManager,
+      image: CzImage,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "snapshotKey")]
+    fn cz_snapshot_manager_key(
+      image: CzImage,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+    ) -> CzOutcome;
+    #[swift_bridge(swift_name = "clone")]
+    fn clone_to(
+      self: &CzSnapshotManager,
+      image: CzImage,
+      #[swift_bridge(label = "hasPlatform")] has_platform: bool,
+      platform: RustPlatform,
+      to: &str,
+    ) -> CzOutcome;
+    fn delete(self: &CzSnapshotManager, keeping: CzImageList) -> CzOutcome;
+
+    // A `SnapshotManager?`, for the container manager's inits, as a
+    // `CzNetwork` is a `Network?`.
+    type CzSnapshots;
+    #[swift_bridge(swift_name = "noSnapshots")]
+    fn cz_no_snapshots() -> CzSnapshots;
+    #[swift_bridge(swift_name = "asSnapshots")]
+    fn as_snapshots(self: &CzSnapshotManager) -> CzSnapshots;
   }
 
   extern "Swift" {
@@ -2736,6 +2799,7 @@ pub(crate) mod ffi {
       network: CzNetwork,
       rosetta: bool,
       #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+      snapshots: CzSnapshots,
     ) -> CzOutcome;
     #[swift_bridge(swift_name = "containerManager")]
     fn container_manager_with_initfs_reference(
@@ -2745,6 +2809,7 @@ pub(crate) mod ffi {
       network: CzNetwork,
       rosetta: bool,
       #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+      snapshots: CzSnapshots,
     ) -> CzOutcome;
     #[swift_bridge(swift_name = "containerManagerAtRoot")]
     fn cz_container_manager_at_root(
@@ -2754,6 +2819,7 @@ pub(crate) mod ffi {
       network: CzNetwork,
       rosetta: bool,
       #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+      snapshots: CzSnapshots,
     ) -> CzOutcome;
     #[swift_bridge(swift_name = "containerManagerAtRoot")]
     fn cz_container_manager_at_root_with_initfs_reference(
@@ -2763,9 +2829,12 @@ pub(crate) mod ffi {
       network: CzNetwork,
       rosetta: bool,
       #[swift_bridge(label = "nestedVirtualization")] nested_virtualization: bool,
+      snapshots: CzSnapshots,
     ) -> CzOutcome;
     #[swift_bridge(swift_name = "imageStore")]
     fn image_store(self: &CzContainerManager) -> CzImageStore;
+    // Holds a `CzSnapshotManager`, or `Absent` for `nil`.
+    fn snapshots(self: &CzContainerManager) -> CzOutcome;
     #[swift_bridge(swift_name = "createFromReference")]
     fn create_from_reference(
       self: &CzContainerManager,
@@ -2796,7 +2865,11 @@ pub(crate) mod ffi {
       configuration: RustConfigure,
     ) -> CzOutcome;
     #[swift_bridge(swift_name = "containerManager")]
-    fn cz_container_manager_with_vmm(vmm: CzVirtualMachineManager, network: CzNetwork) -> CzOutcome;
+    fn cz_container_manager_with_vmm(
+      vmm: CzVirtualMachineManager,
+      network: CzNetwork,
+      snapshots: CzSnapshots,
+    ) -> CzOutcome;
     #[swift_bridge(swift_name = "releaseNetwork")]
     fn release_network(self: &CzContainerManager, id: &str) -> CzOutcome;
     fn delete(self: &CzContainerManager, id: &str) -> CzOutcome;
@@ -3268,5 +3341,7 @@ pub(crate) mod ffi {
     fn close_container_stdin(self: &CzLinuxPod, id: &str) -> CzOutcome;
     #[swift_bridge(swift_name = "relayUnixSocket")]
     fn relay_unix_socket(self: &CzLinuxPod, id: &str, socket: CzUnixSocketConfiguration) -> CzOutcome;
+    #[swift_bridge(swift_name = "attachVolume")]
+    fn attach_volume(self: &CzLinuxPod, volume: RustPodVolume) -> CzOutcome;
   }
 }

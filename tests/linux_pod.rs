@@ -307,6 +307,86 @@ fn runs_processes_in_its_vms_root() {
   pod.stop().expect("the pod should stop");
 }
 
+/// VZ can't add a container to a running pod, so the guest's mount table
+/// shows the attached volume rather than a container that mounts it.
+#[test]
+fn attaches_a_volume_while_running() {
+  let directory = tempfile::tempdir().expect("a temporary directory");
+  let vmm = support::store::vmm();
+  let tmpfs = |name: &str, size_bytes: Option<u64>| cfw::containerization::container::linux_pod::PodVolume {
+    name: name.to_string(),
+    source: cfw::containerization::container::linux_pod::pod_volume::Source::Tmpfs { size_bytes },
+    format: "tmpfs".to_string(),
+  };
+  let declared = tmpfs("declared", None);
+  let pod =
+    cfw::containerization::container::LinuxPod::new("cfw-test-attach-pod", &vmm, support::vm(), move |configuration| {
+      configuration.volumes = vec![declared];
+      Ok(())
+    })
+    .expect("a pod should be made");
+  let rootfs = support::store::unpack(&directory.path().join("sleeper.ext4"));
+  pod
+    .add_container("sleeper", rootfs, support::container::keep_alive_in_pod)
+    .expect("the sleeper should be added");
+
+  let error = pod
+    .attach_volume(tmpfs("early", None))
+    .expect_err("a pod that isn't created attaches nothing");
+  assert!(
+    error.is_code(cfw::containerization_error::Code::InvalidState),
+    "{error}"
+  );
+
+  pod.create().expect("the pod should create");
+  pod
+    .start_container("sleeper")
+    .expect("the sleeper should start");
+  pod
+    .attach_volume(tmpfs("attached", Some(64 * 1024 * 1024)))
+    .expect("a running pod attaches a tmpfs volume");
+
+  let shell = RootShell::new(&pod, "sleeper");
+  assert_eq!(
+    shell.run(
+      "attached-mount",
+      "$B grep ' /run/volumes/attached tmpfs ' /proc/mounts | $B grep -q 'size=65536k'",
+      &[],
+      None,
+    ),
+    0,
+    "the guest mounts the attached tmpfs at its size"
+  );
+  shell
+    .agent
+    .close()
+    .expect("the agent's connection should close");
+
+  for name in ["declared", "attached"] {
+    let error = pod
+      .attach_volume(tmpfs(name, None))
+      .expect_err("a pod refuses a volume name it has");
+    assert!(
+      error.is_code(cfw::containerization_error::Code::InvalidArgument),
+      "{name}: {error}"
+    );
+  }
+
+  let error = pod
+    .attach_volume(cfw::containerization::container::linux_pod::PodVolume {
+      name: "shared".to_string(),
+      source: cfw::containerization::container::linux_pod::pod_volume::Source::Virtiofs {
+        path: directory.path().to_path_buf(),
+        read_only: true,
+      },
+      format: "virtiofs".to_string(),
+    })
+    .expect_err("a virtiofs volume can't be attached to a running pod");
+  assert!(error.is_code(cfw::containerization_error::Code::Unsupported), "{error}");
+
+  pod.stop().expect("the pod should stop");
+}
+
 #[test]
 fn resumes_a_panic_in_a_containers_configuration_on_the_callers_thread() {
   let directory = tempfile::tempdir().expect("a temporary directory");

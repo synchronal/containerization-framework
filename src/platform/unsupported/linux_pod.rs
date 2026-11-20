@@ -47,4 +47,5 @@ uninhabited!(CzLinuxPod {
   fn filesystem_operation(&str, FilesystemOperationKind, &str) -> CzOutcome;
   fn close_container_stdin(&str) -> CzOutcome;
   fn relay_unix_socket(&str, CzUnixSocketConfiguration) -> CzOutcome;
+  fn attach_volume(container::linux_pod::PodVolume) -> CzOutcome;
 });

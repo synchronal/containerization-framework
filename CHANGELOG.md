@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- Update Containerization to 0.57.0. Use the matching init image,
+  `ghcr.io/apple/containerization/vminit:0.57.0`, which `versions::INIT_IMAGE`
+  now pins.
+  - `image::SnapshotManager` binds `SnapshotManager`, which keeps each
+    image's root filesystem unpacked once, as an ext4 snapshot, and clones
+    it for each container. On macOS a clone is copy-on-write, so the
+    snapshots must be on the same APFS volume as the clones. Its `clone`
+    is bound as `clone_to`, because `SnapshotManager` implements `Clone`.
+    `unpack` takes `snapshot_manager::UnpackOptions`, which holds Swift's
+    two defaulted arguments, `platform` and `progress`.
+  - A `ContainerManager` made with snapshots creates each container's root
+    filesystem as a clone of the image's snapshot. `ContainerManagerOptions`
+    has a new `snapshots` field, and `ContainerManager::snapshots` binds
+    `ContainerManager.snapshots`.
+  - `LinuxPod::attach_volume` binds `LinuxPod.attachVolume(_:)`, which
+    mounts a tmpfs or disk image volume in a running pod.
+  - `vminitd` now truncates a file that `writeFile` replaces rather than
+    appends to, and sets a container's hostname by its length in bytes, so a
+    multi-byte hostname is no longer cut short.
+
+### Breaking changes
+
+- `ContainerManager::with_vmm` takes a `WithVmmOptions` in place of its
+  `network` argument. `WithVmmOptions` holds Swift's two defaulted
+  arguments, `network` and `snapshots`.
+- `ContainerManagerOptions` has a new public field, so a struct literal
+  without `..Default::default()` needs to name it.
+
 ## v0.12.0
 
 - Update Containerization to 0.55.0. Use the matching init image,

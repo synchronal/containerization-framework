@@ -143,6 +143,63 @@ fn reaches_its_store_and_creates_from_a_reference() {
 }
 
 #[test]
+fn creates_a_container_from_its_snapshots() {
+  let store = support::store::image_store();
+  let image = support::store::image(&store);
+  // Clones need the snapshots on the store's volume, so they go in the store.
+  let path = support::store::root().join("snapshots-test-manager");
+  let _ = std::fs::remove_dir_all(&path);
+  let snapshots = cfw::containerization::image::SnapshotManager::new(&path, support::TEST_ROOTFS_SIZE_IN_BYTES)
+    .expect("a snapshot manager should be made");
+  let mut manager = support::store::manager_with(
+    &store,
+    cfw::containerization::container::container_manager::ContainerManagerOptions {
+      snapshots: Some(snapshots.clone()),
+      ..Default::default()
+    },
+  );
+  let name = "cfw-test-manager-snapshots";
+
+  assert_eq!(
+    manager
+      .snapshots()
+      .expect("the manager keeps its snapshots")
+      .path(),
+    path
+  );
+  assert!(
+    support::store::manager(&store).snapshots().is_none(),
+    "a manager has no snapshots by default"
+  );
+
+  // A run that died before deleting its container may have left it behind.
+  let _ = manager.delete(name);
+
+  let container = manager
+    .create(
+      name,
+      &image,
+      cfw::containerization::container::container_manager::CreateOptions {
+        networking: false,
+        ..Default::default()
+      },
+      |_| Ok(()),
+    )
+    .expect("the manager should create from a snapshot");
+
+  assert_eq!(container.id(), name);
+  assert!(
+    snapshots
+      .get(&image, None)
+      .expect("Swift looks for the snapshot")
+      .is_some(),
+    "creating the container unpacked the image into the snapshots"
+  );
+  manager.delete(name).expect("the container should delete");
+  std::fs::remove_dir_all(&path).expect("the snapshots should be removable");
+}
+
+#[test]
 fn opens_a_store_at_its_root() {
   let kernel = support::store::kernel();
   let _lock = support::store::initfs_lock();
@@ -161,7 +218,7 @@ fn opens_a_store_at_its_root() {
 #[test]
 fn makes_a_manager_on_the_default_store() {
   let vmm = support::store::vmm();
-  let manager = cfw::containerization::container::ContainerManager::with_vmm(&vmm, None)
+  let manager = cfw::containerization::container::ContainerManager::with_vmm(&vmm, Default::default())
     .expect("a manager should be made on the VM manager");
 
   assert_eq!(

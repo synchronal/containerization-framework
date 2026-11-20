@@ -176,6 +176,14 @@ final class CzLinuxPod: Sendable {
 
     return .awaiting { try await self.pod.relayUnixSocket(id, socket: socket) }
   }
+
+  func attachVolume(volume: RustPodVolume) -> CzOutcome {
+    CzOutcome {
+      let volume = try LinuxPod.PodVolume(volume)
+
+      return try blocking { try await self.pod.attachVolume(volume) }
+    }
+  }
 }
 
 extension CzOutcome {

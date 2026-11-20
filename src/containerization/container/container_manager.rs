@@ -1,6 +1,6 @@
 //! `ContainerManager`, the options for its initializers:
-//! [`ContainerManagerOptions`], and the options for its `create`s:
-//! [`CreateOptions`] and [`CreateWithRootfsOptions`].
+//! [`ContainerManagerOptions`] and [`WithVmmOptions`], and the options for its
+//! `create`s: [`CreateOptions`] and [`CreateWithRootfsOptions`].
 
 use super::LinuxContainer;
 use super::Mount;
@@ -18,7 +18,7 @@ use std::path::Path;
 
 /// The defaulted arguments of `ContainerManager`'s initializers, after the
 /// image store or root. [`Default`] uses Swift's defaults: no network, no
-/// Rosetta, and no nested virtualization.
+/// Rosetta, no nested virtualization, and no snapshots.
 #[derive(Debug, Default)]
 pub struct ContainerManagerOptions {
   /// Swift's `Network?`, of which `VmnetNetwork` is the conforming type on
@@ -26,6 +26,19 @@ pub struct ContainerManagerOptions {
   pub network: Option<network::VmnetNetwork>,
   pub rosetta: bool,
   pub nested_virtualization: bool,
+  /// The snapshots that [`ContainerManager::create`] and
+  /// [`ContainerManager::create_with_reference`] clone root filesystems from.
+  pub snapshots: Option<image::SnapshotManager>,
+}
+
+/// The defaulted arguments of `ContainerManager(vmm:network:snapshots:logger:)`.
+/// [`Default`] uses Swift's defaults: no network and no snapshots.
+#[derive(Debug, Default)]
+pub struct WithVmmOptions {
+  /// Swift's `Network?`, as in [`ContainerManagerOptions::network`].
+  pub network: Option<network::VmnetNetwork>,
+  /// As in [`ContainerManagerOptions::snapshots`].
+  pub snapshots: Option<image::SnapshotManager>,
 }
 
 /// `ContainerManager.create(_:image:...)`'s defaulted arguments, between the
@@ -34,6 +47,8 @@ pub struct ContainerManagerOptions {
 /// layer, writable, networked, `VMResources.default`, and no progress
 /// handler.
 pub struct CreateOptions {
+  /// Ignored when the manager has snapshots, whose clones keep the
+  /// snapshot's capacity.
   pub rootfs_size_in_bytes: u64,
   pub writable_layer_size_in_bytes: Option<u64>,
   pub read_only: bool,
@@ -107,7 +122,7 @@ unsafe impl Send for ContainerManager {}
 unsafe impl Sync for ContainerManager {}
 
 impl ContainerManager {
-  /// `ContainerManager(kernel:initfs:imageStore:network:rosetta:nestedVirtualization:)`.
+  /// `ContainerManager(kernel:initfs:imageStore:network:rosetta:nestedVirtualization:snapshots:logger:)`.
   pub fn new(
     kernel: &vm::Kernel,
     initfs: &Mount,
@@ -121,12 +136,13 @@ impl ContainerManager {
         network_crossing(options.network),
         options.rosetta,
         options.nested_virtualization,
+        snapshots_crossing(options.snapshots),
       ),
       "make a container manager",
     )
   }
 
-  /// `ContainerManager(kernel:initfsReference:imageStore:network:rosetta:nestedVirtualization:)`.
+  /// `ContainerManager(kernel:initfsReference:imageStore:network:rosetta:nestedVirtualization:snapshots:logger:)`.
   pub fn with_initfs_reference(
     kernel: &vm::Kernel,
     initfs_reference: &str,
@@ -140,12 +156,13 @@ impl ContainerManager {
         network_crossing(options.network),
         options.rosetta,
         options.nested_virtualization,
+        snapshots_crossing(options.snapshots),
       ),
       format!("make a container manager booting {initfs_reference}"),
     )
   }
 
-  /// `ContainerManager(kernel:initfs:root:network:rosetta:nestedVirtualization:)`.
+  /// `ContainerManager(kernel:initfs:root:network:rosetta:nestedVirtualization:snapshots:logger:)`.
   /// A `None` root uses [`image::ImageStore::default_store`].
   pub fn at_root(
     kernel: &vm::Kernel,
@@ -161,12 +178,13 @@ impl ContainerManager {
         network_crossing(options.network),
         options.rosetta,
         options.nested_virtualization,
+        snapshots_crossing(options.snapshots),
       ),
       "make a container manager",
     )
   }
 
-  /// `ContainerManager(kernel:initfsReference:root:network:rosetta:nestedVirtualization:)`.
+  /// `ContainerManager(kernel:initfsReference:root:network:rosetta:nestedVirtualization:snapshots:logger:)`.
   /// A `None` root uses [`image::ImageStore::default_store`].
   pub fn at_root_with_initfs_reference(
     kernel: &vm::Kernel,
@@ -182,17 +200,21 @@ impl ContainerManager {
         network_crossing(options.network),
         options.rosetta,
         options.nested_virtualization,
+        snapshots_crossing(options.snapshots),
       ),
       format!("make a container manager booting {initfs_reference}"),
     )
   }
 
-  /// `ContainerManager(vmm:network:logger:)`, which uses
-  /// [`image::ImageStore::default_store`]. Swift's `network` defaults to
-  /// `nil`.
-  pub fn with_vmm(vmm: &vm::VZVirtualMachineManager, network: Option<network::VmnetNetwork>) -> Result<Self, Error> {
+  /// `ContainerManager(vmm:network:snapshots:logger:)`, which uses
+  /// [`image::ImageStore::default_store`].
+  pub fn with_vmm(vmm: &vm::VZVirtualMachineManager, options: WithVmmOptions) -> Result<Self, Error> {
     Self::made(
-      ffi::cz_container_manager_with_vmm(vmm.handle.duplicate(), network_crossing(network)),
+      ffi::cz_container_manager_with_vmm(
+        vmm.handle.duplicate(),
+        network_crossing(options.network),
+        snapshots_crossing(options.snapshots),
+      ),
       "make a container manager",
     )
   }
@@ -210,10 +232,20 @@ impl ContainerManager {
     }
   }
 
+  /// `ContainerManager.snapshots`.
+  pub fn snapshots(&self) -> Option<image::SnapshotManager> {
+    let outcome = self.handle.snapshots();
+
+    outcome.is_some().then(|| image::SnapshotManager {
+      handle: outcome.snapshot_manager(),
+    })
+  }
+
   /// `ContainerManager.create(_:reference:rootfsSizeInBytes:writableLayerSizeInBytes:readOnly:networking:vm:progress:configuration:)`.
   /// The manager's store pulls the image if it doesn't have it.
   ///
-  /// `configuration` runs as [`Self::create`]'s does.
+  /// `configuration` runs as [`Self::create`]'s does, and the root filesystem
+  /// comes from the manager's snapshots as it does there.
   pub fn create_with_reference(
     &mut self,
     id: &str,
@@ -243,6 +275,11 @@ impl ContainerManager {
   }
 
   /// `ContainerManager.create(_:image:rootfsSizeInBytes:writableLayerSizeInBytes:readOnly:networking:vm:progress:configuration:)`.
+  ///
+  /// If the manager has snapshots, the root filesystem is a clone of the
+  /// image's snapshot, and Swift unpacks the image into the snapshots first if
+  /// it has none. The snapshots' directory must then be on the same APFS
+  /// volume as the image store.
   ///
   /// `configuration` runs on another thread, as Swift's closure does, against
   /// the configuration the manager seeded. If it returns an error, `create`
@@ -334,5 +371,13 @@ fn network_crossing(network: Option<network::VmnetNetwork>) -> ffi::CzNetwork {
   match network {
     Some(network) => network.handle.as_network(),
     None => ffi::cz_no_network(),
+  }
+}
+
+/// A `SnapshotManager?`, as it crosses to Swift.
+fn snapshots_crossing(snapshots: Option<image::SnapshotManager>) -> ffi::CzSnapshots {
+  match snapshots {
+    Some(snapshots) => snapshots.handle.as_snapshots(),
+    None => ffi::cz_no_snapshots(),
   }
 }

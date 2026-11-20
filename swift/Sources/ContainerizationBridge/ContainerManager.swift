@@ -14,10 +14,12 @@ extension CzImageStore {
     initfs: RustMount,
     network: CzNetwork,
     rosetta: Bool,
-    nestedVirtualization: Bool
+    nestedVirtualization: Bool,
+    snapshots: CzSnapshots
   ) -> CzOutcome {
     let initfs = Containerization.Mount(initfs)
     let network = network.network
+    let snapshots = snapshots.snapshots
     let store = store
 
     return CzOutcome {
@@ -28,7 +30,8 @@ extension CzImageStore {
           imageStore: store,
           network: network,
           rosetta: rosetta,
-          nestedVirtualization: nestedVirtualization
+          nestedVirtualization: nestedVirtualization,
+          snapshots: snapshots
         )
       )
     }
@@ -39,10 +42,12 @@ extension CzImageStore {
     initfsReference: RustStr,
     network: CzNetwork,
     rosetta: Bool,
-    nestedVirtualization: Bool
+    nestedVirtualization: Bool,
+    snapshots: CzSnapshots
   ) -> CzOutcome {
     let reference = initfsReference.toString()
     let network = network.network
+    let snapshots = snapshots.snapshots
     let store = store
 
     return CzOutcome {
@@ -56,7 +61,8 @@ extension CzImageStore {
             imageStore: store,
             network: network,
             rosetta: rosetta,
-            nestedVirtualization: nestedVirtualization
+            nestedVirtualization: nestedVirtualization,
+            snapshots: snapshots
           )
         }
       )
@@ -71,11 +77,13 @@ func containerManagerAtRoot(
   root: RustString?,
   network: CzNetwork,
   rosetta: Bool,
-  nestedVirtualization: Bool
+  nestedVirtualization: Bool,
+  snapshots: CzSnapshots
 ) -> CzOutcome {
   let initfs = Containerization.Mount(initfs)
   let root = root.map { URL(filePath: $0.toString()) }
   let network = network.network
+  let snapshots = snapshots.snapshots
 
   return CzOutcome {
     CzContainerManager(
@@ -85,7 +93,8 @@ func containerManagerAtRoot(
         root: root,
         network: network,
         rosetta: rosetta,
-        nestedVirtualization: nestedVirtualization
+        nestedVirtualization: nestedVirtualization,
+        snapshots: snapshots
       )
     )
   }
@@ -97,11 +106,13 @@ func containerManagerAtRoot(
   root: RustString?,
   network: CzNetwork,
   rosetta: Bool,
-  nestedVirtualization: Bool
+  nestedVirtualization: Bool,
+  snapshots: CzSnapshots
 ) -> CzOutcome {
   let reference = initfsReference.toString()
   let root = root.map { URL(filePath: $0.toString()) }
   let network = network.network
+  let snapshots = snapshots.snapshots
 
   return CzOutcome {
     let kernel = try Kernel(kernel)
@@ -114,18 +125,20 @@ func containerManagerAtRoot(
           root: root,
           network: network,
           rosetta: rosetta,
-          nestedVirtualization: nestedVirtualization
+          nestedVirtualization: nestedVirtualization,
+          snapshots: snapshots
         )
       }
     )
   }
 }
 
-func containerManager(vmm: CzVirtualMachineManager, network: CzNetwork) -> CzOutcome {
+func containerManager(vmm: CzVirtualMachineManager, network: CzNetwork, snapshots: CzSnapshots) -> CzOutcome {
   let vmm = vmm.manager
   let network = network.network
+  let snapshots = snapshots.snapshots
 
-  return CzOutcome { CzContainerManager(try ContainerManager(vmm: vmm, network: network)) }
+  return CzOutcome { CzContainerManager(try ContainerManager(vmm: vmm, network: network, snapshots: snapshots)) }
 }
 
 /// The manager's configuration closure, as `configuring` makes it.
@@ -179,6 +192,11 @@ final class CzContainerManager: @unchecked Sendable {
 
   func imageStore() -> CzImageStore {
     CzImageStore(manager.imageStore)
+  }
+
+  /// Holds a `CzSnapshotManager`, or `Absent` for `nil`.
+  func snapshots() -> CzOutcome {
+    CzOutcome.holding(manager.snapshots.map(CzSnapshotManager.init))
   }
 
   /// `create(_:reference:...)`, with `seed` and `configuration` as in

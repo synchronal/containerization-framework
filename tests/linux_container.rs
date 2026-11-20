@@ -51,6 +51,18 @@ fn creates_and_runs_processes() {
   );
 }
 
+/// Swift set a hostname by its length in characters until 0.57.0, which cut
+/// off the last bytes of a multi-byte one.
+#[test]
+fn sets_a_multi_byte_hostname_in_full() {
+  let hostname = "café-☕";
+  let booted = Container::boot_with("cfw-test-container-hostname", move |configuration| {
+    configuration.hostname = Some(hostname.to_string());
+  });
+
+  assert_eq!(booted.sh("hostname", "hostname").trim(), hostname);
+}
+
 #[test]
 fn boots_from_copies_of_one_unpacked_rootfs() {
   let directory = tempfile::tempdir().expect("a temporary directory");

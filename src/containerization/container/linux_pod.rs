@@ -254,6 +254,17 @@ impl LinuxPod {
     .map(drop)
   }
 
+  /// `LinuxPod.attachVolume(_:)`, which mounts a volume in the running pod
+  /// as [`Self::create`] mounts those in its configuration. Containers mount
+  /// it with [`Mount::shared_mount`], and [`Self::stop`] unmounts it. Swift
+  /// attaches only tmpfs and disk image volumes this way, and refuses a name
+  /// the pod already has.
+  pub fn attach_volume(&self, volume: PodVolume) -> Result<(), Error> {
+    let action = format!("attach volume {} to pod {}", volume.name, self.id());
+
+    platform::outcome(self.handle.attach_volume(volume), action).map(drop)
+  }
+
   /// `LinuxPod.stop()`.
   pub fn stop(&self) -> Result<(), Error> {
     platform::outcome(self.handle.stop(), format!("stop pod {}", self.id())).map(drop)

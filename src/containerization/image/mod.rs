@@ -1,15 +1,18 @@
 //! Images, the store they are kept in, and unpacking them into a root
-//! filesystem. `Image` is here, with its nested `Image.Description`.
+//! filesystem, once per container or once per image as a snapshot. `Image` is
+//! here, with its nested `Image.Description`.
 
 mod ext4_unpacker;
 pub mod image_store;
 mod init_image;
 mod kernel_image;
+pub mod snapshot_manager;
 
 pub use self::ext4_unpacker::EXT4Unpacker;
 pub use self::image_store::ImageStore;
 pub use self::init_image::InitImage;
 pub use self::kernel_image::KernelImage;
+pub use self::snapshot_manager::SnapshotManager;
 
 use crate::containerization_oci;
 use crate::error::Error;
